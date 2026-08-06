@@ -57,7 +57,10 @@ def get_sidebar_log(u):
 
 def check_login_db(u, p):
     df = conn_gs.read(worksheet="users", ttl=0)
-    user_match = df[(df['username'] == u) & (df['password'] == p)]
+    if df.empty: return None
+    df['username'] = df['username'].astype(str).str.strip()
+    df['password'] = df['password'].astype(str).str.strip()
+    user_match = df[(df['username'] == str(u).strip()) & (df['password'] == str(p).strip())]
     if not user_match.empty: return str(user_match.iloc[0]['role'])
     return None
 
@@ -164,12 +167,11 @@ def update_password_db(u, new_p):
         return True
     return False
 
-# --- 1. ULTRA PRO STYLING (HIGH-END INSTITUTIONAL TERMINAL) ---
+# --- 1. ULTRA PRO STYLING ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800;900&display=swap');
 
-/* ===== GLOBAL APP THEME ===== *//*[cite: 2] */
 .stApp {
     background: #07090f;
     background-image: radial-gradient(circle at 10% 10%, rgba(0, 240, 255, 0.04) 0%, transparent 40%),
@@ -180,140 +182,62 @@ st.markdown("""
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-/* ===== TYPOGRAPHY ===== */
-h1, h2, h3 {
-    font-family: 'Orbitron', sans-serif;
-    letter-spacing: 1px;
-}
+h1, h2, h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
 h1 {
-    font-weight: 900;
-    font-size: 2.2rem;
+    font-weight: 900; font-size: 2.2rem;
     background: linear-gradient(135deg, #00f0ff 0%, #78ff00 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     text-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
 }
 h2, h3 { color: #00f0ff; font-weight: 800; }
 
-/* ===== LOGIN FORM STYLING ===== */
 div[data-testid="stForm"] {
     background: rgba(13, 18, 30, 0.85) !important;
     border: 1px solid rgba(0, 240, 255, 0.25) !important;
     border-top: 3px solid #00f0ff !important;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 35px !important;
-    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+    border-radius: 16px; padding: 35px !important; backdrop-filter: blur(20px);
 }
 div[data-testid="stForm"] label p {
-    font-family: 'Orbitron', sans-serif !important;
-    color: #78ff00 !important;
-    font-size: 0.75rem !important;
-    letter-spacing: 2px;
+    font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.75rem !important; letter-spacing: 2px;
 }
 div[data-testid="stForm"] input {
     background: rgba(3, 6, 12, 0.8) !important;
     border: 1px solid rgba(0, 240, 255, 0.2) !important;
-    color: #00f0ff !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    border-radius: 8px;
-    height: 48px;
-}
-div[data-testid="stForm"] input:focus {
-    border-color: #78ff00 !important;
-    box-shadow: 0 0 15px rgba(120, 255, 0, 0.2);
+    color: #00f0ff !important; font-family: 'JetBrains Mono', monospace !important;
+    border-radius: 8px; height: 48px;
 }
 
-/* ===== CONTAINERS, CARDS & METRICS ===== */
 div[data-testid="stMetric"], .stDataFrame, .stTabs, div[data-testid="stExpander"] {
     background: rgba(13, 18, 30, 0.7) !important;
     border: 1px solid rgba(255, 255, 255, 0.07) !important;
-    border-radius: 12px !important;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border-radius: 12px !important; backdrop-filter: blur(12px);
 }
-[data-testid="stMetricValue"] {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 1.8rem !important;
-    color: #78ff00 !important;
-    font-weight: 700;
-}
-[data-testid="stMetricLabel"] { 
-    color: #94a3b8 !important; 
-    font-weight: 600; 
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-}
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #78ff00 !important; }
+[data-testid="stMetricLabel"] { color: #94a3b8 !important; font-weight: 600; text-transform: uppercase; font-size: 0.8rem; }
 
-/* ===== SIDEBAR NAVIGATION ===== */
-[data-testid="stSidebar"] {
-    background: #090d16;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-}
-[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
-    color: #00f0ff !important; 
-    font-family: 'Orbitron', sans-serif !important;
-    text-transform: uppercase; 
-    letter-spacing: 2px; 
-    font-weight: bold;
-}
+[data-testid="stSidebar"] { background: #090d16; border-right: 1px solid rgba(255, 255, 255, 0.05); }
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-    background: rgba(255, 255, 255, 0.01) !important; 
-    border: 1px solid rgba(255, 255, 255, 0.03) !important;
-    border-radius: 8px !important; 
-    padding: 12px 16px !important; 
-    margin-bottom: 6px !important;
-    display: flex !important; 
-    align-items: center !important; 
-    min-height: 44px !important;
-    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.01) !important; border: 1px solid rgba(255, 255, 255, 0.03) !important;
+    border-radius: 8px !important; padding: 12px 16px !important; margin-bottom: 6px !important;
 }
 div[data-testid="stSidebar"] .stRadio label p {
-    font-family: 'Orbitron', sans-serif !important; 
-    font-size: 0.75rem !important;
-    color: #64748b !important; 
-    display: block !important; 
-    letter-spacing: 1.5px;
-    font-weight: 600;
+    font-family: 'Orbitron', sans-serif !important; font-size: 0.75rem !important; color: #64748b !important; letter-spacing: 1.5px;
 }
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {
     background: linear-gradient(90deg, rgba(0, 240, 255, 0.12), rgba(120, 255, 0, 0.05)) !important;
-    border: 1px solid rgba(0, 240, 255, 0.4) !important;
-    border-left: 4px solid #78ff00 !important;
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.4) !important; border-left: 4px solid #78ff00 !important;
 }
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p {
-    color: #ffffff !important; 
-    text-shadow: 0 0 8px rgba(120, 255, 0, 0.6);
-}
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label div:first-child { display: none !important; }
+div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p { color: #ffffff !important; }
 
-/* ===== BUTTON SYSTEM ===== */
 .stButton>button {
     background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(120, 255, 0, 0.15));
-    border: 1px solid rgba(0, 240, 255, 0.4);
-    color: #78ff00 !important;
-    border-radius: 8px;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 700;
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0, 240, 255, 0.4); color: #78ff00 !important;
+    border-radius: 8px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.8rem;
 }
 .stButton>button:hover {
-    background: linear-gradient(135deg, #00f0ff, #78ff00);
-    color: #07090f !important;
-    border-color: #78ff00;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 240, 255, 0.4);
+    background: linear-gradient(135deg, #00f0ff, #78ff00); color: #07090f !important;
 }
-
-/* Custom Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #07090f; }
-::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.2); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #00f0ff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -324,7 +248,7 @@ if "auth" not in st.session_state:
 if not st.session_state["auth"]["logged_in"]:
     _, col2, _ = st.columns([1,1.5,1])
     with col2:
-        st.markdown("<div style='text-align:center; padding:40px 0;'><h1 style='font-size:2.8rem; margin-bottom:0;'>IDX TERMINAL</h1><p style='color:#00f0ff; letter-spacing:6px; font-family:Orbitron; font-size:0.8rem; margin-top:10px;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:40px 0;'><h1 style='font-size:2.8rem; margin-bottom:0;'>IDX TERMINAL</h1><p style='color:#00f0ff; letter-spacing:6px; font-family:Orbitron; font-size:0.8rem;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             u = st.text_input("NODE ID").strip()
             p = st.text_input("ACCESS KEY", type="password")
@@ -395,8 +319,12 @@ def run_scan(tickers, mode):
 
             if chg < min_chg or val_tr < min_val: continue
 
-            df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-            atr_val = df['ATR'].iloc[-1] if not pd.isna(df['ATR'].iloc[-1]) else c_now * 0.03
+            tr1 = df['High'] - df['Low']
+            tr2 = (df['High'] - df['Close'].shift()).abs()
+            tr3 = (df['Low'] - df['Close'].shift()).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr_val = tr.rolling(14).mean().iloc[-1]
+            if pd.isna(atr_val): atr_val = c_now * 0.03
                 
             results.append({
                 "TICKER": t.replace(".JK", ""), "LAST": int(c_now), "CHG%": round(chg, 2),
@@ -416,8 +344,8 @@ def get_trend_signals(ticker_list):
         try:
             df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
             if df.empty: continue
-            df['MA20'] = ta.sma(df['Close'], length=20)
-            df['MA50'] = ta.sma(df['Close'], length=50)
+            df['MA20'] = df['Close'].rolling(20).mean()
+            df['MA50'] = df['Close'].rolling(50).mean()
             last_ma20, last_ma50 = df['MA20'].iloc[-1], df['MA50'].iloc[-1]
             prev_ma20, prev_ma50 = df['MA20'].iloc[-2], df['MA50'].iloc[-2]
             current_price = df['Close'].iloc[-1]
@@ -464,9 +392,9 @@ user_now = st.session_state["auth"]["user"]
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:16px; border:1px solid rgba(0, 240, 255, 0.2); border-radius:12px; background:rgba(13, 18, 30, 0.9); margin-bottom:15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);'>
+    <div style='padding:16px; border:1px solid rgba(0, 240, 255, 0.2); border-radius:12px; background:rgba(13, 18, 30, 0.9); margin-bottom:15px;'>
         <h3 style='margin:0; color:#00f0ff; font-family:Orbitron; font-size:1rem;'>{user_now.upper()}</h3>
-        <p style='margin:0; font-size:9px; color:#78ff00; font-family:Orbitron; letter-spacing:1px; margin-top:4px;'>NODE ACTIVE | {role.upper()}</p>
+        <p style='margin:0; font-size:9px; color:#78ff00; font-family:Orbitron; margin-top:4px;'>NODE ACTIVE | {role.upper()}</p>
         <hr style='border:0.1px solid rgba(255,255,255,0.08); margin:10px 0;'>
         <p style='font-size:9px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LST: {last_l}</p>
         <p style='font-size:9px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>IP : {ip_l}</p>
@@ -520,8 +448,8 @@ if menu == "SCANNER":
             
             if not c_data.empty:
                 c_data.columns = [c[0] if isinstance(c, tuple) else c for c in c_data.columns]
-                c_data['MA20'] = ta.sma(c_data['Close'], length=20)
-                c_data['MA50'] = ta.sma(c_data['Close'], length=50)
+                c_data['MA20'] = c_data['Close'].rolling(20).mean()
+                c_data['MA50'] = c_data['Close'].rolling(50).mean()
                 
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
                 fig.add_trace(go.Candlestick(x=c_data.index, open=c_data['Open'], high=c_data['High'], low=c_data['Low'], close=c_data['Close'], name='Price'), row=1, col=1)
