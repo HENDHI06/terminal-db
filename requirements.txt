@@ -2,7 +2,6 @@ streamlit
 yfinance
 pandas
 numpy==1.26.4
-pandas-ta
 plotly
 openpyxl
 requests
