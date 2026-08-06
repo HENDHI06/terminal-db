@@ -1,10 +1,10 @@
 streamlit
 yfinance
 pandas
+git+https://github.com/twopirllc/pandas-ta.git
 plotly
-feedparser
-pytz
-requests
 openpyxl
-pandas-ta
+requests
+pytz
 st-gsheets-connection
+feedparser
