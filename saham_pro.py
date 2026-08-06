@@ -23,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- THEME STATE MANAGER ---
+# --- THEME STATE MANAGER (DINAMIS) ---
 if "theme" not in st.session_state:
     st.session_state.theme = "Dark"
 
@@ -34,18 +34,21 @@ if st.session_state.theme == "Light":
     :root {
         --bg-main: #f8fafc;
         --text-main: #0f172a;
-        --card-bg: rgba(255, 255, 255, 0.95);
-        --input-bg: rgba(241, 245, 249, 0.8);
-        --border-color: rgba(15, 23, 42, 0.15);
-        --metric-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.9));
-        --sidebar-bg: #ffffff;
+        --card-bg: #ffffff;
+        --input-bg: #f1f5f9;
+        --border-color: #cbd5e1;
+        --metric-bg: linear-gradient(145deg, #ffffff, #f8fafc);
+        --sidebar-bg: #f1f5f9;
         --accent-text: #0284c7;
-        --sub-text: #64748b;
-        --menu-active-bg: rgba(2, 132, 199, 0.15);
-        --menu-active-border: rgba(2, 132, 199, 0.6);
+        --sub-text: #475569;
+        --menu-active-bg: #e0f2fe;
+        --menu-active-border: #0284c7;
+        --success-text: #16a34a;
+        --danger-text: #dc2626;
     }
     </style>
     """, unsafe_allow_html=True)
+    t_template, t_accent, t_success, t_danger = "plotly_white", "#0284c7", "#16a34a", "#dc2626"
 else:
     st.markdown("""
     <style>
@@ -59,13 +62,16 @@ else:
         --sidebar-bg: #050810;
         --accent-text: #00f0ff;
         --sub-text: #94a3b8;
-        --menu-active-bg: rgba(0, 240, 255, 0.2);
+        --menu-active-bg: rgba(0, 240, 255, 0.15);
         --menu-active-border: rgba(0, 240, 255, 0.6);
+        --success-text: #78ff00;
+        --danger-text: #ff4b4b;
     }
     </style>
     """, unsafe_allow_html=True)
+    t_template, t_accent, t_success, t_danger = "plotly_dark", "#00f0ff", "#78ff00", "#ff4b4b"
 
-# --- CSS UTAMA MENGGUNAKAN VARIABEL ---
+# --- CSS UTAMA WALLET (MENGGUNAKAN VARIABEL) ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800;900&display=swap');
@@ -81,7 +87,7 @@ header {background: transparent !important;}
 h1, h2, h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
 h1 {
     font-weight: 800; font-size: 1.6rem;
-    background: linear-gradient(135deg, #00f0ff 0%, #78ff00 100%);
+    background: linear-gradient(135deg, var(--accent-text) 0%, var(--success-text) 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 h2 { color: var(--accent-text); font-weight: 700; font-size: 1.2rem; margin-bottom: 20px;}
@@ -90,19 +96,19 @@ div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame {
     background: var(--card-bg) !important;
     border: 1px solid var(--border-color) !important;
     border-top: 3px solid var(--accent-text) !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
     border-radius: 20px !important; 
     padding: 15px !important; backdrop-filter: blur(15px);
     margin-bottom: 15px;
 }
 
 div[data-testid="stForm"] label p, div[data-testid="stExpander"] label p {
-    font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.7rem !important;
+    font-family: 'Orbitron', sans-serif !important; color: var(--text-main) !important; font-size: 0.75rem !important; font-weight: bold;
 }
 div[data-testid="stForm"] input {
     background: var(--input-bg) !important;
     border: 1px solid var(--border-color) !important;
-    color: var(--accent-text) !important; font-family: 'JetBrains Mono', monospace !important;
+    color: var(--text-main) !important; font-family: 'JetBrains Mono', monospace !important;
     border-radius: 12px; height: 50px; font-size: 16px;
 }
 
@@ -111,29 +117,28 @@ div[data-testid="stMetric"] {
     border: 1px solid var(--border-color) !important;
     border-radius: 20px !important; backdrop-filter: blur(10px);
     padding: 20px !important; text-align: center;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
 }
-[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.6rem !important; color: #78ff00 !important; }
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.6rem !important; color: var(--success-text) !important; }
 [data-testid="stMetricLabel"] { color: var(--sub-text) !important; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
-[data-testid="stSidebar"] { background: var(--sidebar-bg); }
+[data-testid="stSidebar"] { background: var(--sidebar-bg); border-right: 1px solid var(--border-color); }
 
-/* ==== SOLUSI MENU HP: BIG TOUCH TARGET ==== */
+/* ==== SOLUSI MENU HP: FAT BUTTONS ==== */
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
     background: var(--card-bg) !important; 
     border: 1px solid var(--border-color) !important;
     border-radius: 16px !important; 
-    padding: 16px 20px !important; /* Padding besar empuk dipencet */
-    margin-bottom: 10px !important; /* Jarak antar tombol renggang */
+    padding: 16px 20px !important; 
+    margin-bottom: 8px !important; 
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03);
 }
-/* Hilangkan Bulatan Radio Default Streamlit */
 div[data-testid="stSidebar"] .stRadio [data-baseweb="radio"] { display: none !important; }
 div[data-testid="stSidebar"] .stRadio label p {
     font-family: 'Orbitron', sans-serif !important; 
-    font-size: 0.85rem !important; /* Teks menu besar */
+    font-size: 0.85rem !important; 
     color: var(--text-main) !important;
     margin: 0 !important; padding: 0 !important; width: 100%; text-align: center; font-weight: 600;
 }
@@ -144,30 +149,21 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p { color: var(--text-main) !important; font-weight: 800; }
 
 .stButton>button {
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(120, 255, 0, 0.15));
-    border: 1px solid rgba(0, 240, 255, 0.5); color: #78ff00 !important;
+    background: var(--card-bg);
+    border: 1px solid var(--accent-text); color: var(--accent-text) !important;
     border-radius: 50px !important; /* Pill Shaped */
     font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.85rem;
-    min-height: 52px; width: 100%; box-shadow: 0 6px 15px rgba(0, 240, 255, 0.1);
+    min-height: 52px; width: 100%; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease;
 }
-.stButton>button:active { transform: scale(0.95); background: linear-gradient(135deg, #00f0ff, #78ff00); color: #000 !important; }
+.stButton>button:active { transform: scale(0.95); background: var(--accent-text); color: var(--bg-main) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# --- DATABASE & LOGIC FUNGSI (TIDAK ADA PERUBAHAN) ---
+# --- DATABASE & LOGIC ---
 def get_visitor_info():
-    providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
-    for url in providers:
-        try:
-            response = requests.get(url, timeout=3).json()
-            ip = response.get('ip') or response.get('query', 'Unknown')
-            city = response.get('city', 'Unknown')
-            region = response.get('region', 'Unknown') or response.get('regionName', 'Unknown')
-            if ip != 'Unknown': return ip, f"{city}, {region}"
-        except: continue
     return "Mobile Node", "Cloud"
 
 def update_login_info(u):
@@ -414,16 +410,16 @@ def get_trend_signals(ticker_list):
             current_price = df['Close'].iloc[-1]
             
             if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
-                signals.append({"ticker": ticker.replace(".JK", ""), "status": "GOLDEN CROSS", "price": current_price, "color": "#78ff00"})
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": "GOLDEN CROSS", "price": current_price, "color": "var(--success-text)"})
             elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
-                signals.append({"ticker": ticker.replace(".JK", ""), "status": "DEAD CROSS", "price": current_price, "color": "#ff4b4b"})
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": "DEAD CROSS", "price": current_price, "color": "var(--danger-text)"})
         except: continue
     return signals
 
 def draw_mobile_cards(df):
     for _, row in df.iterrows():
         chg = row.get('CHG%', 0)
-        chg_color = "#78ff00" if chg > 0 else "#ff4b4b"
+        chg_color = "var(--success-text)" if chg > 0 else "var(--danger-text)"
         val_last  = row.get('LAST', '-')
         val_entry = row.get('ENTRY', row.get('Entry', val_last)) 
         val_tp1   = row.get('TP 1', '-')
@@ -432,7 +428,7 @@ def draw_mobile_cards(df):
 
         st.markdown(f"""
         <div style="background: var(--card-bg); border: 1px solid var(--border-color); 
-                    border-radius: 20px; padding: 18px; margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                    border-radius: 20px; padding: 18px; margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                 <b style="font-size: 1.3rem; color: var(--accent-text); font-family: Orbitron;">{row.get('TICKER','-')}</b>
                 <div style="text-align: right;">
@@ -441,14 +437,14 @@ def draw_mobile_cards(df):
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 15px; font-size: 0.75rem; text-align: center;">
-                <div style="background: rgba(0,0,0,0.1); padding: 8px; border-radius: 12px;">
-                    <div style="color: var(--sub-text);">ENTRY</div><b style="color:#0284c7;">{val_entry}</b>
+                <div style="background: var(--input-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--sub-text);">ENTRY</div><b style="color:var(--accent-text);">{val_entry}</b>
                 </div>
-                <div style="background: rgba(120,255,0,0.1); padding: 8px; border-radius: 12px;">
-                    <div style="color: var(--sub-text);">TARGET</div><b style="color:#22c55e;">{val_tp1}</b>
+                <div style="background: var(--input-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--sub-text);">TARGET</div><b style="color:var(--success-text);">{val_tp1}</b>
                 </div>
-                <div style="background: rgba(255,75,75,0.1); padding: 8px; border-radius: 12px;">
-                    <div style="color: var(--sub-text);">CUTLOSS</div><b style="color:#ef4444;">{val_cl}</b>
+                <div style="background: var(--input-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div style="color: var(--sub-text);">CUTLOSS</div><b style="color:var(--danger-text);">{val_cl}</b>
                 </div>
             </div>
         </div>
@@ -460,13 +456,13 @@ user_now = st.session_state.user
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:18px; border:none; border-radius:20px; background:var(--card-bg); margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1); text-align:center;'>
+    <div style='padding:18px; border:1px solid var(--border-color); border-radius:20px; background:var(--card-bg); margin-bottom:15px; text-align:center;'>
         <h3 style='margin:0; color:var(--accent-text); font-family:Orbitron; font-size:1.1rem;'>{user_now.upper()}</h3>
-        <p style='margin:0; font-size:9px; color:#78ff00; font-family:Orbitron; margin-top:4px;'>WALLET SECURED | {role.upper()}</p>
+        <p style='margin:0; font-size:9px; color:var(--success-text); font-family:Orbitron; margin-top:4px;'>WALLET SECURED | {role.upper()}</p>
     </div>
     """, unsafe_allow_html=True)
 
-# SAKELAR TEMA GELAP/TERANG DI SIDEBAR
+# SAKELAR TEMA GELAP/TERANG
 c_dark, c_light = st.sidebar.columns(2)
 if c_dark.button("🌙 GELAP"):
     st.session_state.theme = "Dark"
@@ -495,53 +491,69 @@ if st.sidebar.button("🔒 KUNCI WALLET", use_container_width=True):
     st.rerun()
 
 
-# --- 5. CONTENT AREA DENGAN JADWAL EKSEKUSI ---
+# --- 5. CONTENT AREA ---
 
 if menu == "SCANNER":
     st.title("🛰️ AUTO SCANNER")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **09:15 - 10:00 WIB:** Untuk cari saham momentum yang meloncat di awal sesi buka.
+        **🕒 WAKTU TERBAIK:**
+        * **09:15 - 10:00 WIB:** Cari saham momentum di awal sesi.
         * **15:30 - 15:50 WIB:** Saat *Pre-Closing* untuk di-hold (swing) ke esok hari.
         
         **CARA BACA:**
         * **AI Score:** Kekuatan momentum (Makin tinggi makin kuat).
-        * **TP 1 & TP 2 (Take Profit):** Antre jual di harga ini untuk merealisasikan untung.
-        * **EXIT/CL (Stop Loss):** Disiplin! Jual rugi jika harga sentuh level ini.
+        * **TP 1 & TP 2 (Take Profit):** Antre jual di harga ini untuk bungkus cuan bertahap.
+        * **EXIT/CL (Stop Loss):** Disiplin! Jual rugi jika sentuh level ini agar modal aman.
         """)
 
     if 'results' not in st.session_state: st.session_state.results = None
     tickers = load_tickers()
     
-    mode_scan = st.radio("PILIH MODE SENSITIVITAS:", ["Santai", "Profesional", "Pro"], horizontal=True, label_visibility="collapsed")
+    mode_scan = st.radio("SENSITIVITAS:", ["Santai", "Profesional", "Pro"], horizontal=True, label_visibility="collapsed")
     if st.button("⚡ MULAI SCAN PASAR", use_container_width=True):
         res = run_scan(tickers, mode_scan)
         if not res.empty: st.session_state.results = res; st.rerun()
-        else: st.warning("Scan selesai: Belum ada saham yang memenuhi kriteria kuat saat ini.")
+        else: st.warning("Belum ada saham yang memenuhi kriteria kuat saat ini.")
 
     if st.session_state.results is not None:
         df = st.session_state.results
         st.markdown(f"""
-        <div style='background: var(--card-bg); padding:12px; border-left:4px solid #00f0ff; margin-bottom:15px; border-radius:0 10px 10px 0;'>
+        <div style='background: var(--card-bg); padding:12px 18px; border-left:4px solid var(--accent-text); margin-bottom:15px; border-radius:0 15px 15px 0; border: 1px solid var(--border-color);'>
             <span style='color:var(--accent-text); font-family:Orbitron; font-weight:bold; font-size:0.8rem;'>🧠 QUANT AI STATUS: COMPLETE</span><br>
-            <span style='font-size:0.75rem; color:var(--sub-text);'>📊 PROCESSED: {len(df)} STOCKS ANALYZED</span>
+            <span style='font-size:0.75rem; color:var(--text-main);'>📊 PROCESSED: {len(df)} STOCKS ANALYZED</span>
         </div>
         """, unsafe_allow_html=True)
-        tab1, tab2 = st.tabs(["📱 KARTU SAHAM", "📊 TABEL DATA"])
+        tab1, tab2, tab3 = st.tabs(["📱 KARTU SAHAM", "📊 TABEL DATA", "📈 CHART"])
         with tab1: draw_mobile_cards(df)
         with tab2: st.dataframe(df.drop(columns=['FULL'], errors='ignore'), use_container_width=True, hide_index=True)
+        with tab3:
+            sel_t = st.selectbox("PILIH SAHAM", df['TICKER'].tolist())
+            full_t = df[df['TICKER'] == sel_t]['FULL'].values[0]
+            c_data = yf.download(full_t, period="6mo", interval="1d", progress=False)
+            if not c_data.empty:
+                c_data.columns = [c[0] if isinstance(c, tuple) else c for c in c_data.columns]
+                c_data['MA20'] = c_data['Close'].rolling(20).mean()
+                c_data['MA50'] = c_data['Close'].rolling(50).mean()
+                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
+                fig.add_trace(go.Candlestick(x=c_data.index, open=c_data['Open'], high=c_data['High'], low=c_data['Low'], close=c_data['Close'], name='Price'), row=1, col=1)
+                fig.add_trace(go.Scatter(x=c_data.index, y=c_data['MA20'], line=dict(color=t_accent, width=1.5), name='MA 20'), row=1, col=1)
+                fig.add_trace(go.Scatter(x=c_data.index, y=c_data['MA50'], line=dict(color=t_success, width=1.5), name='MA 50'), row=1, col=1)
+                colors = [t_success if row['Close'] >= row['Open'] else t_danger for index, row in c_data.iterrows()]
+                fig.add_trace(go.Bar(x=c_data.index, y=c_data['Volume'], marker_color=colors, name='Volume'), row=2, col=1)
+                fig.update_layout(template=t_template, height=450, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "STRATEGY SCANNER":
     st.title("⚡ STRATEGY SCANNER")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **16:00 WIB ke atas (Bursa Tutup):** Sinyal *Moving Average* dihitung paling akurat menggunakan harga penutupan final bursa.
+        **🕒 WAKTU TERBAIK:**
+        * **16:00 WIB ke atas (Bursa Tutup):** Sinyal garis rata-rata (Moving Average) paling akurat menggunakan harga penutupan.
         
         **CARA BACA:**
-        * 🟢 **Golden Cross:** Harga rata-rata memotong ke atas. Tren menguat, peluang *Buy*.
-        * 🔴 **Dead Cross:** Tren melemah. Siap-siap amankan posisi.
+        * 🟢 **Golden Cross:** Tren naik menguat, bagus untuk cicil *Buy*.
+        * 🔴 **Dead Cross:** Tren melemah, siap-siap amankan *Profit* / *Cut Loss*.
         """)
     
     try:
@@ -555,17 +567,17 @@ elif menu == "STRATEGY SCANNER":
             results = get_trend_signals(watchlist)
             if results:
                 for res in results:
-                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: var(--card-bg); padding: 18px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}!</h3><p style='margin:6px 0 0 0; color:var(--text-main); font-size:0.9rem;'>{res['ticker']} <span style='color:var(--sub-text);'>| Last: Rp {res['price']:,.0f}</span></p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='border: 1px solid var(--border-color); background: var(--card-bg); padding: 18px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid {res['color']};'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}!</h3><p style='margin:6px 0 0 0; color:var(--text-main); font-size:0.9rem;'>{res['ticker']} <span style='color:var(--sub-text);'>| Last: Rp {res['price']:,.0f}</span></p></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada sinyal saat ini.")
 
 elif menu == "WATCHLIST":
     st.title("⭐ WATCHLIST FAVORIT")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Bebas kapan saja selama jam bursa (09:00 - 16:00 WIB).
+        **🕒 WAKTU TERBAIK:**
+        * Bebas kapan saja selama jam bursa beroperasi.
         
-        Masukkan kode saham incaranmu ke keranjang ini. Klik tombol **SCAN** untuk memantau apakah ada dari mereka yang sedang membentuk momentum bagus hari ini.
+        **FUNGSI:** Masukkan kode saham incaranmu ke keranjang ini. Klik tombol **SCAN WATCHLIST** untuk memantau khusus saham favoritmu saja.
         """)
         
     my_wl = get_watchlist(user_now)
@@ -591,14 +603,14 @@ elif menu == "WATCHLIST":
 
 elif menu == "FUNDAMENTAL":
     st.title("📟 CEK FUNDAMENTAL")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Akhir pekan (Sabtu/Minggu) atau malam hari untuk reset portofolio investasi jangka panjang.
+        **🕒 WAKTU TERBAIK:**
+        * Akhir pekan (Sabtu/Minggu) saat santai untuk mencari saham investasi jangka panjang.
         
         **CARA BACA:**
         * **Graham Value:** Harga wajar ideal perusahaan. Jika harga pasar lebih murah, saham status *Undervalued*.
-        * **Z-Score:** Menilai tingkat keamanan finansial (> 2.9 = Sangat Sehat, < 1.8 = Rawan Utang).
+        * **Z-Score:** Menilai tingkat keamanan finansial (> 2.9 = Sangat Aman, < 1.8 = Rawan Utang/Bangkrut).
         """)
     
     with st.form("f_fund"):
@@ -620,18 +632,18 @@ elif menu == "FUNDAMENTAL":
                 c2.metric("ROE (Profitabilitas)", f"{roe:.1f}%")
 
                 status = 'BAWAH HARGA WAJAR (MURAH) 🟢' if current_price < graham else 'ATAS HARGA WAJAR (MAHAL) 🔴'
-                st.markdown(f"<div style='background:var(--card-bg); padding:18px; border-radius:20px; border:1px solid var(--border-color); text-align:center;'><p style='color:var(--sub-text); font-size:11px; margin:0; font-weight:bold;'>ESTIMASI HARGA WAJAR</p><h2 style='color:var(--accent-text); margin:5px 0;'>Rp {graham:,.0f}</h2><p style='font-size:11px; color:var(--text-main); margin:0;'>{status}</p></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background:var(--card-bg); padding:20px; border-radius:20px; border:1px solid var(--border-color); text-align:center;'><p style='color:var(--sub-text); font-size:12px; margin:0; font-weight:bold;'>ESTIMASI HARGA WAJAR</p><h2 style='color:var(--accent-text); margin:8px 0;'>Rp {graham:,.0f}</h2><p style='font-size:12px; color:var(--text-main); font-weight:bold; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
             except Exception as e: st.error("Data tidak ditemukan.")
 
 elif menu == "TICKER COMPARISON":
     st.title("⚔️ ADU SAHAM (BATTLE)")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Kapan pun (Sangat cocok digunakan saat ingin memilih di antara 2 saham di sektor yang sama).
+        **🕒 WAKTU TERBAIK:**
+        * Kapan pun (Sangat cocok saat kamu bingung mau pilih saham A atau saham B di sektor yang sama).
         
         **CARA BACA:** 
-        Bandingkan secara Head-to-Head. Pilih saham yang memiliki **PE & PBV lebih kecil** (lebih murah) tetapi **ROE lebih besar** (mencetak laba lebih besar).
+        Bandingkan Head-to-Head. Pilih saham yang memiliki **PE & PBV lebih kecil** (Valuasi Murah) tetapi **ROE lebih besar** (Cetak Laba Kuat).
         """)
         
     with st.form("f_battle"):
@@ -655,14 +667,14 @@ elif menu == "TICKER COMPARISON":
 
 elif menu == "SECTOR HEATMAP":
     st.title("🌐 PETA SEKTOR")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **15:30 WIB:** Melihat ke arah mana uang besar (Big Fund) berotasi untuk persiapan esok hari.
+        **🕒 WAKTU TERBAIK:**
+        * **15:30 WIB:** Melihat ke arah mana uang besar (Big Fund) berotasi.
         
         **CARA BACA:**
-        * **Balok Positif (Kanan):** Sektor sedang disuntik dana besar (*inflow*). Cocok untuk mencari saham memompa tren.
-        * **Balok Negatif (Kiri):** Sektor dihindari pasar, jauhi untuk trading harian.
+        * **Balok Positif (Kanan):** Sektor disuntik dana besar (*inflow*). Cocok cari saham di sektor ini.
+        * **Balok Negatif (Kiri):** Sektor dihindari pasar, jauhi sementara.
         """)
     
     sectors = {
@@ -694,18 +706,19 @@ elif menu == "SECTOR HEATMAP":
             
             if sector_data:
                 df_sec = pd.DataFrame(sector_data).sort_values(by="Perubahan %", ascending=False)
-                fig = px.bar(df_sec, y="Sektor", x="Perubahan %", orientation='h', color="Perubahan %", color_continuous_scale=["#ef4444", "#94a3b8", "#22c55e"])
-                fig.update_layout(template="plotly_dark", height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                fig = px.bar(df_sec, y="Sektor", x="Perubahan %", orientation='h', color="Perubahan %", color_continuous_scale=[t_danger, "#94a3b8", t_success])
+                fig.update_layout(template=t_template, height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "RISK CALCULATOR":
     st.title("🧮 KALKULATOR RISIKO")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **WAJIB** digunakan sebelum menekan tombol beli (*Buy*) di aplikasi Brokermu.
+        **🕒 WAKTU TERBAIK:**
+        * **WAJIB** digunakan sebelum kamu menekan tombol *Buy* di aplikasi Sekuritasmu.
         
-        Fitur ini menghitung rasio aman uangmu. Disarankan batasi Maksimal Kerugian per Trade di angka **1% hingga 2%** dari total uang portofolio.
+        **FUNGSI:**
+        Kalkulator ini menghitung **Berapa Lot maksimal** yang boleh kamu beli agar modalmu tidak hancur jika terpaksa *Cut Loss*. (Disarankan risiko 1-2% dari modal).
         """)
     
     with st.form("risk_calc_form"):
@@ -727,17 +740,17 @@ elif menu == "RISK CALCULATOR":
             
             st.markdown("### 🎯 KESIMPULAN BELI:")
             c1, c2 = st.columns(2)
-            c1.metric("JUMLAH AMAN (LOT)", f"{total_lots:,} Lot")
+            c1.metric("BELI MAKSIMAL", f"{total_lots:,} Lot")
             c2.metric("UANG TERPAKAI", f"Rp {actual_inv:,.0f}")
 
 elif menu == "DIVIDEND TRACKER":
     st.title("💰 PEMBURU DIVIDEN")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Kapan saja untuk mencari saham-saham tabungan.
+        **🕒 WAKTU TERBAIK:**
+        * Kapan saja untuk mencari pasif *income* dari saham.
         
-        Bandingkan *Dividend Yield* (Persentase Bunga). Bunga deposito bank sekitar 4% setahun. Jika Yield saham berada di atas 5-6%, itu adalah tambang emas untuk ditahan lama!
+        **CARA BACA:** Bunga deposito bank hanya sekitar 4% setahun. Jika *Yield* saham berada di atas 5-6%, itu sangat menguntungkan!
         """)
         
     with st.form("f_div"):
@@ -754,19 +767,19 @@ elif menu == "DIVIDEND TRACKER":
                 df.columns = ['Tanggal', 'Nominal (Rp)']
                 df['Tanggal'] = pd.to_datetime(df['Tanggal']).dt.strftime('%Y-%m-%d')
                 st.dataframe(df.sort_values(by='Tanggal', ascending=False).head(10), use_container_width=True, hide_index=True)
-            else: st.info("Emiten jarang membagikan dividen.")
+            else: st.info("Belum ada data dividen.")
         except: st.error("Data tidak ditemukan.")
 
 elif menu == "CORRELATION MATRIX":
     st.title("🧬 CEK KORELASI SAHAM")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Saat ingin mengatur ulang susunan isi portofolio saham (Akhir Pekan/Bulan).
+        **🕒 WAKTU TERBAIK:**
+        * Saat mengatur ulang porsi portofolio (Akhir Pekan/Bulan).
         
         **CARA BACA:**
-        * **Biru Tua / Negatif (-1):** Saling mem-*back up*. Jika saham A turun, saham B naik. Bagus untuk memecah risiko.
-        * **Merah Tua / Positif (+1):** Bergerak kembar. Bahaya, jika IHSG rontok, semua sahammu akan merah massal.
+        * **Biru Tua (-1):** Sangat bagus! Jika saham A turun, saham B naik. Bagus untuk memecah risiko.
+        * **Merah Tua (+1):** Saham kembar. Bahaya, jika IHSG rontok, semua sahammu ikut rontok.
         """)
         
     with st.form("f_cor"):
@@ -782,20 +795,20 @@ elif menu == "CORRELATION MATRIX":
                     if isinstance(data_corr.columns, pd.MultiIndex): data_corr.columns = data_corr.columns.get_level_values(0)
                     data_corr.columns = [c.replace(".JK", "") for c in data_corr.columns]
                     fig_corr = px.imshow(data_corr.corr(), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
-                    fig_corr.update_layout(template="plotly_dark", height=350, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    fig_corr.update_layout(template=t_template, height=350, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig_corr, use_container_width=True)
             except: st.error("Format salah atau data gagal ditarik.")
 
 elif menu == "FOREIGN & BROKER FLOW":
     st.title("🏛️ JEJAK BANDAR & ASING")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
+        **🕒 WAKTU TERBAIK:**
         * **Setelah 16:15 WIB:** Di sinilah rekap aktivitas uang bandar harian sudah terekam sempurna.
         
-        **CARA BACA (Chaikin Money Flow):**
-        * **Angka Positif Hijau:** Dana besar sedang memborong (Akumulasi). Potensi harga naik.
-        * **Angka Negatif Merah:** Dana besar cuci gudang (Distribusi). Potensi harga longsor.
+        **CARA BACA:**
+        * **Positif (Hijau):** Dana besar sedang memborong (Akumulasi). Potensi harga naik.
+        * **Negatif (Merah):** Dana besar cuci gudang (Distribusi). Hati-hati harga longsor.
         """)
         
     with st.form("f_ff"):
@@ -813,15 +826,17 @@ elif menu == "FOREIGN & BROKER FLOW":
                     latest = df_ff['CMF_20'].iloc[-1]
                     
                     status = "AKUMULASI (BANDAR MASUK) 🚀" if latest > 0 else "DISTRIBUSI (BANDAR KELUAR) ⚠️"
-                    st.markdown(f"<div style='text-align:center; padding:20px; background:var(--card-bg); border: 2px solid {'#22c55e' if latest>0 else '#ef4444'}; border-radius:20px;'><h2 style='color:{'#22c55e' if latest>0 else '#ef4444'}; margin:0;'>{latest:.3f}</h2><p style='color:var(--text-main); font-weight:bold; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
+                    color_ff = t_success if latest > 0 else t_danger
+                    
+                    st.markdown(f"<div style='text-align:center; padding:20px; background:var(--card-bg); border: 2px solid {color_ff}; border-radius:20px;'><h2 style='color:{color_ff}; margin:0;'>{latest:.3f}</h2><p style='color:var(--text-main); font-weight:bold; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
             except: st.error("Gagal melacak dana.")
 
 elif menu == "MARKET_NEWS":
     st.title("📰 BERITA PASAR")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **08:00 - 08:30 WIB:** Cek berita sebelum bursa buka untuk menakar sentimen hari ini (apakah IHSG akan hijau riang atau panik merah).
+        **🕒 WAKTU TERBAIK:**
+        * **08:00 - 08:30 WIB:** Cek berita sebelum bursa buka untuk menakar sentimen hari ini.
         """)
     
     with st.spinner("Mengambil tajuk berita terbaru..."):
@@ -833,10 +848,10 @@ elif menu == "MARKET_NEWS":
 
 elif menu == "MONEY MANAGEMENT":
     st.title("💼 DOMPET PORTOFOLIO")
-    with st.expander("📖 BUKU PANDUAN & WAKTU EKSEKUSI", expanded=False):
+    with st.expander("📖 PANDUAN & JADWAL EKSEKUSI", expanded=False):
         st.markdown("""
-        **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Sesegera mungkin setelah kamu melakukan transaksi Beli/Jual di aplikasi sekuritasmu agar portofolio di Wallet ini selalu sinkron.
+        **🕒 WAKTU TERBAIK:**
+        * Sesegera mungkin setelah kamu melakukan transaksi Beli/Jual di aplikasi sekuritasmu agar catatan di Wallet ini selalu sinkron (pas/sama persis).
         """)
         
     privacy_mode = st.checkbox("🕶️ Mode Privasi (Sembunyikan Saldo)", value=False)
@@ -861,13 +876,14 @@ elif menu == "MONEY MANAGEMENT":
         df_p[['Live', 'Cost', 'Value', 'P/L']] = df_p.apply(calc_active, axis=1)
         t_inv, t_pl = df_p['Cost'].sum(), df_p['P/L'].sum()
 
+    color_pl = t_success if t_pl >= 0 else t_danger
     st.markdown(f"""
     <div style='background: var(--metric-bg); border:1px solid var(--border-color); border-radius:24px; padding:25px; text-align:center; margin-bottom:20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);'>
         <p style='color:var(--sub-text); font-family:Orbitron; margin:0; font-size:12px; letter-spacing:2px; font-weight:bold;'>TOTAL SALDO INVESTASI</p>
         <h1 style='color:var(--text-main); font-family:JetBrains Mono; font-size:2.2rem; margin:10px 0;'>{format_privacy(t_inv + t_pl)}</h1>
         <div style='display:flex; justify-content:center; gap:20px; margin-top:10px;'>
             <div><span style='color:var(--sub-text); font-size:10px; font-weight:bold;'>MODAL AWAL:</span><br><b style='color:var(--accent-text);'>{format_privacy(t_inv)}</b></div>
-            <div><span style='color:var(--sub-text); font-size:10px; font-weight:bold;'>UNREALIZED P/L:</span><br><b style='color:{'#22c55e' if t_pl>=0 else '#ef4444'};'>{'+' if t_pl>0 else ''}{format_privacy(t_pl)}</b></div>
+            <div><span style='color:var(--sub-text); font-size:10px; font-weight:bold;'>UNREALIZED P/L:</span><br><b style='color:{color_pl};'>{'+' if t_pl>0 else ''}{format_privacy(t_pl)}</b></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -884,7 +900,7 @@ elif menu == "MONEY MANAGEMENT":
 
         if not df_p.empty:
             for i, row in df_p.iterrows():
-                pnl_color = "#22c55e" if row['P/L'] >= 0 else "#ef4444"
+                pnl_color = t_success if row['P/L'] >= 0 else t_danger
                 with st.expander(f"📦 {row['ticker']} | {int(row['lots'])} Lot | {('+' if row['P/L']>0 else '')}{row['P/L']:,.0f} Rp"):
                     st.markdown(f"**Harga Beli:** Rp {row['buy_price']:,.0f} | **Harga Skrg:** Rp {row['Live']:,.0f}")
                     with st.form(f"f_sell_{row['id']}"):
@@ -900,8 +916,8 @@ elif menu == "MONEY MANAGEMENT":
             df_h['pnl'] = pd.to_numeric(df_h['pnl'], errors='coerce')
             if role != 'admin': df_h = df_h[df_h['username'] == user_now]
             for idx, h_row in df_h.sort_values(by='date', ascending=False).iterrows():
-                pnl_color = "#22c55e" if h_row['pnl'] >= 0 else "#ef4444"
-                st.markdown(f"<div style='background:var(--card-bg); padding:16px; border-radius:16px; border-left:4px solid {pnl_color}; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);'><b>{h_row['ticker']}</b> <span style='color:var(--sub-text); font-size:11px;'>({h_row['date']})</span><br>Beli: Rp {h_row['buy_price']} | Jual: Rp {h_row['sell_price']} | <b style='color:{pnl_color};'>{'+' if h_row['pnl']>0 else ''}Rp {h_row['pnl']:,.0f}</b></div>", unsafe_allow_html=True)
+                pnl_color = t_success if h_row['pnl'] >= 0 else t_danger
+                st.markdown(f"<div style='background:var(--card-bg); padding:16px; border-radius:16px; border-left:4px solid {pnl_color}; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);'><b style='color:var(--text-main);'>{h_row['ticker']}</b> <span style='color:var(--sub-text); font-size:11px;'>({h_row['date']})</span><br><span style='color:var(--text-main);'>Beli: Rp {h_row['buy_price']} | Jual: Rp {h_row['sell_price']} | <b style='color:{pnl_color};'>{'+' if h_row['pnl']>0 else ''}Rp {h_row['pnl']:,.0f}</b></span></div>", unsafe_allow_html=True)
         else: st.info("Belum ada riwayat penjualan.")
 
 elif menu == "USER MANAGEMENT":
