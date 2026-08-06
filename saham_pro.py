@@ -14,28 +14,14 @@ import pytz
 import math
 import feedparser
 
-# --- 0. CONFIG, THEME STATE & APP SETUP ---
+# --- 0. CONFIG & MOBILE WALLET APP SETUP ---
 warnings.filterwarnings("ignore", category=FutureWarning)
 st.set_page_config(
     page_title="IDX WALLET TERMINAL", 
     page_icon="⚡", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed" # Mode Mobile: Sidebar tertutup otomatis
 )
-
-# Inisialisasi Tema (Dark/Light)
-if "theme" not in st.session_state:
-    st.session_state["theme"] = "dark"
-
-is_dark = st.session_state["theme"] == "dark"
-
-# Variabel Warna Dinamis
-c_prim = "#00f0ff" if is_dark else "#0284c7"       # Cyan (Dark) / Blue (Light)
-c_sec = "#78ff00" if is_dark else "#16a34a"        # Lime (Dark) / Green (Light)
-c_bg_card = "rgba(15, 23, 42, 0.9)" if is_dark else "rgba(255, 255, 255, 0.95)"
-c_text = "#ffffff" if is_dark else "#0f172a"
-c_muted = "#94a3b8" if is_dark else "#64748b"
-plot_theme = "plotly_dark" if is_dark else "plotly_white"
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
@@ -187,105 +173,103 @@ def update_password_db(u, new_p):
         return True
     return False
 
-
-# --- 1. DYNAMIC CSS (DARK/LIGHT MODE & HUGE TOUCH MENU) ---
-st.markdown(f"""
+# --- 1. MOBILE WALLET ULTIMATE UI (CSS) ---
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800;900&display=swap');
 
-/* Base App Theme */
-.stApp {{
-    background: {'#090c15' if is_dark else '#f4f6f9'};
-    background-image: {'radial-gradient(circle at 50% -20%, rgba(0, 240, 255, 0.1) 0%, transparent 60%)' if is_dark else 'none'};
+/* Latar Belakang & Base App */
+.stApp {
+    background: #090c15;
+    background-image: radial-gradient(circle at 50% -20%, rgba(0, 240, 255, 0.1) 0%, transparent 60%);
     font-family: 'Plus Jakarta Sans', sans-serif;
-    color: {'#f1f5f9' if is_dark else '#0f172a'};
-}}
-header {{background: transparent !important;}}
-[data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu {{ display: none !important; }}
+    color: #f1f5f9;
+}
+header {background: transparent !important;}
+[data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-h1, h2, h3 {{ font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }}
-h1 {{
+h1, h2, h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
+h1 {
     font-weight: 800; font-size: 1.6rem;
-    background: linear-gradient(135deg, {c_prim} 0%, {c_sec} 100%);
+    background: linear-gradient(135deg, #00f0ff 0%, #78ff00 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}}
-h2 {{ color: {c_prim}; font-weight: 700; font-size: 1.2rem; margin-bottom: 20px;}}
+}
+h2 { color: #00f0ff; font-weight: 700; font-size: 1.2rem; margin-bottom: 20px;}
 
-/* Card, Expander & Forms */
-div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame {{
-    background: {c_bg_card} !important;
-    border: {'none' if is_dark else '1px solid rgba(0,0,0,0.05)'} !important;
-    box-shadow: {'0 10px 30px rgba(0, 0, 0, 0.5)' if is_dark else '0 8px 25px rgba(0, 0, 0, 0.05)'};
+/* Styling Form, Metric, dan Expander mirip Apple Wallet/DANA */
+div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border: none !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     border-radius: 20px !important; 
     padding: 15px !important; backdrop-filter: blur(15px);
     margin-bottom: 15px;
-}}
-div[data-testid="stForm"] label p, div[data-testid="stExpander"] label p {{
-    font-family: 'Orbitron', sans-serif !important; color: {c_sec} !important; font-size: 0.7rem !important;
-}}
-div[data-testid="stForm"] input {{
-    background: {'rgba(0, 0, 0, 0.3)' if is_dark else '#ffffff'} !important;
-    border: {'1px solid rgba(0, 240, 255, 0.2)' if is_dark else '1px solid #cbd5e1'} !important;
-    color: {'#00f0ff' if is_dark else '#0284c7'} !important; 
-    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Input Fields */
+div[data-testid="stForm"] label p, div[data-testid="stExpander"] label p {
+    font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.7rem !important;
+}
+div[data-testid="stForm"] input {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(0, 240, 255, 0.2) !important;
+    color: #00f0ff !important; font-family: 'JetBrains Mono', monospace !important;
     border-radius: 12px; height: 50px; font-size: 16px;
-}}
+}
 
-/* Metrics */
-div[data-testid="stMetric"] {{
-    background: {'linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(9, 12, 21, 0.9))' if is_dark else '#ffffff'} !important;
-    border: {'1px solid rgba(255, 255, 255, 0.05)' if is_dark else '1px solid #e2e8f0'} !important;
+/* Metrik Dompet (Wallet Balance Feel) */
+div[data-testid="stMetric"] {
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(9, 12, 21, 0.9)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-radius: 20px !important; backdrop-filter: blur(10px);
-    padding: 20px !important; text-align: center;
-    box-shadow: {'0 8px 20px rgba(0,0,0,0.4)' if is_dark else '0 4px 15px rgba(0,0,0,0.05)'};
-}}
-[data-testid="stMetricValue"] {{ font-family: 'JetBrains Mono', monospace !important; font-size: 1.6rem !important; color: {c_sec} !important; }}
-[data-testid="stMetricLabel"] {{ color: {c_muted} !important; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }}
+    padding: 20px !important;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.6rem !important; color: #78ff00 !important; }
+[data-testid="stMetricLabel"] { color: #94a3b8 !important; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
-/* Sidebar & ENLARGED MENU UI */
-[data-testid="stSidebar"] {{ background: {'#050810' if is_dark else '#ffffff'}; border-right: 1px solid {'rgba(255,255,255,0.05)' if is_dark else '#e2e8f0'}; }}
+/* Sidebar Wallet Menu */
+[data-testid="stSidebar"] { background: #050810; }
+div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
+    background: transparent !important; border: none !important;
+    border-radius: 14px !important; padding: 12px 15px !important; margin-bottom: 2px !important;
+}
+div[data-testid="stSidebar"] .stRadio label p {
+    font-family: 'Orbitron', sans-serif !important; font-size: 0.75rem !important; color: #64748b !important;
+}
+div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {
+    background: rgba(0, 240, 255, 0.1) !important;
+    border: 1px solid rgba(0, 240, 255, 0.3) !important; 
+}
+div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p { color: #ffffff !important; font-weight: 700; }
 
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {{
-    background: {'rgba(255,255,255,0.03)' if is_dark else '#f1f5f9'} !important; 
-    border: none !important;
-    border-radius: 18px !important; 
-    padding: 16px 20px !important; /* UKURAN TOMBOL MENU BESAR */
-    margin-bottom: 12px !important; /* JARAK ANTAR MENU LUAS */
-}}
-div[data-testid="stSidebar"] .stRadio label p {{
-    font-family: 'Orbitron', sans-serif !important; 
-    font-size: 1.05rem !important; /* UKURAN TEKS MENU BESAR */
-    font-weight: 600 !important;
-    color: {'#94a3b8' if is_dark else '#475569'} !important; 
-}}
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {{
-    background: {'rgba(0, 240, 255, 0.15)' if is_dark else '#e0f2fe'} !important;
-    border-left: 6px solid {c_prim} !important;
-}}
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p {{ 
-    color: {'#ffffff' if is_dark else '#0369a1'} !important; 
-    font-weight: 800 !important; 
-}}
-
-/* Tombol Aksi */
-.stButton>button {{
-    background: linear-gradient(135deg, {c_prim}, {c_sec});
-    color: {'#000000' if is_dark else '#ffffff'} !important;
-    border: none !important;
-    border-radius: 50px !important; 
-    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 0.85rem;
-    min-height: 52px; width: 100%; 
-    box-shadow: {'0 6px 15px rgba(0, 240, 255, 0.2)' if is_dark else '0 6px 15px rgba(2, 132, 199, 0.3)'};
-}}
+/* Tombol Wallet (Pill Shaped, Touch Friendly) */
+.stButton>button {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(120, 255, 0, 0.15));
+    border: 1px solid rgba(0, 240, 255, 0.5); color: #78ff00 !important;
+    border-radius: 50px !important; /* Bentuk Pill / Kapsul */
+    font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.85rem;
+    min-height: 52px; width: 100%; box-shadow: 0 6px 15px rgba(0, 240, 255, 0.15);
+    transition: all 0.2s ease;
+}
+.stButton>button:active {
+    transform: scale(0.95);
+    background: linear-gradient(135deg, #00f0ff, #78ff00); color: #000 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
+# --- 2. AUTHENTICATION (FLATTENED TO PREVENT KEYERROR) ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
 
-# --- 2. AUTHENTICATION ---
-if not st.session_state["auth"]["logged_in"]:
+if not st.session_state.logged_in:
     _, col2, _ = st.columns([0.05, 1, 0.05])
     with col2:
-        st.markdown(f"<div style='text-align:center; padding:40px 0;'><h1 style='font-size:2.2rem; margin-bottom:0;'>IDX WALLET</h1><p style='color:{c_prim}; letter-spacing:3px; font-family:Orbitron; font-size:0.7rem;'>MOBILE QUANT TERMINAL</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:40px 0;'><h1 style='font-size:2.2rem; margin-bottom:0;'>IDX WALLET</h1><p style='color:#00f0ff; letter-spacing:3px; font-family:Orbitron; font-size:0.7rem;'>MOBILE QUANT TERMINAL</p></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             u = st.text_input("NODE ID").strip()
             p = st.text_input("ACCESS KEY", type="password")
@@ -294,7 +278,9 @@ if not st.session_state["auth"]["logged_in"]:
                 role = check_login_db(u, p)
                 if role:
                     update_login_info(u)
-                    st.session_state["auth"] = {"logged_in": True, "user": u, "role": role}
+                    st.session_state.logged_in = True
+                    st.session_state.user = u
+                    st.session_state.role = role
                     st.rerun()
                 else: st.error("Akses Ditolak!")
     st.stop()
@@ -389,7 +375,7 @@ def get_trend_signals(ticker_list):
             current_price = df['Close'].iloc[-1]
             
             if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
-                signals.append({"ticker": ticker.replace(".JK", ""), "status": "GOLDEN CROSS", "price": current_price, "color": c_sec})
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": "GOLDEN CROSS", "price": current_price, "color": "#78ff00"})
             elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
                 signals.append({"ticker": ticker.replace(".JK", ""), "status": "DEAD CROSS", "price": current_price, "color": "#ff4b4b"})
         except: continue
@@ -398,7 +384,7 @@ def get_trend_signals(ticker_list):
 def draw_mobile_cards(df):
     for _, row in df.iterrows():
         chg = row.get('CHG%', 0)
-        chg_color = c_sec if chg > 0 else "#ff4b4b"
+        chg_color = "#78ff00" if chg > 0 else "#ff4b4b"
         val_last  = row.get('LAST', '-')
         val_entry = row.get('ENTRY', row.get('Entry', val_last)) 
         val_tp1   = row.get('TP 1', '-')
@@ -406,45 +392,40 @@ def draw_mobile_cards(df):
         val_cl    = row.get('EXIT/CL', '-')
 
         st.markdown(f"""
-        <div style="background: {c_bg_card}; border: 1px solid {'rgba(0, 240, 255, 0.15)' if is_dark else 'rgba(0,0,0,0.05)'}; 
-                    border-radius: 20px; padding: 18px; margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(128,128,128,0.2); padding-bottom: 10px;">
-                <b style="font-size: 1.2rem; color: {c_prim}; font-family: Orbitron;">{row.get('TICKER','-')}</b>
+        <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(0, 240, 255, 0.15); 
+                    border-radius: 20px; padding: 18px; margin-bottom: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;">
+                <b style="font-size: 1.2rem; color: #00f0ff; font-family: Orbitron;">{row.get('TICKER','-')}</b>
                 <div style="text-align: right;">
-                    <div style="font-size: 1.1rem; color: {c_text}; font-weight: bold;">Rp {val_last}</div>
+                    <div style="font-size: 1.1rem; color: #fff; font-weight: bold;">Rp {val_last}</div>
                     <div style="color: {chg_color}; font-size: 0.8rem; font-weight: bold;">{'+' if chg>0 else ''}{chg}%</div>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-top: 15px; font-size: 0.75rem; text-align: center;">
-                <div style="background: rgba(128,128,128,0.1); padding: 8px; border-radius: 10px;">
-                    <div style="color: {c_muted};">ENTRY</div><b style="color:{c_prim};">{val_entry}</b>
+                <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: 10px;">
+                    <div style="color: #94a3b8;">ENTRY</div><b style="color:#00f0ff;">{val_entry}</b>
                 </div>
                 <div style="background: rgba(120,255,0,0.05); padding: 8px; border-radius: 10px;">
-                    <div style="color: {c_muted};">TARGET</div><b style="color:{c_sec};">{val_tp1}</b>
+                    <div style="color: #94a3b8;">TARGET</div><b style="color:#78ff00;">{val_tp1}</b>
                 </div>
                 <div style="background: rgba(255,75,75,0.05); padding: 8px; border-radius: 10px;">
-                    <div style="color: {c_muted};">CUTLOSS</div><b style="color:#ff4b4b;">{val_cl}</b>
+                    <div style="color: #94a3b8;">CUTLOSS</div><b style="color:#ff4b4b;">{val_cl}</b>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
 # --- 4. NAVIGATION & SIDEBAR ---
-role = st.session_state["auth"]["role"]
-user_now = st.session_state["auth"]["user"]
+role = st.session_state.role
+user_now = st.session_state.user
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:18px; border:none; border-radius:20px; background:{c_bg_card}; margin-bottom:20px; box-shadow:0 4px 15px rgba(0,0,0,0.1);'>
-        <h3 style='margin:0; color:{c_prim}; font-family:Orbitron; font-size:1rem;'>{user_now.upper()}</h3>
-        <p style='margin:0; font-size:9px; color:{c_sec}; font-family:Orbitron; margin-top:4px;'>WALLET SECURED | {role.upper()}</p>
+    <div style='padding:18px; border:none; border-radius:20px; background:rgba(15, 23, 42, 0.9); margin-bottom:20px;'>
+        <h3 style='margin:0; color:#00f0ff; font-family:Orbitron; font-size:1rem;'>{user_now.upper()}</h3>
+        <p style='margin:0; font-size:9px; color:#78ff00; font-family:Orbitron; margin-top:4px;'>WALLET SECURED | {role.upper()}</p>
     </div>
     """, unsafe_allow_html=True)
-
-if st.sidebar.button("🌓 GANTI TEMA (GELAP/TERANG)", use_container_width=True):
-    st.session_state["theme"] = "light" if is_dark else "dark"
-    st.rerun()
-st.sidebar.write("---")
 
 menu_list = [
     "SCANNER", "STRATEGY SCANNER", "WATCHLIST", "FUNDAMENTAL", 
@@ -459,7 +440,9 @@ menu = st.sidebar.radio("Menu", menu_list, label_visibility="collapsed")
 
 st.sidebar.write("---")
 if st.sidebar.button("🔒 KUNCI WALLET", use_container_width=True):
-    st.session_state["auth"] = {"logged_in": False}
+    st.session_state.logged_in = False
+    st.session_state.user = None
+    st.session_state.role = None
     st.rerun()
 
 
@@ -485,32 +468,9 @@ if menu == "SCANNER":
 
     if st.session_state.results is not None:
         df = st.session_state.results
-        
-        st.markdown(f"""
-        <div style='background: rgba(128,128,128, 0.1); padding:12px; border-left:4px solid {c_prim}; margin-bottom:15px; border-radius:0 10px 10px 0;'>
-            <span style='color:{c_prim}; font-family:Orbitron; font-weight:bold; font-size:0.8rem;'>🧠 QUANT AI STATUS: COMPLETE</span><br>
-            <span style='font-size:0.75rem; color:{c_muted};'>📊 PROCESSED: {len(df)} STOCKS ANALYZED</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        tab1, tab2, tab3 = st.tabs(["📱 KARTU", "📊 TABEL", "📈 CHART"])
+        tab1, tab2 = st.tabs(["📱 KARTU SAHAM", "📊 TABEL DATA"])
         with tab1: draw_mobile_cards(df)
         with tab2: st.dataframe(df.drop(columns=['FULL'], errors='ignore'), use_container_width=True, hide_index=True)
-        with tab3:
-            sel_t = st.selectbox("PILIH SAHAM UNTUK GRAFIK", df['TICKER'].tolist())
-            full_t = df[df['TICKER'] == sel_t]['FULL'].values[0]
-            c_data = yf.download(full_t, period="6mo", interval="1d", progress=False)
-            if not c_data.empty:
-                c_data.columns = [c[0] if isinstance(c, tuple) else c for c in c_data.columns]
-                c_data['MA20'], c_data['MA50'] = c_data['Close'].rolling(20).mean(), c_data['Close'].rolling(50).mean()
-                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
-                fig.add_trace(go.Candlestick(x=c_data.index, open=c_data['Open'], high=c_data['High'], low=c_data['Low'], close=c_data['Close'], name='Price'), row=1, col=1)
-                fig.add_trace(go.Scatter(x=c_data.index, y=c_data['MA20'], line=dict(color=c_prim, width=1.5), name='MA 20'), row=1, col=1)
-                fig.add_trace(go.Scatter(x=c_data.index, y=c_data['MA50'], line=dict(color=c_sec, width=1.5), name='MA 50'), row=1, col=1)
-                colors = [c_sec if row['Close'] >= row['Open'] else '#ff4b4b' for index, row in c_data.iterrows()]
-                fig.add_trace(go.Bar(x=c_data.index, y=c_data['Volume'], marker_color=colors, name='Volume'), row=2, col=1)
-                fig.update_layout(template=plot_theme, height=420, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "STRATEGY SCANNER":
     st.title("⚡ STRATEGY SCANNER")
@@ -532,7 +492,7 @@ elif menu == "STRATEGY SCANNER":
             results = get_trend_signals(watchlist)
             if results:
                 for res in results:
-                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: {c_bg_card}; padding: 18px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}!</h3><p style='margin:6px 0 0 0; color:{c_text}; font-size:0.9rem;'>{res['ticker']} <span style='color:{c_muted};'>| Last: Rp {res['price']:,.0f}</span></p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(15,23,42,0.9); padding: 18px; border-radius: 20px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}!</h3><p style='margin:6px 0 0 0; color:#fff; font-size:0.9rem;'>{res['ticker']} <span style='color:#94a3b8;'>| Last: Rp {res['price']:,.0f}</span></p></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada sinyal saat ini.")
 
 elif menu == "WATCHLIST":
@@ -554,7 +514,7 @@ elif menu == "WATCHLIST":
         st.write("### 🗑️ Hapus dari Daftar")
         with st.form("form_del_wl"):
             del_wl = st.selectbox("Pilih yang ingin dihapus", [t.replace(".JK","") for t in my_wl])
-            if st.form_submit_button("HAPUS DARI DAFTAR"):
+            if st.form_submit_button("HAPUS"):
                 remove_watchlist(user_now, f"{del_wl}.JK"); st.warning("Dihapus!"); st.rerun()
                 
         st.markdown("---")
@@ -569,7 +529,7 @@ elif menu == "FUNDAMENTAL":
     with st.expander("📖 BUKU PANDUAN: CARA BACA VALUASI", expanded=False):
         st.markdown("""
         * **Graham Value:** Estimasi harga wajar/murah sebuah saham. Jika harga pasar lebih rendah, berarti *Undervalued* (Diskon).
-        * **ROE:** Semakin tinggi persenannya, semakin efisien perusahaan mencetak laba.
+        * **Z-Score:** Tingkat keamanan dari kebangkrutan. Di atas 2.9 = Sangat Aman. Di bawah 1.8 = Rawan Utang.
         """)
     
     with st.form("f_fund"):
@@ -591,7 +551,7 @@ elif menu == "FUNDAMENTAL":
                 c2.metric("ROE (Profitabilitas)", f"{roe:.1f}%")
 
                 status = 'DI BAWAH HARGA WAJAR (MURAH) 🟢' if current_price < graham else 'DI ATAS HARGA WAJAR (MAHAL) 🔴'
-                st.markdown(f"<div style='background:{c_bg_card}; padding:18px; border-radius:20px; border:1px solid {c_prim}; text-align:center; box-shadow:0 5px 15px rgba(0,0,0,0.1);'><p style='color:{c_muted}; font-size:10px; margin:0;'>HARGA WAJAR (GRAHAM)</p><h2 style='color:{c_sec}; margin:5px 0;'>Rp {graham:,.0f}</h2><p style='font-size:10px; color:{c_text}; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background:rgba(15,23,42,0.9); padding:18px; border-radius:20px; border:1px solid #00f0ff; text-align:center;'><p style='color:#94a3b8; font-size:10px; margin:0;'>HARGA WAJAR (GRAHAM)</p><h2 style='color:#78ff00; margin:5px 0;'>Rp {graham:,.0f}</h2><p style='font-size:10px; color:#fff; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
             except Exception as e: st.error("Data tidak ditemukan.")
 
 elif menu == "TICKER COMPARISON":
@@ -659,8 +619,8 @@ elif menu == "SECTOR HEATMAP":
             
             if sector_data:
                 df_sec = pd.DataFrame(sector_data).sort_values(by="Perubahan %", ascending=False)
-                fig = px.bar(df_sec, y="Sektor", x="Perubahan %", orientation='h', color="Perubahan %", color_continuous_scale=["#ff4b4b", c_muted, c_sec])
-                fig.update_layout(template=plot_theme, height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                fig = px.bar(df_sec, y="Sektor", x="Perubahan %", orientation='h', color="Perubahan %", color_continuous_scale=["#ff4b4b", "#1e293b", "#78ff00"])
+                fig.update_layout(template="plotly_dark", height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "RISK CALCULATOR":
@@ -723,8 +683,8 @@ elif menu == "CORRELATION MATRIX":
     with st.expander("📖 BUKU PANDUAN: DIVERSIFIKASI", expanded=False):
         st.markdown("""
         Jangan menaruh semua telur di keranjang yang sama! 
-        * **Biru (-1):** Sangat bagus! Jika satu saham turun, yang lain biasanya naik menyeimbangkan portofolio.
-        * **Merah (+1):** Saham-saham ini gerakannya kembar. Bahaya jika pasar anjlok, semuanya ikut anjlok bareng.
+        * **Biru Tua (-1):** Sangat bagus! Jika satu saham turun, yang lain biasanya naik menyeimbangkan portofolio.
+        * **Merah Tua (+1):** Saham-saham ini gerakannya kembar. Bahaya jika pasar anjlok, semuanya ikut anjlok bareng.
         """)
         
     with st.form("f_cor"):
@@ -740,7 +700,7 @@ elif menu == "CORRELATION MATRIX":
                     if isinstance(data_corr.columns, pd.MultiIndex): data_corr.columns = data_corr.columns.get_level_values(0)
                     data_corr.columns = [c.replace(".JK", "") for c in data_corr.columns]
                     fig_corr = px.imshow(data_corr.corr(), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
-                    fig_corr.update_layout(template=plot_theme, height=350, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    fig_corr.update_layout(template="plotly_dark", height=350, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig_corr, use_container_width=True)
             except: st.error("Format salah atau data gagal ditarik.")
 
@@ -749,8 +709,8 @@ elif menu == "FOREIGN & BROKER FLOW":
     with st.expander("📖 BUKU PANDUAN: IKUTI UANG BESAR", expanded=False):
         st.markdown("""
         Indikator *Chaikin Money Flow* (CMF) mendeteksi jejak kaki institusi/asing.
-        * **Angka Positif:** Bandar sedang akumulasi/borong barang. Harga siap terbang.
-        * **Angka Negatif:** Distribusi/Buang barang. Bandar sedang cuci gudang, hati-hati tertimpa!
+        * **Angka Positif Hijau:** Bandar sedang akumulasi/borong barang. Harga siap terbang.
+        * **Angka Negatif Merah:** Distribusi/Buang barang. Bandar sedang cuci gudang, hati-hati tertimpa!
         """)
         
     with st.form("f_ff"):
@@ -768,7 +728,7 @@ elif menu == "FOREIGN & BROKER FLOW":
                     latest = df_ff['CMF_20'].iloc[-1]
                     
                     status = "AKUMULASI (BANDAR MASUK) 🚀" if latest > 0 else "DISTRIBUSI (BANDAR KELUAR) ⚠️"
-                    st.markdown(f"<div style='text-align:center; padding:20px; background:{c_bg_card}; border-radius:20px; box-shadow:0 5px 15px rgba(0,0,0,0.1);'><h2 style='color:{c_sec if latest>0 else '#ff4b4b'}; margin:0;'>{latest:.3f}</h2><p style='color:{c_text}; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; padding:15px; background:rgba(0,0,0,0.4); border-radius:15px;'><h2 style='color:{'#78ff00' if latest>0 else '#ff4b4b'}; margin:0;'>{latest:.3f}</h2><p style='color:#fff; margin:0;'>{status}</p></div>", unsafe_allow_html=True)
             except: st.error("Gagal melacak dana.")
 
 elif menu == "MARKET_NEWS":
@@ -780,7 +740,7 @@ elif menu == "MARKET_NEWS":
         try:
             feed = feedparser.parse("https://news.google.com/rss/search?q=saham+indonesia+ihsg&hl=id&gl=ID&ceid=ID:id")
             for entry in feed.entries[:8]: 
-                st.markdown(f"<div style='background:{c_bg_card}; padding:18px; border-radius:18px; margin-bottom:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05);'><b><a href='{entry.link}' style='color:{c_prim}; text-decoration:none;'>{entry.title}</a></b><br><small style='color:{c_muted};'>{entry.published}</small></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background:rgba(15,23,42,0.8); padding:15px; border-radius:15px; margin-bottom:10px;'><b><a href='{entry.link}' style='color:#00f0ff; text-decoration:none;'>{entry.title}</a></b><br><small style='color:#64748b;'>{entry.published}</small></div>", unsafe_allow_html=True)
         except: st.error("Koneksi feed berita terputus.")
 
 elif menu == "MONEY MANAGEMENT":
@@ -817,12 +777,12 @@ elif menu == "MONEY MANAGEMENT":
 
     # TAMPILAN SALDO WALLET BESAR
     st.markdown(f"""
-    <div style='background: linear-gradient(135deg, {c_bg_card}, rgba(128,128,128,0.1)); border:1px solid {c_prim}; border-radius:24px; padding:25px; text-align:center; margin-bottom:20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);'>
-        <p style='color:{c_muted}; font-family:Orbitron; margin:0; font-size:12px; letter-spacing:2px;'>TOTAL SALDO INVESTASI</p>
-        <h1 style='color:{c_text}; font-family:JetBrains Mono; font-size:2.2rem; margin:10px 0;'>{format_privacy(t_inv + t_pl)}</h1>
+    <div style='background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(15, 23, 42, 0.9)); border:1px solid rgba(0,240,255,0.4); border-radius:24px; padding:25px; text-align:center; margin-bottom:20px; box-shadow: 0 10px 25px rgba(0,240,255,0.1);'>
+        <p style='color:#94a3b8; font-family:Orbitron; margin:0; font-size:12px; letter-spacing:2px;'>TOTAL SALDO INVESTASI</p>
+        <h1 style='color:#fff; font-family:JetBrains Mono; font-size:2.2rem; margin:10px 0;'>{format_privacy(t_inv + t_pl)}</h1>
         <div style='display:flex; justify-content:center; gap:20px; margin-top:10px;'>
-            <div><span style='color:{c_muted}; font-size:10px;'>MODAL AWAL:</span><br><b style='color:{c_prim};'>{format_privacy(t_inv)}</b></div>
-            <div><span style='color:{c_muted}; font-size:10px;'>UNREALIZED P/L:</span><br><b style='color:{c_sec if t_pl>=0 else '#ff4b4b'};'>{'+' if t_pl>0 else ''}{format_privacy(t_pl)}</b></div>
+            <div><span style='color:#94a3b8; font-size:10px;'>MODAL AWAL:</span><br><b style='color:#00f0ff;'>{format_privacy(t_inv)}</b></div>
+            <div><span style='color:#94a3b8; font-size:10px;'>UNREALIZED P/L:</span><br><b style='color:{'#78ff00' if t_pl>=0 else '#ff4b4b'};'>{'+' if t_pl>0 else ''}{format_privacy(t_pl)}</b></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -839,7 +799,7 @@ elif menu == "MONEY MANAGEMENT":
 
         if not df_p.empty:
             for i, row in df_p.iterrows():
-                pnl_color = c_sec if row['P/L'] >= 0 else "#ff4b4b"
+                pnl_color = "#78ff00" if row['P/L'] >= 0 else "#ff4b4b"
                 with st.expander(f"📦 {row['ticker']} | {int(row['lots'])} Lot | {('+' if row['P/L']>0 else '')}{row['P/L']:,.0f} Rp"):
                     st.markdown(f"**Harga Beli:** Rp {row['buy_price']:,.0f} | **Harga Skrg:** Rp {row['Live']:,.0f}")
                     with st.form(f"f_sell_{row['id']}"):
@@ -855,8 +815,8 @@ elif menu == "MONEY MANAGEMENT":
             df_h['pnl'] = pd.to_numeric(df_h['pnl'], errors='coerce')
             if role != 'admin': df_h = df_h[df_h['username'] == user_now]
             for idx, h_row in df_h.sort_values(by='date', ascending=False).iterrows():
-                pnl_color = c_sec if h_row['pnl'] >= 0 else "#ff4b4b"
-                st.markdown(f"<div style='background:{c_bg_card}; padding:16px; border-radius:16px; border-left:4px solid {pnl_color}; margin-bottom:10px; box-shadow:0 4px 10px rgba(0,0,0,0.05);'><b style='color:{c_text}'>{h_row['ticker']}</b> <span style='color:{c_muted}; font-size:11px;'>({h_row['date']})</span><br><span style='color:{c_text}'>Beli: {h_row['buy_price']} | Jual: {h_row['sell_price']}</span> | <b style='color:{pnl_color};'>{'+' if h_row['pnl']>0 else ''}Rp {h_row['pnl']:,.0f}</b></div>", unsafe_allow_html=True)
+                pnl_color = "#78ff00" if h_row['pnl'] >= 0 else "#ff4b4b"
+                st.markdown(f"<div style='background:rgba(0,0,0,0.3); padding:12px; border-radius:12px; border-left:3px solid {pnl_color}; margin-bottom:8px;'><b>{h_row['ticker']}</b> <span style='color:#64748b; font-size:11px;'>({h_row['date']})</span><br>Beli: {h_row['buy_price']} | Jual: {h_row['sell_price']} | <b style='color:{pnl_color};'>{'+' if h_row['pnl']>0 else ''}Rp {h_row['pnl']:,.0f}</b></div>", unsafe_allow_html=True)
         else: st.info("Belum ada riwayat penjualan.")
 
 elif menu == "USER MANAGEMENT":
