@@ -14,13 +14,13 @@ import pytz
 import math
 import feedparser
 
-# --- 0. CONFIG & MOBILE APP SETUP ---
+# --- 0. CONFIG & MOBILE WALLET APP SETUP ---
 warnings.filterwarnings("ignore", category=FutureWarning)
 st.set_page_config(
-    page_title="IDX CYBER TERMINAL PRO", 
+    page_title="IDX WALLET TERMINAL", 
     page_icon="⚡", 
     layout="wide",
-    initial_sidebar_state="collapsed"  # Otomatis tertutup di HP agar seperti aplikasi native
+    initial_sidebar_state="collapsed"
 )
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
@@ -35,7 +35,7 @@ def get_visitor_info():
             region = response.get('region', 'Unknown') or response.get('regionName', 'Unknown')
             if ip != 'Unknown': return ip, f"{city}, {region}"
         except: continue
-    return "Cloud Node", "Data Center"
+    return "Mobile Node", "Cloud"
 
 def update_login_info(u):
     ip, loc = get_visitor_info()
@@ -173,76 +173,75 @@ def update_password_db(u, new_p):
         return True
     return False
 
-# --- 1. MOBILE APP STYLING & TOUCH OPTIMIZATION ---
+# --- 1. MOBILE WALLET STYLING ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;800;900&display=swap');
 
 .stApp {
-    background: #07090f;
-    background-image: radial-gradient(circle at 10% 10%, rgba(0, 240, 255, 0.04) 0%, transparent 40%),
-                      radial-gradient(circle at 90% 90%, rgba(120, 255, 0, 0.03) 0%, transparent 40%);
+    background: #090d16;
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 50%),
+                      radial-gradient(circle at 100% 100%, rgba(120, 255, 0, 0.04) 0%, transparent 40%);
     font-family: 'Plus Jakarta Sans', sans-serif;
     color: #e2e8f0;
 }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-h1, h2, h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+h1, h2, h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
 h1 {
-    font-weight: 900; font-size: 1.8rem;
+    font-weight: 800; font-size: 1.6rem;
     background: linear-gradient(135deg, #00f0ff 0%, #78ff00 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
 }
-h2, h3 { color: #00f0ff; font-weight: 800; font-size: 1.2rem; }
+h2, h3 { color: #00f0ff; font-weight: 700; font-size: 1.1rem; }
 
-/* Mobile Card & Container Optimization */
+/* Wallet Card Aesthetics */
 div[data-testid="stForm"] {
-    background: rgba(13, 18, 30, 0.9) !important;
-    border: 1px solid rgba(0, 240, 255, 0.25) !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid rgba(0, 240, 255, 0.2) !important;
     border-top: 3px solid #00f0ff !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-    border-radius: 14px; padding: 20px !important; backdrop-filter: blur(20px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    border-radius: 16px; padding: 18px !important; backdrop-filter: blur(15px);
 }
 div[data-testid="stForm"] label p {
-    font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.7rem !important; letter-spacing: 1.5px;
+    font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.65rem !important; letter-spacing: 1px;
 }
 div[data-testid="stForm"] input {
-    background: rgba(3, 6, 12, 0.9) !important;
-    border: 1px solid rgba(0, 240, 255, 0.2) !important;
+    background: rgba(5, 8, 15, 0.95) !important;
+    border: 1px solid rgba(0, 240, 255, 0.25) !important;
     color: #00f0ff !important; font-family: 'JetBrains Mono', monospace !important;
-    border-radius: 8px; height: 44px;
+    border-radius: 10px; height: 44px;
 }
 
 div[data-testid="stMetric"], .stDataFrame, .stTabs, div[data-testid="stExpander"] {
-    background: rgba(13, 18, 30, 0.75) !important;
-    border: 1px solid rgba(255, 255, 255, 0.07) !important;
-    border-radius: 12px !important; backdrop-filter: blur(12px);
+    background: rgba(15, 23, 42, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 14px !important; backdrop-filter: blur(10px);
 }
-[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.5rem !important; color: #78ff00 !important; }
-[data-testid="stMetricLabel"] { color: #94a3b8 !important; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.35rem !important; color: #78ff00 !important; }
+[data-testid="stMetricLabel"] { color: #94a3b8 !important; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
-[data-testid="stSidebar"] { background: #090d16; border-right: 1px solid rgba(255, 255, 255, 0.05); }
+[data-testid="stSidebar"] { background: #070a12; border-right: 1px solid rgba(255, 255, 255, 0.04); }
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
     background: rgba(255, 255, 255, 0.01) !important; border: 1px solid rgba(255, 255, 255, 0.03) !important;
-    border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 5px !important;
+    border-radius: 10px !important; padding: 10px 12px !important; margin-bottom: 4px !important;
 }
 div[data-testid="stSidebar"] .stRadio label p {
-    font-family: 'Orbitron', sans-serif !important; font-size: 0.7rem !important; color: #64748b !important; letter-spacing: 1px;
+    font-family: 'Orbitron', sans-serif !important; font-size: 0.68rem !important; color: #94a3b8 !important; letter-spacing: 0.5px;
 }
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {
-    background: linear-gradient(90deg, rgba(0, 240, 255, 0.12), rgba(120, 255, 0, 0.05)) !important;
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.15), rgba(120, 255, 0, 0.05)) !important;
     border: 1px solid rgba(0, 240, 255, 0.4) !important; border-left: 4px solid #78ff00 !important;
 }
-div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p { color: #ffffff !important; }
+div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p { color: #ffffff !important; font-weight: bold; }
 
-/* Touch-friendly buttons for Mobile */
+/* Touch-optimized Wallet Buttons */
 .stButton>button {
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(120, 255, 0, 0.15));
-    border: 1px solid rgba(0, 240, 255, 0.4); color: #78ff00 !important;
-    border-radius: 8px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.75rem;
-    min-height: 44px; width: 100%;
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.18), rgba(120, 255, 0, 0.18));
+    border: 1px solid rgba(0, 240, 255, 0.45); color: #78ff00 !important;
+    border-radius: 10px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.75rem;
+    min-height: 44px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .stButton>button:hover {
     background: linear-gradient(135deg, #00f0ff, #78ff00); color: #07090f !important;
@@ -255,19 +254,19 @@ if "auth" not in st.session_state:
     st.session_state["auth"] = {"logged_in": False, "user": None, "role": None}
 
 if not st.session_state["auth"]["logged_in"]:
-    _, col2, _ = st.columns([0.1, 1, 0.1])
+    _, col2, _ = st.columns([0.05, 1, 0.05])
     with col2:
-        st.markdown("<div style='text-align:center; padding:30px 0;'><h1 style='font-size:2.2rem; margin-bottom:0;'>IDX TERMINAL</h1><p style='color:#00f0ff; letter-spacing:4px; font-family:Orbitron; font-size:0.7rem;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:25px 0;'><h1 style='font-size:2rem; margin-bottom:0;'>IDX WALLET</h1><p style='color:#00f0ff; letter-spacing:3px; font-family:Orbitron; font-size:0.65rem;'>MOBILE QUANT TERMINAL</p></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             u = st.text_input("NODE ID").strip()
             p = st.text_input("ACCESS KEY", type="password")
-            if st.form_submit_button("INITIALIZE SESSION", width="stretch"):
+            if st.form_submit_button("LOGIN WALLET", width="stretch"):
                 role = check_login_db(u, p)
                 if role:
                     update_login_info(u)
                     st.session_state["auth"] = {"logged_in": True, "user": u, "role": role}
                     st.rerun()
-                else: st.error("ACCESS DENIED / AUTHENTICATION FAILED")
+                else: st.error("ACCESS DENIED / AUTH FAILED")
     st.stop()
 
 
@@ -378,8 +377,8 @@ def draw_mobile_cards(df):
         val_m     = row.get('VAL(M)', 0)
 
         st.markdown(f"""
-        <div style="background: rgba(13, 18, 30, 0.9); border: 1px solid rgba(0, 240, 255, 0.2); 
-                    border-radius: 12px; padding: 14px; margin-bottom: 10px; border-left: 4px solid {chg_color};">
+        <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(0, 240, 255, 0.2); 
+                    border-radius: 14px; padding: 14px; margin-bottom: 10px; border-left: 4px solid {chg_color};">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <b style="font-size: 1rem; color: #00f0ff; font-family: Orbitron;">{row.get('TICKER','-')}</b>
                 <span style="color: {chg_color}; font-weight: bold; font-family: JetBrains Mono;">{chg}%</span>
@@ -401,22 +400,29 @@ user_now = st.session_state["auth"]["user"]
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:14px; border:1px solid rgba(0, 240, 255, 0.2); border-radius:12px; background:rgba(13, 18, 30, 0.9); margin-bottom:12px;'>
-        <h3 style='margin:0; color:#00f0ff; font-family:Orbitron; font-size:0.9rem;'>{user_now.upper()}</h3>
-        <p style='margin:0; font-size:8px; color:#78ff00; font-family:Orbitron; margin-top:4px;'>NODE ACTIVE | {role.upper()}</p>
+    <div style='padding:14px; border:1px solid rgba(0, 240, 255, 0.2); border-radius:12px; background:rgba(15, 23, 42, 0.9); margin-bottom:12px;'>
+        <h3 style='margin:0; color:#00f0ff; font-family:Orbitron; font-size:0.85rem;'>{user_now.upper()}</h3>
+        <p style='margin:0; font-size:7px; color:#78ff00; font-family:Orbitron; margin-top:3px;'>WALLET ACTIVE | {role.upper()}</p>
         <hr style='border:0.1px solid rgba(255,255,255,0.08); margin:8px 0;'>
-        <p style='font-size:8px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LST: {last_l}</p>
-        <p style='font-size:8px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>IP : {ip_l}</p>
-        <p style='font-size:8px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LOC: {loc_l}</p>
+        <p style='font-size:7.5px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LST: {last_l}</p>
+        <p style='font-size:7.5px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>IP : {ip_l}</p>
+        <p style='font-size:7.5px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LOC: {loc_l}</p>
     </div>
     """, unsafe_allow_html=True)
 
-menu_list = ["SCANNER", "STRATEGY SCANNER", "WATCHLIST", "FUNDAMENTAL", "TICKER COMPARISON", "SECTOR HEATMAP", "RISK CALCULATOR", "DIVIDEND TRACKER", "CORRELATION MATRIX", "FOREIGN & BROKER FLOW", "MARKET_NEWS", "MONEY MANAGEMENT", "SECURITY SETTINGS"]
-if role == "admin": menu_list.insert(7, "USER MANAGEMENT")
+menu_list = [
+    "SCANNER", "STRATEGY SCANNER", "WATCHLIST", "FUNDAMENTAL", 
+    "TICKER COMPARISON", "SECTOR HEATMAP", "RISK CALCULATOR", 
+    "DIVIDEND TRACKER", "CORRELATION MATRIX", "FOREIGN & BROKER FLOW", 
+    "MARKET_NEWS", "MONEY MANAGEMENT", "SECURITY SETTINGS"
+]
+if role == "admin": 
+    menu_list.insert(7, "USER MANAGEMENT")
+
 menu = st.sidebar.radio("Menu", menu_list, label_visibility="collapsed")
 
 st.sidebar.write("---")
-if st.sidebar.button("🔴 TERMINATE SESSION", use_container_width=True):
+if st.sidebar.button("🔴 LOCK WALLET", use_container_width=True):
     st.session_state["auth"] = {"logged_in": False}
     st.rerun()
 
@@ -476,7 +482,7 @@ if menu == "SCANNER":
                 colors = ['#78ff00' if row['Close'] >= row['Open'] else '#ff4b4b' for index, row in c_data.iterrows()]
                 fig.add_trace(go.Bar(x=c_data.index, y=c_data['Volume'], marker_color=colors, name='Volume'), row=2, col=1)
                 
-                fig.update_layout(template="plotly_dark", height=450, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                fig.update_layout(template="plotly_dark", height=420, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "STRATEGY SCANNER":
@@ -499,7 +505,7 @@ elif menu == "STRATEGY SCANNER":
             results = get_trend_signals(watchlist)
             if results:
                 for res in results:
-                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(13,18,30,0.8); padding: 14px; border-radius: 12px; margin-bottom: 10px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1rem;'>{res['status']} DETECTED!</h3><p style='margin:4px 0; color:#94a3b8; font-size:0.85rem;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(15,23,42,0.8); padding: 14px; border-radius: 12px; margin-bottom: 10px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1rem;'>{res['status']} DETECTED!</h3><p style='margin:4px 0; color:#94a3b8; font-size:0.85rem;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
                 if any(r['status'] == "GOLDEN CROSS" for r in results): st.balloons()
             else: st.info("Tidak ada sinyal MA Crossover saat ini.")
 
@@ -548,7 +554,7 @@ elif menu == "FUNDAMENTAL":
     if btn_analyze: st.session_state.clicked_analyze = True; st.session_state.last_ticker = target_f
 
     def draw_pro_card(label, value, subtext, color="#00f0ff"):
-        st.markdown(f"<div style='background:rgba(13,18,30,0.8); padding:14px; border-radius:12px; border-top:3px solid {color};'><p style='margin:0; font-size:9px; color:#94a3b8; font-family:Orbitron;'>{label.upper()}</p><h2 style='margin:4px 0; color:{color}; font-family:JetBrains Mono; font-size:1.3rem;'>{value}</h2><p style='margin:0; font-size:10px; color:#64748b;'>{subtext}</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background:rgba(15,23,42,0.8); padding:14px; border-radius:12px; border-top:3px solid {color};'><p style='margin:0; font-size:9px; color:#94a3b8; font-family:Orbitron;'>{label.upper()}</p><h2 style='margin:4px 0; color:{color}; font-family:JetBrains Mono; font-size:1.3rem;'>{value}</h2><p style='margin:0; font-size:10px; color:#64748b;'>{subtext}</p></div>", unsafe_allow_html=True)
 
     if st.session_state.clicked_analyze:
         with st.spinner("SYNCING_FINANCIALS..."):
@@ -562,10 +568,7 @@ elif menu == "FUNDAMENTAL":
                 per = info.get('trailingPE', 0) or 0
                 pbv = info.get('priceToBook', 0) or 0
                 roe = (info.get('returnOnEquity', 0) or 0) * 100
-                der = info.get('debtToEquity', 0) or 0
                 target_mean = info.get('targetMeanPrice', current_price) or current_price
-                div_yield = (info.get('dividendYield', 0) or 0) * 100
-                cr = info.get('currentRatio', 0) or 0
                 
                 st.markdown(f"### 🏢 {info.get('longName', target_f)}")
                 
@@ -573,7 +576,6 @@ elif menu == "FUNDAMENTAL":
                 c1.metric("PE_RATIO", f"{per:,.2f}x"); c2.metric("PBV_RATIO", f"{pbv:,.2f}x")
 
                 graham = math.sqrt(22.5 * eps * bvps) if (eps > 0 and bvps > 0) else 0
-                fair_pe_val = eps * (15 if roe > 15 else 10)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 col_v1, col_v2 = st.columns(2)
@@ -729,7 +731,7 @@ elif menu == "MARKET_NEWS":
     for entry in feed.entries[:8]: st.markdown(f"📡 **[{entry.title}]({entry.link})**\n<small style='color:#00f0ff;'>{entry.published}</small>\n---", unsafe_allow_html=True)
 
 elif menu == "MONEY MANAGEMENT":
-    st.title("💼 PORTFOLIO")
+    st.title("💼 PORTFOLIO WALLET")
     privacy_mode = st.checkbox("🕶️ Privacy Mode", value=False)
     format_privacy = lambda v: "Rp *****" if privacy_mode else f"Rp {v:,.0f}"
 
@@ -783,13 +785,23 @@ elif menu == "MONEY MANAGEMENT":
         st.write("Statistik performa trading harian.")
 
 elif menu == "USER MANAGEMENT":
-    st.title("👤 USERS")
+    st.title("👤 USER MANAGEMENT (ADMIN)")
     df_u = conn_gs.read(worksheet="users", ttl=0)
-    st.dataframe(df_u[['username', 'role', 'last_login']], use_container_width=True, hide_index=True)
+    st.dataframe(df_u[['username', 'role', 'last_login', 'location']], use_container_width=True, hide_index=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        with st.form("add_u"):
+            nu, np, nr = st.text_input("New User"), st.text_input("Password", type="password"), st.selectbox("Role", ["user", "admin"])
+            if st.form_submit_button("GRANT USER"):
+                if add_user_db(nu, np, nr): st.success("Added"); st.rerun()
+    with c2:
+        du = st.text_input("Revoke Username")
+        if st.button("🔴 DELETE USER"):
+            if delete_user_db(du): st.warning("Removed"); st.rerun()
 
 elif menu == "SECURITY SETTINGS":
-    st.title("🔒 SECURITY")
+    st.title("🔒 SECURITY VAULT")
     with st.form("p"):
         new_p = st.text_input("NEW PASSWORD", type="password")
-        if st.form_submit_button("UPDATE"):
+        if st.form_submit_button("UPDATE PASSWORD"):
             if update_password_db(user_now, new_p): st.success("Updated")
