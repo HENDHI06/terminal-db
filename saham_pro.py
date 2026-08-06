@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
@@ -402,7 +403,7 @@ st.sidebar.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-menu_list = ["SCANNER", "STRATEGY SCANNER", "WATCHLIST", "FUNDAMENTAL", "TICKER COMPARISON", "MARKET_NEWS", "MONEY MANAGEMENT", "SECURITY SETTINGS"]
+menu_list = ["SCANNER", "STRATEGY SCANNER", "WATCHLIST", "FUNDAMENTAL", "TICKER COMPARISON", "SECTOR HEATMAP", "RISK CALCULATOR", "MARKET_NEWS", "MONEY MANAGEMENT", "SECURITY SETTINGS"]
 if role == "admin": menu_list.insert(7, "USER MANAGEMENT")
 menu = st.sidebar.radio("Menu", menu_list, label_visibility="collapsed")
 
@@ -612,6 +613,108 @@ elif menu == "TICKER COMPARISON":
                 })
                 st.table(df_compare.set_index("METRIC"))
             except Exception as e: st.error(f"BATTLE_FAILED: {e}")
+
+elif menu == "SECTOR HEATMAP":
+    st.title("🌐 IDX SECTOR HEATMAP & ROTATION")
+    st.write("Pantau performa rata-rata sektor industri di Bursa Efek Indonesia.")
+    
+    sectors = {
+        "Financials": ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK"],
+        "Energy": ["ADRO.JK", "PTBA.JK", "HRUM.JK", "MEDC.JK"],
+        "Basic Materials": ["INCO.JK", "MDKA.JK", "ANTM.JK", "TPIA.JK"],
+        "Consumer Cyclical": ["ASII.JK", "ACES.JK", "ERAA.JK", "MAPI.JK"],
+        "Consumer Non-Cyclical": ["UNVR.JK", "ICBP.JK", "INDF.JK", "GGRM.JK"],
+        "Infrastructures": ["TLKM.JK", "ISAT.JK", "EXCL.JK", "TOWR.JK"],
+        "Technology": ["GOTO.JK", "EMTK.JK", "BUKA.JK"],
+        "Property & Real Estate": ["BSDE.JK", "CTRA.JK", "SMRA.JK", "PWON.JK"],
+        "Healthcare": ["KLBF.JK", "MIKA.JK", "HEAL.JK"]
+    }
+    
+    if st.button("⚡ FETCH SECTOR PERFORMANCE", use_container_width=True):
+        with st.spinner("Analyzing sector performance across IDX..."):
+            sector_data = []
+            all_tickers = [t for lst in sectors.values() for t in lst]
+            try:
+                data = yf.download(all_tickers, period="5d", interval="1d", progress=False, group_by="ticker", threads=True)
+                for sec_name, t_list in sectors.items():
+                    sec_changes = []
+                    for t in t_list:
+                        try:
+                            df_t = data[t] if len(all_tickers) > 1 else data
+                            if isinstance(df_t.columns, pd.MultiIndex): df_t.columns = df_t.columns.get_level_values(0)
+                            if not df_t.empty and len(df_t) >= 2:
+                                c_now = df_t['Close'].iloc[-1]
+                                c_prev = df_t['Close'].iloc[-2]
+                                chg = ((c_now - c_prev) / c_prev) * 100
+                                sec_changes.append(chg)
+                        except: continue
+                    if sec_changes:
+                        avg_chg = sum(sec_changes) / len(sec_changes)
+                        sector_data.append({"Sector": sec_name, "Avg Change (%)": round(avg_chg, 2)})
+            except Exception as e:
+                st.error(f"Gagal mengambil data sektor: {e}")
+            
+            if sector_data:
+                df_sec = pd.DataFrame(sector_data).sort_values(by="Avg Change (%)", ascending=False)
+                
+                fig_sec = px.bar(df_sec, x="Sector", y="Avg Change (%)", color="Avg Change (%)",
+                                 color_continuous_scale=["#ff4b4b", "#1e293b", "#78ff00"],
+                                 title="<b>Rata-rata Perubahan Sektor Hari Ini (%)</b>")
+                fig_sec.update_layout(template="plotly_dark", height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_sec, use_container_width=True)
+                
+                st.dataframe(df_sec, use_container_width=True, hide_index=True)
+            else:
+                st.warning("Tidak dapat memuat data sektor saat ini.")
+
+elif menu == "RISK CALCULATOR":
+    st.title("🧮 POSITION SIZING & RISK CALCULATOR")
+    st.write("Hitung alokasi lot ideal berdasarkan toleransi risiko dan modal portofolio Anda.")
+    
+    with st.form("risk_calc_form"):
+        c1, c2 = st.columns(2)
+        capital = c1.number_input("Total Modal / Portofolio (Rp)", min_value=100000, value=10000000, step=500000)
+        risk_pct = c2.number_input("Maksimal Risiko per Trade (%)", min_value=0.1, max_value=10.0, value=2.0, step=0.1)
+        
+        c3, c4, c5 = st.columns(3)
+        entry_p = c3.number_input("Harga Rencana Beli (Entry)", min_value=1, value=5000)
+        stop_loss_p = c4.number_input("Harga Batas Rugi (Stop Loss / CL)", min_value=1, value=4800)
+        target_p = c5.number_input("Harga Target Profit (Take Profit)", min_value=1, value=5500)
+        
+        calc_btn = st.form_submit_button("HITUNG ALOKASI RISIKO", width="stretch")
+        
+    if calc_btn:
+        if stop_loss_p >= entry_p:
+            st.error("⚠️ Harga Stop Loss harus lebih rendah dari Harga Entry untuk posisi Buy!")
+        else:
+            max_risk_idr = capital * (risk_pct / 100)
+            risk_per_share = entry_p - stop_loss_p
+            total_shares = max_risk_idr / risk_per_share
+            total_lots = math.floor(total_shares / 100)
+            actual_shares = total_lots * 100
+            total_investment = actual_shares * entry_p
+            actual_risk_idr = actual_shares * risk_per_share
+            potential_profit = actual_shares * (target_p - entry_p)
+            risk_reward_ratio = (target_p - entry_p) / risk_per_share if risk_per_share > 0 else 0
+            
+            st.markdown("---")
+            st.markdown("### 📊 HASIL KALKULASI PROFESIONAL")
+            
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("REKOMENDASI LOT", f"{total_lots:,} Lot", f"{actual_shares:,} Lembar")
+            m2.metric("TOTAL INVESTASI", f"Rp {total_investment:,.0f}", f"{(total_investment/capital)*100:.1f}% dari Modal")
+            m3.metric("MAKSIMAL RISIKO", f"Rp {actual_risk_idr:,.0f}", f"{risk_pct}% dari Modal", delta_color="inverse")
+            m4.metric("RISK : REWARD", f"1 : {risk_reward_ratio:.2f}", "Potensi Cuan / Risiko")
+            
+            st.markdown(f"""
+            <div style='background: rgba(13,18,30,0.8); border: 1px solid rgba(0,240,255,0.3); padding: 20px; border-radius: 12px; margin-top: 15px;'>
+                <h4 style='color:#00f0ff; margin-top:0;'>💡 CATATAN EKSEKUSI:</h4>
+                <ul style='color:#94a3b8; margin-bottom:0;'>
+                    <li>Jika harga turun menyentuh <b>Rp {stop_loss_p:,}</b>, segera cut loss untuk mengamankan modal (Kerugian: Rp {actual_risk_idr:,.0f}).</li>
+                    <li>Potensi keuntungan jika mencapai TP di <b>Rp {target_p:,}</b> adalah <b>Rp {potential_profit:,.0f}</b>.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
 elif menu == "MARKET_NEWS":
     st.title("📰 FINANCIAL INTELLIGENCE FEED")
