@@ -223,7 +223,7 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
     background: rgba(255, 255, 255, 0.01) !important; 
     border: 1px solid rgba(255, 255, 255, 0.03) !important;
     border-radius: 8px !important; 
-    padding: 14px 16px !important; /* Diperbesar agar empuk di HP */
+    padding: 14px 16px !important; 
     margin-bottom: 8px !important;
 }
 div[data-testid="stSidebar"] .stRadio label p {
@@ -238,7 +238,7 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 .stButton>button {
     background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(120, 255, 0, 0.15));
     border: 1px solid rgba(0, 240, 255, 0.4); color: #78ff00 !important;
-    border-radius: 12px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.8rem;
+    border-radius: 8px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.8rem;
     min-height: 48px;
 }
 .stButton>button:hover {
@@ -247,7 +247,7 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (ANTI ERROR) ---
+# --- 2. AUTHENTICATION ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -268,7 +268,7 @@ if not st.session_state.logged_in:
                     st.session_state.user = u
                     st.session_state.role = role
                     st.rerun()
-                else: st.error("Akses Ditolak! ID atau Password salah.")
+                else: st.error("ACCESS DENIED / AUTHENTICATION FAILED")
     st.stop()
 
 
@@ -299,7 +299,7 @@ def run_scan(tickers, mode):
     try:
         data = yf.download(tickers, period="2mo", interval="1d", group_by="ticker", threads=True, progress=False)
     except:
-        st.error("Gagal terhubung ke data bursa.")
+        st.error("Failed to connect to market data.")
         return pd.DataFrame()
 
     total = len(tickers)
@@ -336,44 +336,58 @@ def run_scan(tickers, mode):
             if pd.isna(atr_val): atr_val = c_now * 0.03
                 
             results.append({
-                "TICKER": t.replace(".JK", ""), "LAST": int(c_now), "CHG%": round(chg, 2),
+                "TICKER": t.replace(".JK", ""), "LAST": float(c_now), "CHG%": round(chg, 2),
                 "RSI": round(rsi, 1), "VAL(M)": round(val_tr / 1_000_000, 1), 
                 "AI_SCORE": round((chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0), 2),
                 "BREAKOUT": "YA" if is_breakout else "TDK",
-                "TP 1": int(c_now + (1.5 * atr_val)), "TP 2": int(c_now + (2.5 * atr_val)), "EXIT/CL": int(c_now - (1.0 * atr_val)), "FULL": t
+                "TP 1": float(c_now + (1.5 * atr_val)), "TP 2": float(c_now + (2.5 * atr_val)), "EXIT/CL": float(c_now - (1.0 * atr_val)), "FULL": t
             })
         except: continue
     progress.empty()
     return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
 
+# MEMPERBAIKI ERROR TYPEERROR PADA SAAT FORMAT ANGKA DI STRATEGY SCANNER
 def get_trend_signals(ticker_list):
     signals = []
     for ticker in ticker_list:
         try:
             df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
             if df.empty: continue
+            
+            # Mencegah error tipe data MultiIndex jika yfinance error
+            if isinstance(df.columns, pd.MultiIndex): 
+                df.columns = df.columns.get_level_values(0)
+                
             df['MA20'] = df['Close'].rolling(20).mean()
             df['MA50'] = df['Close'].rolling(50).mean()
-            last_ma20, last_ma50 = df['MA20'].iloc[-1], df['MA50'].iloc[-1]
-            prev_ma20, prev_ma50 = df['MA20'].iloc[-2], df['MA50'].iloc[-2]
-            current_price = df['Close'].iloc[-1]
+            
+            # MEMAKSA DATA MENJADI TIPE FLOAT MURNI (Solusi Utama TypeError Layar Merah)
+            last_ma20 = float(df['MA20'].iloc[-1])
+            last_ma50 = float(df['MA50'].iloc[-1])
+            prev_ma20 = float(df['MA20'].iloc[-2])
+            prev_ma50 = float(df['MA50'].iloc[-2])
+            current_price = float(df['Close'].iloc[-1])
+            
+            if math.isnan(current_price) or math.isnan(last_ma20) or math.isnan(last_ma50): 
+                continue
             
             if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
                 signals.append({"ticker": ticker.replace(".JK", ""), "status": "GOLDEN CROSS", "price": current_price, "color": "#78ff00"})
             elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
                 signals.append({"ticker": ticker.replace(".JK", ""), "status": "DEAD CROSS", "price": current_price, "color": "#ff4b4b"})
-        except: continue
+        except Exception as e: 
+            continue
     return signals
 
 def draw_mobile_cards(df):
     for _, row in df.iterrows():
         chg = row.get('CHG%', 0)
         chg_color = "#78ff00" if chg > 0 else "#ff4b4b"
-        val_last  = row.get('LAST', '-')
+        val_last  = row.get('LAST', 0)
         val_entry = row.get('ENTRY', row.get('Entry', val_last)) 
-        val_tp1   = row.get('TP 1', '-')
-        val_tp2   = row.get('TP 2', '-')
-        val_cl    = row.get('EXIT/CL', '-')
+        val_tp1   = row.get('TP 1', 0)
+        val_tp2   = row.get('TP 2', 0)
+        val_cl    = row.get('EXIT/CL', 0)
         val_m     = row.get('VAL(M)', 0)
 
         st.markdown(f"""
@@ -384,11 +398,11 @@ def draw_mobile_cards(df):
                 <span style="color: {chg_color}; font-weight: bold; font-family: JetBrains Mono; font-size: 1rem;">{'+' if chg>0 else ''}{chg}%</span>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #94a3b8;">
-                <div>Harga: <b style="color:#fff;">Rp {val_last}</b></div>
+                <div>Harga: <b style="color:#fff;">Rp {val_last:,.0f}</b></div>
                 <div>Trx: <b style="color:#fff;">{val_m} Miliar</b></div>
-                <div style="color: #00f0ff; font-weight: bold;">Harga Beli: Rp {val_entry}</div>
-                <div style="color: #78ff00; font-weight: bold;">Jual Untung: Rp {val_tp1}</div>
-                <div style="color: #ff4b4b; font-weight: bold;">Jual Rugi: Rp {val_cl}</div>
+                <div style="color: #00f0ff; font-weight: bold;">Harga Beli: Rp {float(val_entry):,.0f}</div>
+                <div style="color: #78ff00; font-weight: bold;">Jual Untung: Rp {float(val_tp1):,.0f}</div>
+                <div style="color: #ff4b4b; font-weight: bold;">Jual Rugi: Rp {float(val_cl):,.0f}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -432,7 +446,7 @@ if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
 # --- 5. CONTENT AREA ---
 
 if menu == "SCANNER":
-    st.title("🛰️ AUTO SCANNER")
+    st.title("🛰️ ALGORITHMIC SCANNER")
     with st.expander("📖 PANDUAN & WAKTU EKSEKUSI", expanded=False):
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
@@ -442,7 +456,7 @@ if menu == "SCANNER":
         **CARA BACA:**
         * **AI Score:** Kekuatan momentum (Makin tinggi angkanya, makin kuat sinyal belinya).
         * **Jual Untung (TP):** Harga antre jual untuk mengamankan keuntungan.
-        * **Jual Rugi (CL):** Harga batas bawah. Segera jual jika harga turun menyentuh angka ini agar kerugian tidak membesar.
+        * **Jual Rugi (CL):** Harga batas bawah. Segera jual jika harga turun menyentuh angka ini.
         """)
 
     if 'results' not in st.session_state: st.session_state.results = None
@@ -459,8 +473,7 @@ if menu == "SCANNER":
     if st.session_state.results is not None:
         df = st.session_state.results
         
-        # KOTAK KESIMPULAN BAHASA MANUSIA
-        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang sangat bagus hari ini. Saham urutan teratas adalah yang paling direkomendasikan.")
+        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang sangat bagus hari ini.")
 
         tab1, tab2, tab3 = st.tabs(["📱 KARTU RINGKAS", "📊 TABEL DATA", "📈 GRAFIK (CHART)"])
         with tab1: draw_mobile_cards(df)
@@ -490,7 +503,7 @@ elif menu == "STRATEGY SCANNER":
     with st.expander("📖 PANDUAN & WAKTU EKSEKUSI", expanded=False):
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * **16:00 WIB ke atas (Bursa Tutup):** Sinyal *Moving Average* (MA) dihitung paling akurat menggunakan harga penutupan akhir bursa.
+        * **16:00 WIB ke atas (Bursa Tutup):** Sinyal *Moving Average* dihitung paling akurat menggunakan harga penutupan final bursa.
         
         **CARA BACA:**
         * 🟢 **Golden Cross:** Sinyal bahwa tren saham akan mulai merangkak naik kuat. Cocok untuk mulai beli (cicil).
@@ -507,7 +520,6 @@ elif menu == "STRATEGY SCANNER":
         with st.spinner(f"Menganalisis ratusan saham..."):
             results = get_trend_signals(watchlist)
             if results:
-                # KOTAK KESIMPULAN
                 st.info("💡 **Kesimpulan:** Di bawah ini adalah saham-saham yang trennya baru saja berbalik arah hari ini. Perhatikan status Golden Cross (Waktunya Beli) atau Dead Cross (Waktunya Jual/Hindari).")
                 for res in results:
                     st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(13,18,30,0.8); padding: 16px; border-radius: 12px; margin-bottom: 12px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']} DETECTED!</h3><p style='margin:6px 0 0 0; color:#94a3b8;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
@@ -552,7 +564,7 @@ elif menu == "FUNDAMENTAL":
     with st.expander("📖 PANDUAN & WAKTU EKSEKUSI", expanded=False):
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Akhir pekan (Sabtu/Minggu) untuk meriset saham yang cocok untuk tabungan investasi jangka panjang.
+        * Akhir pekan (Sabtu/Minggu) atau malam hari untuk reset portofolio investasi jangka panjang.
         
         **CARA BACA:**
         * **Graham Intrinsic Value:** Nilai kewajaran perusahaan. Jika harga pasar lebih murah, saham status *Undervalued* (Diskon/Murah).
@@ -649,6 +661,10 @@ elif menu == "SECTOR HEATMAP":
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
         * **15:30 WIB:** Melihat ke arah mana uang triliunan rupiah berotasi untuk persiapan trading esok hari.
+        
+        **CARA BACA:**
+        * **Sektor Hijau:** Sektor sedang memimpin pasar (*inflow*). Cari saham di sektor ini.
+        * **Sektor Merah:** Sektor sedang koreksi/dihindari.
         """)
     
     sectors = {
@@ -803,10 +819,10 @@ elif menu == "FOREIGN & BROKER FLOW":
                 if not df_ff.empty:
                     if isinstance(df_ff.columns, pd.MultiIndex): df_ff.columns = df_ff.columns.get_level_values(0)
                     
-                    # PERBAIKAN BUG `nan` DI SINI (DENGAN FILLNA)
+                    # BUG FIX: Cegah nilai kosong jadi 'nan'
                     df_ff['Multiplier'] = ((df_ff['Close'] - df_ff['Low']) - (df_ff['High'] - df_ff['Close'])) / (df_ff['High'] - df_ff['Low'] + 1e-9)
                     df_ff['CMF_20'] = (df_ff['Multiplier'] * df_ff['Volume']).rolling(20).sum() / df_ff['Volume'].rolling(20).sum()
-                    df_ff['CMF_20'] = df_ff['CMF_20'].fillna(0) # Mencegah NaN jadi angka 0
+                    df_ff['CMF_20'] = df_ff['CMF_20'].fillna(0)
                     latest_cmf = df_ff['CMF_20'].iloc[-1]
                     
                     if latest_cmf > 0.05:
