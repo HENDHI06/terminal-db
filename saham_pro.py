@@ -245,6 +245,9 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
     border-radius: 8px; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.8rem;
     min-height: 48px; width: 100%;
 }
+.stButton>button:hover {
+    background: linear-gradient(135deg, #00f0ff, #78ff00); color: #07090f !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -358,6 +361,54 @@ def run_scan(tickers, mode):
     progress.empty()
     return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
 
+def get_trend_signals(ticker_list):
+    signals = []
+    for ticker in ticker_list:
+        try:
+            df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
+            if df.empty: continue
+            
+            if isinstance(df.columns, pd.MultiIndex): 
+                df.columns = df.columns.get_level_values(0)
+                
+            df['MA20'] = df['Close'].rolling(20).mean()
+            df['MA50'] = df['Close'].rolling(50).mean()
+            
+            df['Multiplier'] = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
+            df['CMF_20'] = (df['Multiplier'] * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
+            df['CMF_20'] = df['CMF_20'].fillna(0)
+            
+            last_ma20 = float(df['MA20'].iloc[-1])
+            last_ma50 = float(df['MA50'].iloc[-1])
+            prev_ma20 = float(df['MA20'].iloc[-2])
+            prev_ma50 = float(df['MA50'].iloc[-2])
+            current_price = float(df['Close'].iloc[-1])
+            cmf_val = float(df['CMF_20'].iloc[-1])
+            
+            if math.isnan(current_price) or math.isnan(last_ma20) or math.isnan(last_ma50): 
+                continue
+            
+            if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
+                if cmf_val > 0:
+                    status_text = "🟢 GOLDEN CROSS + AKUMULASI BANDAR (Sangat Kuat)"
+                    color_code = "#78ff00"
+                else:
+                    status_text = "🟡 GOLDEN CROSS (Hati-hati, Bandar Distribusi)"
+                    color_code = "#ffcc00"
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
+            
+            elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
+                if cmf_val < 0:
+                    status_text = "🔴 DEAD CROSS + DISTRIBUSI BANDAR (Sangat Bahaya)"
+                    color_code = "#ff4b4b"
+                else:
+                    status_text = "🟠 DEAD CROSS (Koreksi Normal Wajar)"
+                    color_code = "#ff9900"
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
+        except Exception as e: 
+            continue
+    return signals
+
 def draw_mobile_cards(df):
     for _, row in df.iterrows():
         chg = row.get('CHG%', 0)
@@ -365,6 +416,7 @@ def draw_mobile_cards(df):
         val_last  = row.get('LAST', 0)
         val_entry = row.get('ENTRY', row.get('Entry', val_last)) 
         val_tp1   = row.get('TP 1', 0)
+        val_tp2   = row.get('TP 2', 0)
         val_cl    = row.get('EXIT/CL', 0)
         val_m     = row.get('VAL(M)', 0)
 
@@ -397,6 +449,7 @@ st.sidebar.markdown(f"""
         <p style='margin:0; font-size:9px; color:#78ff00; font-family:Orbitron; margin-top:4px;'>NODE ACTIVE | {role.upper()}</p>
         <hr style='border:0.1px solid rgba(255,255,255,0.08); margin:10px 0;'>
         <p style='font-size:9px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>LST: {last_l}</p>
+        <p style='font-size:9px; color:#94a3b8; margin:2px 0; font-family:JetBrains Mono;'>IP : {ip_l}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -442,16 +495,6 @@ if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
 # =========================================================================
 if menu == "🖥️ DASHBOARD UTAMA":
     st.markdown(f"<h2 style='color:#fff;'>Selamat Datang, <span style='color:#00f0ff;'>{user_now.upper()}!</span></h2>", unsafe_allow_html=True)
-    
-    # --- QUICK ACTION BUTTONS ---
-    st.markdown("### 🚀 Akses Cepat (Quick Actions)")
-    qa1, qa2, qa3, qa4 = st.columns(4)
-    if qa1.button("🛒 Beli Saham"): st.info("Buka menu **💼 DOMPET TRADING** di kiri untuk mencatat pembelian.")
-    if qa2.button("⚡ Scan Pasar"): st.info("Buka menu **🛰️ AUTO SCANNER** di kiri untuk mulai scan.")
-    if qa3.button("🏛️ Cek Bandar"): st.info("Buka menu **🏛️ JEJAK BANDAR** di kiri untuk lacak aliran dana.")
-    if qa4.button("🎯 Cek Support"): st.info("Buka menu **🎯 AUTO SUP/RES** di kiri untuk cari titik pantulan.")
-    
-    st.markdown("---")
 
     # --- IHSG STATUS ---
     try:
@@ -520,13 +563,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
     with c_ai:
         st.markdown("<h3 style='font-size:1rem; color:#78ff00;'>🔥 Top Pick AI Hari Ini</h3>", unsafe_allow_html=True)
         with st.spinner("Memindai cepat saham Blue Chip..."):
-            liquid_stocks = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "AMRT.JK", "ADRO.JK", "PTBA.JK", "ICBP.JK", "GOTO.JK"]
+            liquid_stocks = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "AMRT.JK", "ADRO.JK", "PTBA.JK", "ICBP.JK", "GOTO.JK", "PGEO.JK"]
             quick_res = run_scan(liquid_stocks, "Santai")
             if not quick_res.empty:
                 for idx, row in quick_res.head(3).iterrows():
                     chg_color = "#78ff00" if row['CHG%'] > 0 else "#ff4b4b"
                     st.markdown(f"<div style='background:rgba(13,18,30,0.5); border-left:4px solid {chg_color}; padding:10px; border-radius:8px; margin-bottom:8px;'><b style='color:#00f0ff;'>{row['TICKER']}</b> <span style='float:right; color:{chg_color}; font-weight:bold;'>{'+' if row['CHG%']>0 else ''}{row['CHG%']}%</span></div>", unsafe_allow_html=True)
-            else: st.info("Tidak ada sinyal momentum di Blue Chips pagi ini.")
+            else: st.info("Tidak ada sinyal AI kuat pagi ini.")
 
     with c_mover:
         st.markdown("<h3 style='font-size:1rem; color:#ff4b4b;'>📈 Top Movers (Blue Chips)</h3>", unsafe_allow_html=True)
@@ -559,6 +602,7 @@ elif menu == "🕯️ POLA CANDLE AI":
     with st.expander("📖 CARA KERJA DETEKTOR CANDLESTICK", expanded=False):
         st.markdown("""
         **Biarkan AI yang menghafal bentuk grafik untukmu!**
+        Fitur ini mendeteksi pola *candlestick* terbaru yang berpotensi menjadi titik balik arah (Reversal).
         * **Bullish Engulfing / Hammer:** Tanda bandar mulai menadah barang di bawah. Harga siap naik! 🚀
         * **Bearish Engulfing / Shooting Star:** Tanda bandar jualan di pucuk. Harga rawan longsor! ⚠️
         """)
@@ -600,16 +644,16 @@ elif menu == "🕯️ POLA CANDLE AI":
                         kesimpulan = "Luar Biasa! Terdapat candle hijau besar yang 'menelan' candle merah sebelumnya. Sinyal kuat bandar mulai akumulasi agresif."
                     elif is_hammer:
                         pola, warna = "🔨 HAMMER (PALU) TERDETEKSI!", "#78ff00"
-                        kesimpulan = "Bagus! Ekor bawah yang panjang menandakan perlawanan kuat dari pembeli saat harga dijatuhkan."
+                        kesimpulan = "Bagus! Ekor bawah yang panjang menandakan perlawanan kuat dari *buyer* (pembeli) saat harga dijatuhkan."
                     elif is_bear_engulfing:
                         pola, warna = "⚠️ BEARISH ENGULFING TERDETEKSI!", "#ff4b4b"
-                        kesimpulan = "BAHAYA! Candle merah besar menelan candle hijau sebelumnya. Sinyal kuat bandar sedang guyur barang massal."
+                        kesimpulan = "BAHAYA! Candle merah besar menelan candle hijau sebelumnya. Sinyal kuat bandar sedang guyur/buang barang massal."
                     elif is_shooting_star:
                         pola, warna = "🌠 SHOOTING STAR TERDETEKSI!", "#ff4b4b"
-                        kesimpulan = "Hati-hati! Ekor atas panjang menandakan tekanan jual bandar di atas sangat kuat."
+                        kesimpulan = "Hati-hati! Ekor atas panjang menandakan *buyer* gagal mengangkat harga karena tekanan jual bandar di atas sangat kuat."
                     elif is_doji:
                         pola, warna = "⚖️ POLA DOJI TERDETEKSI!", "#00f0ff"
-                        kesimpulan = "Pasar sedang bimbang. Bersiap untuk ledakan arah harga berikutnya."
+                        kesimpulan = "Pasar sedang bimbang/bingung. Bersiap untuk ledakan arah harga berikutnya."
                         
                     st.markdown(f"<div style='background:rgba(13,18,30,0.8); border:2px solid {warna}; padding:20px; border-radius:12px; text-align:center;'><h3 style='margin:0; color:{warna};'>{pola}</h3><p style='color:#fff; font-size:14px; margin-top:10px;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
                     
@@ -627,7 +671,7 @@ elif menu == "🛰️ AUTO SCANNER":
     c1, c2 = st.columns([4,1])
     with c1: mode_scan = st.radio("PILIH SENSITIVITAS SCANNER:", ["Santai", "Profesional", "Pro"], horizontal=True)
     with c2: 
-        if st.button("⚡ MULAI SCAN", use_container_width=True):
+        if st.button("⚡ MULAI SCAN PASAR", use_container_width=True):
             res = run_scan(tickers, mode_scan)
             if not res.empty: st.session_state.results = res; st.rerun()
             else: st.warning("Scan selesai: Belum ada saham yang momentumnya cukup kuat saat ini.")
@@ -636,7 +680,7 @@ elif menu == "🛰️ AUTO SCANNER":
         df = st.session_state.results
         st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang bagus.")
 
-        tab1, tab2, tab3 = st.tabs(["📱 KARTU", "📊 TABEL", "📈 GRAFIK"])
+        tab1, tab2, tab3 = st.tabs(["📱 KARTU RINGKAS", "📊 TABEL DATA", "📈 GRAFIK (CHART)"])
         with tab1: draw_mobile_cards(df)
         with tab2: st.dataframe(df.drop(columns=['FULL'], errors='ignore'), use_container_width=True, hide_index=True)
         with tab3:
@@ -667,36 +711,10 @@ elif menu == "⚡ STRATEGY SCANNER":
 
     if st.button("🚀 MULAI CARI SINYAL", use_container_width=True):
         with st.spinner(f"Menganalisis perpaduan Tren & Jejak Bandar..."):
-            # Perlu memasukkan fungsi get_trend_signals baru jika belum
-            signals = []
-            for ticker in watchlist:
-                try:
-                    df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
-                    if df.empty: continue
-                    if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-                    df['MA20'] = df['Close'].rolling(20).mean()
-                    df['MA50'] = df['Close'].rolling(50).mean()
-                    df['Multiplier'] = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-                    df['CMF_20'] = (df['Multiplier'] * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
-                    df['CMF_20'] = df['CMF_20'].fillna(0)
-                    last_ma20, last_ma50 = float(df['MA20'].iloc[-1]), float(df['MA50'].iloc[-1])
-                    prev_ma20, prev_ma50 = float(df['MA20'].iloc[-2]), float(df['MA50'].iloc[-2])
-                    current_price, cmf_val = float(df['Close'].iloc[-1]), float(df['CMF_20'].iloc[-1])
-                    if math.isnan(current_price) or math.isnan(last_ma20): continue
-                    
-                    if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
-                        if cmf_val > 0: status_text, color_code = "🟢 GOLDEN CROSS + AKUMULASI BANDAR (Sangat Kuat)", "#78ff00"
-                        else: status_text, color_code = "🟡 GOLDEN CROSS (Hati-hati, Bandar Distribusi)", "#ffcc00"
-                        signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
-                    elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
-                        if cmf_val < 0: status_text, color_code = "🔴 DEAD CROSS + DISTRIBUSI BANDAR (Sangat Bahaya)", "#ff4b4b"
-                        else: status_text, color_code = "🟠 DEAD CROSS (Koreksi Normal Wajar)", "#ff9900"
-                        signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
-                except: continue
-            
-            if signals:
+            results = get_trend_signals(watchlist)
+            if results:
                 st.info("💡 **Kesimpulan:** Cari saham yang bersatus **Golden Cross + AKUMULASI BANDAR (Warna Hijau)**, ini adalah sinyal beli paling matang dan aman.")
-                for res in signals:
+                for res in results:
                     st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(13,18,30,0.8); padding: 16px; border-radius: 12px; margin-bottom: 12px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}</h3><p style='margin:6px 0 0 0; color:#94a3b8;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada sinyal pembalikan tren (Cross) yang terdeteksi hari ini.")
 
@@ -807,6 +825,7 @@ elif menu == "📅 SIKLUS MUSIMAN":
             except: st.error("Data sejarah tidak cukup.")
 
 elif menu == "📟 CEK FUNDAMENTAL":
+    st.markdown("""<style>.stMetric {border-left: 4px solid #00f0ff !important;}</style>""", unsafe_allow_html=True)
     st.title("📟 CEK FUNDAMENTAL")
     col_in1, col_in2 = st.columns([3, 1])
     with col_in1: target_f = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
@@ -814,7 +833,7 @@ elif menu == "📟 CEK FUNDAMENTAL":
 
     if btn_analyze:
         full_tk = f"{target_f}.JK" if not target_f.endswith(".JK") else target_f
-        with st.spinner("Menarik data laporan keuangan..."):
+        with st.spinner("Menarik data..."):
             try:
                 info = yf.Ticker(full_tk).info
                 current_price = info.get('currentPrice') or info.get('previousClose', 1)
@@ -881,6 +900,7 @@ elif menu == "🌐 PETA SEKTOR":
                         except: continue
                     if sec_changes: sector_data.append({"Sektor": sec_name, "Perubahan (%)": round(sum(sec_changes) / len(sec_changes), 2)})
             except: pass
+            
             if sector_data:
                 df_sec = pd.DataFrame(sector_data).sort_values(by="Perubahan (%)", ascending=False)
                 fig_sec = px.bar(df_sec, x="Sektor", y="Perubahan (%)", color="Perubahan (%)", color_continuous_scale=["#ff4b4b", "#1e293b", "#78ff00"])
@@ -911,15 +931,10 @@ elif menu == "🧮 KALKULATOR TRADING":
                 max_risk_idr = capital * (risk_pct / 100)
                 risk_per_share = entry_p - stop_loss_p
                 total_lots = math.floor((max_risk_idr / risk_per_share) / 100)
-                actual_shares = total_lots * 100
-                st.markdown("---")
-                m1, m2, m3 = st.columns(3)
-                m1.metric("BELI MAKSIMAL", f"{total_lots:,} Lot")
-                m2.metric("MODAL TERPAKAI", f"Rp {actual_shares * entry_p:,.0f}")
-                m3.metric("POTENSI RUGI (CL)", f"Rp {actual_shares * risk_per_share:,.0f}", delta_color="inverse")
+                st.success(f"💡 Beli Maksimal: **{total_lots:,} Lot**. Modal terpakai: Rp {total_lots*100*entry_p:,.0f}.")
                 
     with tab_avg:
-        st.info("💡 Penyelamat Mental: Hitung lot tambahan untuk menurunkan harga rata-rata (Average Down).")
+        st.info("💡 Hitung lot tambahan untuk menurunkan harga rata-rata (Average Down).")
         with st.form("avg_calc_form"):
             c1, c2 = st.columns(2)
             p1 = c1.number_input("Harga Nyangkut (Atas)", min_value=1, value=1000)
@@ -930,18 +945,13 @@ elif menu == "🧮 KALKULATOR TRADING":
             calc_avg_btn = st.form_submit_button("HITUNG AVERAGE BARU", width="stretch")
             
         if calc_avg_btn:
-            if p2 >= p1: st.error("⚠️ Harga Baru harus lebih murah!")
+            if p2 >= p1: st.error("⚠️ Harga Baru harus lebih murah dari Harga Nyangkut!")
             else:
                 total_modal_lama = p1 * l1 * 100
                 total_modal_baru = p2 * l2 * 100
                 total_lot_akhir = l1 + l2
                 new_avg = (total_modal_lama + total_modal_baru) / (total_lot_akhir * 100)
-                st.markdown("---")
-                a1, a2, a3 = st.columns(3)
-                a1.metric("AVERAGE BARU", f"Rp {new_avg:,.0f}")
-                a2.metric("TOTAL LOT", f"{total_lot_akhir:,} Lot")
-                a3.metric("TAMBAHAN MODAL", f"Rp {total_modal_baru:,.0f}")
-                st.success(f"💡 Cukup tunggu harga mantul ke **Rp {new_avg:,.0f}** untuk BEP (Impas).")
+                st.success(f"💡 Harga Rata-ratamu turun menjadi **Rp {new_avg:,.0f}**! Modal tambahan: Rp {total_modal_baru:,.0f}")
 
 elif menu == "💰 PEMBURU DIVIDEN":
     st.title("💰 PEMBURU DIVIDEN")
@@ -1003,81 +1013,14 @@ elif menu == "🏛️ JEJAK BANDAR":
 
 elif menu == "📰 BERITA PASAR":
     st.title("📰 FINANCIAL INTELLIGENCE CENTER")
-    
-    st.markdown("### 🌍 Global Macro Radar")
-    with st.spinner("Menarik data pasar global..."):
-        try:
-            macro_tickers = {"Dow Jones": "^DJI", "Nasdaq": "^IXIC", "Minyak (WTI)": "CL=F", "Kurs (USD/IDR)": "IDR=X"}
-            macro_data = yf.download(list(macro_tickers.values()), period="5d", interval="1d", progress=False)
-            c1, c2, c3, c4 = st.columns(4)
-            columns = [c1, c2, c3, c4]
-            for i, (name, symbol) in enumerate(macro_tickers.items()):
-                try:
-                    close_data = macro_data['Close'][symbol].dropna()
-                    if len(close_data) >= 2:
-                        last_price, prev_price = float(close_data.iloc[-1]), float(close_data.iloc[-2])
-                        pct_change = ((last_price - prev_price) / prev_price) * 100
-                        if name == "Kurs (USD/IDR)": columns[i].metric(label=name, value=f"Rp {last_price:,.0f}", delta=f"{pct_change:.2f}%", delta_color="inverse")
-                        else: columns[i].metric(label=name, value=f"{last_price:,.2f}", delta=f"{pct_change:.2f}%")
-                except: columns[i].metric(label=name, value="N/A", delta="0.00%")
-        except: st.warning("Data Global Macro tidak dapat diakses.")
-
-    st.markdown("---")
-    t_gen, t_spec, t_corp = st.tabs(["🌐 BERITA PASAR", "🔍 CARI BERITA SAHAM", "📅 CORPORATE ACTION"])
-    
-    def analyze_sentiment(text):
-        pos_words = ['naik', 'laba', 'untung', 'lonjak', 'akuisisi', 'investasi', 'meroket', 'cuan', 'diborong', 'dividen']
-        neg_words = ['turun', 'rugi', 'anjlok', 'suspend', 'kasus', 'gagal', 'merosot', 'jeblok', 'dilepas', 'resesi']
-        score = sum(1 for w in pos_words if w in text.lower()) - sum(1 for w in neg_words if w in text.lower())
-        if score > 0: return "🟢 POSITIF", "#78ff00"
-        elif score < 0: return "🔴 NEGATIF", "#ff4b4b"
-        else: return "⚪ NETRAL", "#94a3b8"
-
-    def check_if_new(p_parsed):
-        if p_parsed and (time.time() - mktime(p_parsed)) < (12 * 3600): return "🔥 NEW"
-        return ""
-
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
-    with t_gen:
-        with st.spinner("Menarik tajuk berita..."):
-            try:
-                feed = feedparser.parse(requests.get("https://news.google.com/rss/search?q=saham+indonesia+ihsg&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
-                for entry in feed.entries[:10]: 
-                    sent_text, sent_color = analyze_sentiment(entry.title)
-                    fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
-                    st.markdown(f"<div style='background:rgba(13, 18, 30, 0.8); border:1px solid rgba(0, 240, 255, 0.2); padding:16px; border-radius:12px; margin-bottom:12px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:bold; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#ff4b4b; font-weight:bold;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#00f0ff; text-decoration:none; font-size:1rem; font-weight:bold;'>{entry.title}</a><p style='color:#94a3b8; font-size:0.8rem; margin-top:8px; margin-bottom:0;'>⏰ {entry.published}</p></div>", unsafe_allow_html=True)
-            except: st.error("Koneksi berita terputus.")
-                
-    with t_spec:
-        with st.form("f_news"):
-            search_t = st.text_input("Ketik Kode Saham").upper().strip()
-            btn_news = st.form_submit_button("CARI BERITA", width="stretch")
-        if btn_news and search_t:
-            with st.spinner(f"Mencari berita {search_t}..."):
-                try:
-                    feed_spec = feedparser.parse(requests.get(f"https://news.google.com/rss/search?q={search_t}+saham&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
-                    if not feed_spec.entries: st.warning("Berita tidak ditemukan.")
-                    for entry in feed_spec.entries[:8]: 
-                        sent_text, sent_color = analyze_sentiment(entry.title)
-                        st.markdown(f"<div style='background:rgba(13, 18, 30, 0.8); border:1px solid rgba(0, 240, 255, 0.2); padding:16px; border-radius:12px; margin-bottom:12px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:bold; color:{sent_color};'>{sent_text}</span></div><a href='{entry.link}' target='_blank' style='color:#00f0ff; text-decoration:none; font-size:1rem; font-weight:bold;'>{entry.title}</a></div>", unsafe_allow_html=True)
-                except: st.error("Pencarian berita gagal.")
-                
-    with t_corp:
-        st.info("💡 Pantau berita jadwal *Cum Date* Dividen atau Right Issue terbaru di sini.")
-        with st.spinner("Memindai aksi korporasi..."):
-            try:
-                feed_corp = feedparser.parse(requests.get("https://news.google.com/rss/search?q=jadwal+dividen+OR+right+issue+OR+cum+date+saham+indonesia&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
-                for entry in feed_corp.entries[:10]: 
-                    st.markdown(f"<div style='background:rgba(13, 18, 30, 0.8); border:1px solid #78ff00; padding:16px; border-radius:12px; margin-bottom:12px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:bold; color:#78ff00;'>🟢 INFO CORPORATE ACTION</span></div><a href='{entry.link}' target='_blank' style='color:#fff; text-decoration:none; font-size:1rem; font-weight:bold;'>{entry.title}</a></div>", unsafe_allow_html=True)
-            except: st.error("Koneksi jadwal terputus.")
+    st.info("Silakan cek berita pasar di menu Dashboard Utama (Berita global akan pindah ke sana di masa depan).")
 
 elif menu == "💼 DOMPET TRADING":
     st.title("💼 BUKU DOMPET TRADING & JURNAL")
     
     c_title, c_toggle = st.columns([3, 1])
-    show_saldo = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False)
-    format_privacy = lambda v: f"Rp {v:,.0f}" if show_saldo else "Rp *****"
+    privacy_mode = not c_toggle.checkbox("👁️ Tampilkan Saldo", value=False)
+    format_privacy = lambda v, c=True: ("Rp *****" if c else "*****") if privacy_mode else (f"Rp {v:,.0f}" if c else f"{v:,.0f}")
 
     tab1, tab2, tab3 = st.tabs(["📈 SAHAM DIMILIKI", "📜 HISTORY JUAL", "📊 JURNAL AI"])
     
@@ -1113,7 +1056,7 @@ elif menu == "💼 DOMPET TRADING":
             
             m1, m2, m3 = st.columns(3)
             m1.metric("MODAL AWAL", format_privacy(t_inv))
-            m2.metric("UNTUNG/RUGI", format_privacy(t_pl), f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%" if show_saldo else "*****")
+            m2.metric("UNTUNG/RUGI", format_privacy(t_pl), f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%" if not privacy_mode else "*****")
             m3.metric("UANG SEKARANG", format_privacy(t_inv + t_pl))
 
             st.markdown("---")
@@ -1154,7 +1097,6 @@ elif menu == "💼 DOMPET TRADING":
                 
                 if not strat_analysis.empty:
                     best_strat = strat_analysis.loc[strat_analysis['Win Rate (%)'].idxmax()]
-                    worst_strat = strat_analysis.loc[strat_analysis['Win Rate (%)'].idxmin()]
                     st.success(f"💡 **Saran AI:** Kamu paling jago saat pakai strategi **'{best_strat['strategy']}'** (Akurasi {best_strat['Win Rate (%)']:.0f}%).")
             
             total_trades = len(df_h)
