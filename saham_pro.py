@@ -7,7 +7,6 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 import time
-from time import mktime
 import warnings
 import os
 import requests 
@@ -26,12 +25,13 @@ st.set_page_config(
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# --- DATABASE & LOGIC FUNGSI ---
+# --- DATABASE & LOGIC FUNGSI (DIOPTIMASI AGAR TIDAK MACET) ---
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
     for url in providers:
         try:
-            response = requests.get(url, timeout=3).json()
+            # Timeout dipersingkat jadi 1.5 detik agar login tidak lemot
+            response = requests.get(url, timeout=1.5).json()
             ip = response.get('ip') or response.get('query', 'Unknown')
             city = response.get('city', 'Unknown')
             region = response.get('region', 'Unknown') or response.get('regionName', 'Unknown')
@@ -39,35 +39,45 @@ def get_visitor_info():
         except: continue
     return "Mobile Node", "Cloud"
 
-def update_login_info(u):
-    ip, loc = get_visitor_info()
-    tz = pytz.timezone('Asia/Jakarta') 
-    now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-    df = conn_gs.read(worksheet="users", ttl=0)
-    for col in ['last_login', 'ip_address', 'location']:
-        if col not in df.columns: df[col] = "" 
-        df[col] = df[col].astype(str)
-    idx = df.index[df['username'] == u].tolist()
-    if idx:
-        df.at[idx[0], 'last_login'] = now
-        df.at[idx[0], 'ip_address'] = ip
-        df.at[idx[0], 'location'] = loc
-        conn_gs.update(worksheet="users", data=df)
+# FUNGSI LOGIN & UPDATE DISATUKAN AGAR HEMAT API GOOGLE SHEETS
+def authenticate_user(u, p):
+    try:
+        df = conn_gs.read(worksheet="users", ttl=0)
+        if df.empty: return None
+        
+        df['username'] = df['username'].astype(str).str.strip()
+        df['password'] = df['password'].astype(str).str.strip()
+        
+        user_match = df[(df['username'] == str(u).strip()) & (df['password'] == str(p).strip())]
+        
+        if not user_match.empty:
+            idx = user_match.index[0]
+            role = str(user_match.iloc[0]['role'])
+            
+            ip, loc = get_visitor_info()
+            tz = pytz.timezone('Asia/Jakarta') 
+            now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+            
+            for col in ['last_login', 'ip_address', 'location']:
+                if col not in df.columns: df[col] = "" 
+                df[col] = df[col].astype(str)
+                
+            df.at[idx, 'last_login'] = now
+            df.at[idx, 'ip_address'] = ip
+            df.at[idx, 'location'] = loc
+            
+            conn_gs.update(worksheet="users", data=df)
+            return role
+        return None
+    except Exception as e:
+        st.error(f"Koneksi Google Sheets Terganggu: {e}")
+        return None
 
 def get_sidebar_log(u):
     df = conn_gs.read(worksheet="users", ttl=60)
     user_data = df[df['username'] == u]
     if not user_data.empty: return user_data.iloc[0]['last_login'], user_data.iloc[0]['ip_address'], user_data.iloc[0]['location']
     return "-", "-", "-"
-
-def check_login_db(u, p):
-    df = conn_gs.read(worksheet="users", ttl=0)
-    if df.empty: return None
-    df['username'] = df['username'].astype(str).str.strip()
-    df['password'] = df['password'].astype(str).str.strip()
-    user_match = df[(df['username'] == str(u).strip()) & (df['password'] == str(p).strip())]
-    if not user_match.empty: return str(user_match.iloc[0]['role'])
-    return None
 
 def add_to_portfolio(u, t, p, l, tp, cl):
     df = conn_gs.read(worksheet="portfolio", ttl=0)
@@ -248,7 +258,7 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (ANTI ERROR) ---
+# --- 2. AUTHENTICATION (ANTI HANG / TIMEOUT) ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -262,14 +272,15 @@ if not st.session_state.logged_in:
             u = st.text_input("NODE ID").strip()
             p = st.text_input("ACCESS KEY", type="password")
             if st.form_submit_button("INITIALIZE SESSION", width="stretch"):
-                role = check_login_db(u, p)
-                if role:
-                    update_login_info(u)
-                    st.session_state.logged_in = True
-                    st.session_state.user = u
-                    st.session_state.role = role
-                    st.rerun()
-                else: st.error("ACCESS DENIED / AUTHENTICATION FAILED")
+                with st.spinner("🔑 Menghubungkan ke Database..."):
+                    role = authenticate_user(u, p)
+                    if role:
+                        st.session_state.logged_in = True
+                        st.session_state.user = u
+                        st.session_state.role = role
+                        st.rerun()
+                    else: 
+                        st.error("ACCESS DENIED / AUTHENTICATION FAILED")
     st.stop()
 
 
@@ -496,7 +507,8 @@ if menu == "SCANNER":
 
     if st.session_state.results is not None:
         df = st.session_state.results
-        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang sangat bagus hari ini.")
+        
+        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang bagus. Kolom 'BANDAR' menunjukkan apakah saham ini sedang diborong institusi (Akumulasi) atau hanya jebakan ritel.")
 
         tab1, tab2, tab3 = st.tabs(["📱 KARTU RINGKAS", "📊 TABEL DATA", "📈 GRAFIK (CHART)"])
         with tab1: draw_mobile_cards(df)
@@ -539,9 +551,9 @@ elif menu == "STRATEGY SCANNER":
         with st.spinner(f"Menganalisis perpaduan Tren & Jejak Bandar..."):
             results = get_trend_signals(watchlist)
             if results:
-                st.info("💡 **Kesimpulan:** Perhatikan status di bawah ini. Cari saham yang bersatus **Golden Cross + AKUMULASI BANDAR**, ini adalah sinyal beli paling matang dan aman.")
+                st.info("💡 **Kesimpulan:** Perhatikan baik-baik status di bawah ini. Cari saham yang bersatus **Golden Cross + AKUMULASI BANDAR (Warna Hijau)**, ini adalah sinyal beli paling matang dan aman.")
                 for res in results:
-                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(13,18,30,0.8); padding: 16px; border-radius: 12px; margin-bottom: 12px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1rem;'>{res['status']}</h3><p style='margin:6px 0 0 0; color:#94a3b8;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='border: 1px solid {res['color']}; background: rgba(13,18,30,0.8); padding: 16px; border-radius: 12px; margin-bottom: 12px;'><h3 style='color:{res['color']}; margin:0; font-family:Orbitron; font-size:1.1rem;'>{res['status']}</h3><p style='margin:6px 0 0 0; color:#94a3b8;'>Saham: <b style='color:#fff;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada sinyal pembalikan tren (Cross) yang terdeteksi hari ini.")
 
 elif menu == "WATCHLIST":
@@ -549,7 +561,9 @@ elif menu == "WATCHLIST":
     with st.expander("📖 PANDUAN & WAKTU EKSEKUSI", expanded=False):
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Bebas kapan saja selama jam bursa.
+        * Bebas kapan saja selama jam bursa (09:00 - 16:00 WIB).
+        
+        Masukkan kode saham yang sedang kamu incar/pantau ke dalam daftar ini. Lalu klik tombol **SCAN** untuk memantau apakah ada dari saham tersebut yang sedang membentuk momentum bagus untuk dibeli hari ini.
         """)
         
     my_wl = get_watchlist(user_now)
@@ -581,7 +595,11 @@ elif menu == "FUNDAMENTAL":
     with st.expander("📖 PANDUAN & WAKTU EKSEKUSI", expanded=False):
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
-        * Akhir pekan (Sabtu/Minggu) untuk meriset saham yang cocok untuk tabungan investasi jangka panjang.
+        * Akhir pekan (Sabtu/Minggu) atau malam hari untuk reset portofolio investasi jangka panjang.
+        
+        **CARA BACA:**
+        * **Graham Intrinsic Value:** Nilai kewajaran perusahaan. Jika harga pasar lebih murah, saham status *Undervalued* (Diskon/Murah).
+        * **Altman Z-Score:** Menilai tingkat keamanan finansial. Skor di atas 2.9 berarti perusahaan sangat sehat. Skor di bawah 1.8 berarti perusahaan banyak utang dan rawan bangkrut.
         """)
     
     col_in1, col_in2 = st.columns([3, 1])
@@ -611,6 +629,7 @@ elif menu == "FUNDAMENTAL":
 
                 graham = math.sqrt(22.5 * eps * bvps) if (eps > 0 and bvps > 0) else 0
                 
+                # KOTAK KESIMPULAN VALUASI
                 if current_price < graham:
                     st.success(f"💡 **Kesimpulan Valuasi:** Harga wajar saham ini seharusnya **Rp {graham:,.0f}**, tetapi harga di pasar sekarang baru Rp {current_price:,.0f}. Berarti saham ini masih sangat **MURAH / UNDERVALUED**.")
                 else:
@@ -627,6 +646,7 @@ elif menu == "FUNDAMENTAL":
                 rc2.metric("Rasio Utang (DER)", f"{der:.1f}%", delta="Bahaya" if der > 150 else "Aman", delta_color="inverse")
                 with rc3: st.markdown(f"<div style='background:rgba(13,18,30,0.8); border:1px solid {z_color}; padding:14px; border-radius:12px; text-align:center;'><p style='margin:0; font-size:10px; color:{z_color}; font-family:Orbitron;'>ALTMAN Z-SCORE</p><h3 style='margin:4px 0 0 0; color:{z_color}; font-family:JetBrains Mono;'>{z:.2f}</h3></div>", unsafe_allow_html=True)
 
+                # KOTAK KESIMPULAN KESEHATAN
                 if z > 2.9:
                     st.info(f"💡 **Kesimpulan Keuangan:** Perusahaan ini **SANGAT SEHAT** dan sangat jauh dari risiko kebangkrutan.")
                 elif z > 1.8:
@@ -654,6 +674,7 @@ elif menu == "TICKER COMPARISON":
                 i1, i2 = yf.Ticker(f"{tk1}.JK").info, yf.Ticker(f"{tk2}.JK").info
                 get_val = lambda d, k: d.get(k, 0) or 0
                 st.markdown(f"<div style='display: flex; justify-content: space-around; align-items: center; background: rgba(13,18,30,0.8); padding: 20px; border-radius: 14px; border: 1px solid rgba(0,240,255,0.3);'><div style='text-align: center;'><h1 style='margin:0; color:#00f0ff; font-size:2rem;'>{tk1}</h1></div><h2 style='color: #ff4b4b; font-family: Orbitron;'>VS</h2><div style='text-align: center;'><h1 style='margin:0; color:#78ff00; font-size:2rem;'>{tk2}</h1></div></div>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
                 
                 st.info("💡 **Cara Memilih Pemenang:** Pilih saham yang angka **PE dan PBV-nya LEBIH KECIL** (berarti harganya lebih murah), tetapi memiliki persentase **ROE LEBIH BESAR** (berarti lebih jago mencetak untung).")
                 
@@ -663,7 +684,7 @@ elif menu == "TICKER COMPARISON":
                     tk2: [f"Rp {get_val(i2, 'currentPrice'):,.0f}", f"{get_val(i2, 'trailingPE'):,.2f}x", f"{get_val(i2, 'priceToBook'):,.2f}x", f"{get_val(i2, 'returnOnEquity')*100:.2f}%", f"{get_val(i2, 'debtToEquity'):,.2f}%", f"{get_val(i2, 'dividendYield')*100:.2f}%"]
                 })
                 st.table(df_compare.set_index("METRIK"))
-            except Exception as e: st.error("Gagal menarik data.")
+            except Exception as e: st.error("Gagal menarik data. Pastikan format penulisan adalah st.text_input.")
 
 elif menu == "SECTOR HEATMAP":
     st.title("🌐 PETA PERGERAKAN SEKTOR")
@@ -671,6 +692,10 @@ elif menu == "SECTOR HEATMAP":
         st.markdown("""
         **🕒 WAKTU TERBAIK PENGGUNAAN:**
         * **15:30 WIB:** Melihat ke arah mana uang triliunan rupiah berotasi untuk persiapan trading esok hari.
+        
+        **CARA BACA:**
+        * **Sektor Hijau:** Sektor sedang memimpin pasar (*inflow*). Cari saham di sektor ini.
+        * **Sektor Merah:** Sektor sedang koreksi/dihindari.
         """)
     
     sectors = {
@@ -702,6 +727,7 @@ elif menu == "SECTOR HEATMAP":
             except: pass
             
             if sector_data:
+                # KOTAK KESIMPULAN SEKTOR
                 st.info("💡 **Kesimpulan:** Perhatikan balok warna hijau yang menjorok ke kanan. Sektor tersebut sedang menjadi primadona (banyak dana masuk). Jika ingin trading harian, carilah saham di sektor tersebut.")
                 
                 df_sec = pd.DataFrame(sector_data).sort_values(by="Perubahan (%)", ascending=False)
@@ -767,6 +793,7 @@ elif menu == "DIVIDEND TRACKER":
                 st.markdown(f"### 🏢 {t_obj.info.get('longName', div_tk)}")
                 st.metric("BUNGA KEUNTUNGAN (YIELD) TAHUNAN", f"{div_yield:.2f}%")
                 
+                # KOTAK KESIMPULAN DIVIDEN
                 if div_yield > 5:
                     st.success(f"💡 **Kesimpulan:** Saham ini **SANGAT MENARIK** untuk ditabung! Bunga deposito bank saat ini hanya 4-5% per tahun. Saham ini memberikan bunga dividen sebesar {div_yield:.2f}%, jauh lebih menguntungkan dari naruh uang di bank.")
                 elif div_yield > 0:
@@ -789,7 +816,7 @@ elif menu == "CORRELATION MATRIX":
         * Saat ingin mengatur ulang porsi isi keranjang saham (Akhir Pekan/Bulan).
         """)
     
-    input_tkrs = st.text_input("MASUKKAN KODE SAHAM (PISAHKAN KOMA)", value="BBCA, BBRI, AMRT, TLKM")
+    input_tkrs = st.text_input("MASUKKAN KODE SAHAM YANG KAMU PUNYA (PISAHKAN DENGAN KOMA)", value="BBCA, BBRI, AMRT, TLKM")
     if st.button("CEK HUBUNGAN SAHAM", width="stretch"):
         with st.spinner("Memproses hubungan matematika..."):
             try:
@@ -823,25 +850,26 @@ elif menu == "FOREIGN & BROKER FLOW":
                 if not df_ff.empty:
                     if isinstance(df_ff.columns, pd.MultiIndex): df_ff.columns = df_ff.columns.get_level_values(0)
                     
+                    # PERBAIKAN BUG `nan` DI SINI (DENGAN FILLNA)
                     df_ff['Multiplier'] = ((df_ff['Close'] - df_ff['Low']) - (df_ff['High'] - df_ff['Close'])) / (df_ff['High'] - df_ff['Low'] + 1e-9)
                     df_ff['CMF_20'] = (df_ff['Multiplier'] * df_ff['Volume']).rolling(20).sum() / df_ff['Volume'].rolling(20).sum()
-                    df_ff['CMF_20'] = df_ff['CMF_20'].fillna(0) 
+                    df_ff['CMF_20'] = df_ff['CMF_20'].fillna(0) # Mencegah NaN jadi angka 0
                     latest_cmf = df_ff['CMF_20'].iloc[-1]
                     
                     if latest_cmf > 0.05:
                         status_flow = "AKUMULASI BESAR (BANDAR MEMBORONG BARANG) 🚀"
                         color_flow = "#78ff00"
-                        kesimpulan = "💡 **Kesimpulan:** Dana-dana besar (Institusi/Bandar) terlihat sedang **aktif memborong dan menimbun** saham ini secara masif dalam 20 hari terakhir. Ini adalah sinyal bahwa harga bersiap diterbangkan."
+                        kesimpulan = "💡 **Kesimpulan:** Dana-dana besar (Institusi/Bandar) terlihat sedang **aktif memborong dan menimbun** saham ini secara masif dalam 20 hari terakhir. Ini adalah sinyal bahwa harga bersiap diterbangkan. Saat yang bagus untuk ikut *Numpang Beli* (Follow the Giant)."
                     elif latest_cmf < -0.05:
                         status_flow = "DISTRIBUSI BESAR (BANDAR BUANG BARANG) ⚠️"
                         color_flow = "#ff4b4b"
-                        kesimpulan = "💡 **Kesimpulan:** AWAS! Dana besar (Institusi/Bandar) sedang **mencuci gudang dan membuang** saham ini ke pasar ritel. Harga rawan dibanting turun dalam waktu dekat."
+                        kesimpulan = "💡 **Kesimpulan:** AWAS! Dana besar (Institusi/Bandar) sedang **mencuci gudang dan membuang** saham ini ke pasar ritel. Harga rawan dibanting turun dalam waktu dekat. Sebaiknya hindari membeli saham ini sekarang."
                     else:
                         status_flow = "NETRAL / SIDEWAYS (BANDAR TIDUR) 💤"
                         color_flow = "#00f0ff"
                         kesimpulan = "💡 **Kesimpulan:** Tidak ada pergerakan arus uang yang signifikan. Bandar sedang tidak aktif memborong maupun jualan (atau sahamnya tidak ada transaksi/suspend). Harga akan cenderung bergerak mendatar."
                     
-                    st.markdown(f"<div style='text-align:center; padding:20px; background:rgba(13, 18, 30, 0.9); border: 1px solid {color_flow}; border-radius:16px;'><h3 style='color:#fff; margin:0;'>Status Bandar: <span style='color:{color_flow};'>{status_flow}</span></h3></div>", unsafe_allow_html=True)
+                    st.markdown(f"### Status Bandar: <span style='color:{color_flow};'>{status_flow}</span>", unsafe_allow_html=True)
                     st.metric("Skor Chaikin Money Flow (CMF)", f"{latest_cmf:.3f}")
                     st.info(kesimpulan)
                     
@@ -851,10 +879,6 @@ elif menu == "FOREIGN & BROKER FLOW":
                     st.plotly_chart(fig_mf, use_container_width=True)
             except: st.error("Data saham tidak ditemukan.")
 
-
-# =========================================================================
-# 🔥 FITUR BARU: MARKET NEWS (FINANCIAL INTELLIGENCE CENTER)
-# =========================================================================
 elif menu == "MARKET_NEWS":
     st.title("📰 FINANCIAL INTELLIGENCE CENTER")
     
@@ -874,10 +898,9 @@ elif menu == "MARKET_NEWS":
                 try:
                     close_data = macro_data['Close'][symbol]
                     if len(close_data) >= 2:
-                        last_price = close_data.iloc[-1]
-                        prev_price = close_data.iloc[-2]
+                        last_price = float(close_data.iloc[-1])
+                        prev_price = float(close_data.iloc[-2])
                         pct_change = ((last_price - prev_price) / prev_price) * 100
-                        
                         columns[i].metric(label=name, value=f"{last_price:,.2f}", delta=f"{pct_change:.2f}%")
                 except:
                     columns[i].metric(label=name, value="N/A", delta="0.00%")
