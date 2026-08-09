@@ -216,7 +216,7 @@ div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMet
     border: 1px solid rgba(0, 240, 255, 0.25) !important;
     border-top: 3px solid #00f0ff !important;
     border-radius: 16px; padding: 15px !important; backdrop-filter: blur(20px);
-    margin-bottom: 16px !important;
+    margin-bottom: 12px !important;
 }
 div[data-testid="stForm"] label p { font-family: 'Orbitron', sans-serif !important; color: #78ff00 !important; font-size: 0.75rem !important; letter-spacing: 2px;}
 div[data-testid="stForm"] input, div[data-testid="stForm"] select {
@@ -251,10 +251,6 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 .stButton>button:hover { background: linear-gradient(135deg, #00f0ff, #78ff00); color: #07090f !important; }
 </style>
 """, unsafe_allow_html=True)
-
-# --- STATE CONTROL ---
-if 'active_menu' not in st.session_state:
-    st.session_state.active_menu = "🖥️ DASHBOARD UTAMA"
 
 # --- 2. AUTHENTICATION ---
 if "logged_in" not in st.session_state:
@@ -476,10 +472,8 @@ menu_list = [
 if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: 
     menu_list.insert(16, "⚙️ USER MANAGEMENT")
 
-# Sinkronisasi state sidebar radio
-idx_menu = menu_list.index(st.session_state.active_menu) if st.session_state.active_menu in menu_list else 0
-menu = st.sidebar.radio("Navigasi", menu_list, index=idx_menu, label_visibility="collapsed")
-st.session_state.active_menu = menu
+# MENGGUNAKAN KEY STREAMLIT AGAR MENU TIDAK NGEBALIK SENDIRI
+menu = st.sidebar.radio("Navigasi", menu_list, key="nav_sidebar_menu", label_visibility="collapsed")
 
 st.sidebar.write("---")
 if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
@@ -502,7 +496,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
                     "ARTO.JK","BRPT.JK","MDKA.JK","ANTM.JK","INCO.JK","CPIN.JK","AKRA.JK","MEDC.JK",
                     "HRUM.JK","EXCL.JK","ISAT.JK","INKP.JK","TKIM.JK","PGEO.JK"]
 
-    # --- BAGIAN 1: IHSG STATUS (DIPISAH KE ATAS AGAR TIDAK DEMPET) ---
+    # --- BAGIAN 1: IHSG STATUS (TERSUSUN KE BAWAH DENGAN AMAN) ---
     try:
         ihsg_data = yf.download("^JKSE", period="2d", interval="1d", progress=False)
         if not ihsg_data.empty and len(ihsg_data) >= 2:
@@ -518,7 +512,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
             </div>""", unsafe_allow_html=True)
     except: st.warning("Gagal memuat IHSG.")
 
-    # --- BAGIAN 2: MARKET BREADTH (KESEHATAN PASAR DI BAWAH IHSG) ---
+    # --- BAGIAN 2: MARKET BREADTH ---
     with st.spinner("Memindai Kesehatan Pasar..."):
         try:
             br_data = yf.download(proxy_market, period="2d", interval="1d", progress=False)['Close']
@@ -590,7 +584,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # --- BAGIAN 4: UNUSUAL VOLUME & TOP MOVERS (DISUSUN BERGANTIAN KE BAWAH) ---
+    # --- BAGIAN 4: UNUSUAL VOLUME & TOP MOVERS ---
     st.markdown("<h3 style='font-size:1rem; color:#00f0ff;'>🌋 Unusual Volume (Radar Bandar)</h3>", unsafe_allow_html=True)
     with st.spinner("Melacak ledakan volume..."):
         try:
