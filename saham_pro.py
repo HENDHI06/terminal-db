@@ -252,6 +252,10 @@ div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true
 </style>
 """, unsafe_allow_html=True)
 
+# --- STATE CONTROL ---
+if 'active_menu' not in st.session_state:
+    st.session_state.active_menu = "🖥️ DASHBOARD UTAMA"
+
 # --- 2. AUTHENTICATION ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -472,8 +476,8 @@ menu_list = [
 if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: 
     menu_list.insert(16, "⚙️ USER MANAGEMENT")
 
-# MENGGUNAKAN KEY STREAMLIT AGAR MENU TIDAK NGEBALIK SENDIRI
-menu = st.sidebar.radio("Navigasi", menu_list, key="nav_sidebar_menu", label_visibility="collapsed")
+# PENGGUNAAN KEY DI RADIO BUTTON AGAR MENU TIDAK NGEBALIK SENDIRI
+menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility="collapsed")
 
 st.sidebar.write("---")
 if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
@@ -486,7 +490,7 @@ if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
 # --- 5. CONTENT AREA ---
 
 # =========================================================================
-# 🔥 MASTER COMMAND CENTER (DASHBOARD) - SMARTPHONE OPTIMIZED (STACKED)
+# 🔥 MASTER COMMAND CENTER (DASHBOARD) - ULTIMATE DENGAN SENTIMEN & ASING
 # =========================================================================
 if menu == "🖥️ DASHBOARD UTAMA":
     st.markdown(f"<h2 style='color:#fff; margin-bottom:15px;'>Selamat Datang, <span style='color:#00f0ff;'>{user_now.upper()}!</span></h2>", unsafe_allow_html=True)
@@ -495,8 +499,11 @@ if menu == "🖥️ DASHBOARD UTAMA":
                     "PTBA.JK","ITMG.JK","UNVR.JK","ICBP.JK","INDF.JK","KLBF.JK","PGAS.JK","GOTO.JK",
                     "ARTO.JK","BRPT.JK","MDKA.JK","ANTM.JK","INCO.JK","CPIN.JK","AKRA.JK","MEDC.JK",
                     "HRUM.JK","EXCL.JK","ISAT.JK","INKP.JK","TKIM.JK","PGEO.JK"]
+    
+    big_banks = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK"] # Proxy pergerakan Asing
 
-    # --- BAGIAN 1: IHSG STATUS (TERSUSUN KE BAWAH DENGAN AMAN) ---
+    up, down, flat = 0, 0, 0
+    # --- BAGIAN 1: IHSG STATUS ---
     try:
         ihsg_data = yf.download("^JKSE", period="2d", interval="1d", progress=False)
         if not ihsg_data.empty and len(ihsg_data) >= 2:
@@ -517,7 +524,6 @@ if menu == "🖥️ DASHBOARD UTAMA":
         try:
             br_data = yf.download(proxy_market, period="2d", interval="1d", progress=False)['Close']
             if isinstance(br_data.columns, pd.MultiIndex): br_data.columns = br_data.columns.get_level_values(0)
-            up, down, flat = 0, 0, 0
             for tk in proxy_market:
                 try:
                     c_l, c_p = float(br_data[tk].iloc[-1]), float(br_data[tk].iloc[-2])
@@ -536,11 +542,68 @@ if menu == "🖥️ DASHBOARD UTAMA":
                     </div>
                 </div>""", unsafe_allow_html=True)
         except: pass
+        
+    # --- BAGIAN 3: RADAR SENTIMEN & ARUS DANA ASING (NEW) ---
+    c_flow, c_fg = st.columns(2)
+    with c_flow:
+        with st.spinner("Melacak Dana Asing..."):
+            try:
+                flow_data = yf.download(big_banks, period="1mo", interval="1d", progress=False)
+                if isinstance(flow_data.columns, pd.MultiIndex): flow_data.columns = flow_data.columns.get_level_values(0)
+                avg_cmfs = []
+                for tk in big_banks:
+                    try:
+                        df_f = pd.DataFrame({'High': flow_data['High'][tk], 'Low': flow_data['Low'][tk], 'Close': flow_data['Close'][tk], 'Volume': flow_data['Volume'][tk]})
+                        mult = ((df_f['Close'] - df_f['Low']) - (df_f['High'] - df_f['Close'])) / (df_f['High'] - df_f['Low'] + 1e-9)
+                        cmf_20 = (mult * df_f['Volume']).rolling(20).sum() / df_f['Volume'].rolling(20).sum()
+                        avg_cmfs.append(cmf_20.iloc[-1])
+                    except: pass
+                
+                net_flow = sum(avg_cmfs) / len(avg_cmfs) if avg_cmfs else 0
+                flow_color = "#78ff00" if net_flow > 0 else "#ff4b4b"
+                flow_status = "NET BUY (Masuk) 🛒" if net_flow > 0.05 else ("NET SELL (Keluar) 💸" if net_flow < -0.05 else "NETRAL ⚖️")
+                
+                st.markdown(f"""<div style='background:rgba(13,18,30,0.85); border:1px solid {flow_color}; padding:15px; border-radius:14px; text-align:center; height:200px;'>
+                    <p style='margin:0 0 10px 0; font-size:11px; color:#94a3b8; font-family:Orbitron;'>🦅 ARUS DANA ASING (BIG CAPS)</p>
+                    <h3 style='color:{flow_color}; margin:15px 0;'>{flow_status}</h3>
+                    <p style='font-size:12px; color:#fff;'>Indikator Kekuatan: {net_flow:.2f}</p>
+                </div>""", unsafe_allow_html=True)
+            except: st.info("Data Arus Dana belum tersedia.")
+            
+    with c_fg:
+        try:
+            fg_ratio = up / (up + down + 0.0001) * 100
+            fg_value = int(fg_ratio)
+            if fg_value <= 30: fg_status, fg_color = "EXTREME FEAR", "#ff4b4b"
+            elif fg_value <= 45: fg_status, fg_color = "FEAR", "#ff9900"
+            elif fg_value <= 55: fg_status, fg_color = "NEUTRAL", "#00f0ff"
+            elif fg_value <= 70: fg_status, fg_color = "GREED", "#78ff00"
+            else: fg_status, fg_color = "EXTREME GREED", "#00ff00"
+            
+            fig_fg = go.Figure(go.Indicator(
+                mode = "gauge+number", value = fg_value,
+                number = {'font': {'color': fg_color, 'size':30}},
+                title = {'text': f"<br><span style='color:{fg_color}; font-size:16px; font-weight:bold;'>{fg_status}</span>", 'font': {'size': 14}},
+                gauge = {
+                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white", 'visible': False},
+                    'bar': {'color': fg_color, 'thickness': 0.3}, 'bgcolor': "rgba(255,255,255,0.1)",
+                    'steps': [
+                        {'range': [0, 30], 'color': "rgba(255, 75, 75, 0.2)"}, {'range': [30, 45], 'color': "rgba(255, 153, 0, 0.2)"},
+                        {'range': [45, 55], 'color': "rgba(0, 240, 255, 0.2)"}, {'range': [55, 70], 'color': "rgba(120, 255, 0, 0.2)"},
+                        {'range': [70, 100], 'color': "rgba(0, 255, 0, 0.2)"}],
+                }
+            ))
+            fig_fg.update_layout(height=160, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)")
+            
+            st.markdown("<div style='background:rgba(13,18,30,0.85); border:1px solid rgba(0,240,255,0.25); border-radius:14px; height:200px; padding:10px;'><p style='margin:0 0 5px 0; font-size:11px; color:#94a3b8; font-family:Orbitron; text-align:center;'>🌡️ FEAR & GREED SENTIMENT</p>", unsafe_allow_html=True)
+            st.plotly_chart(fig_fg, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        except: st.info("Termometer Sentimen belum siap.")
 
-    # --- BAGIAN 3: PRIVASI SALDO & RINGKASAN PORTOFOLIO ---
+    # --- BAGIAN 4: PRIVASI SALDO & RINGKASAN PORTOFOLIO ---
     c_title, c_toggle = st.columns([2.5, 1.5])
-    c_title.markdown("<h3 style='font-size:1rem; color:#00f0ff; margin-top:5px;'>💼 Portofolio & AI Auditor</h3>", unsafe_allow_html=True)
-    show_saldo_dash = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False)
+    c_title.markdown("<h3 style='font-size:1rem; color:#00f0ff; margin-top:20px;'>💼 Portofolio & AI Auditor</h3>", unsafe_allow_html=True)
+    show_saldo_dash = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False, key="privasi_dash")
     fmt_dash = lambda v: f"Rp {v:,.0f}" if show_saldo_dash else "Rp *****"
 
     df_p = get_user_portfolio(user_now, role)
@@ -584,7 +647,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # --- BAGIAN 4: UNUSUAL VOLUME & TOP MOVERS ---
+    # --- BAGIAN 5: UNUSUAL VOLUME & TOP MOVERS ---
     st.markdown("<h3 style='font-size:1rem; color:#00f0ff;'>🌋 Unusual Volume (Radar Bandar)</h3>", unsafe_allow_html=True)
     with st.spinner("Melacak ledakan volume..."):
         try:
