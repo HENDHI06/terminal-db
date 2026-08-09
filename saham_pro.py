@@ -26,7 +26,7 @@ st.set_page_config(
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# --- DATABASE & LOGIC FUNGSI (DIOPTIMASI) ---
+# --- DATABASE & LOGIC FUNGSI ---
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
     for url in providers:
@@ -121,7 +121,6 @@ def get_user_portfolio(u, r):
     df = conn_gs.read(worksheet="portfolio", ttl=0)
     if df.empty or len(df) == 0: return pd.DataFrame()
     df['id'], df['lots'], df['buy_price'] = pd.to_numeric(df['id'], errors='coerce'), pd.to_numeric(df['lots'], errors='coerce'), pd.to_numeric(df['buy_price'], errors='coerce')
-    # Filter agar user hanya melihat miliknya sendiri
     df = df[df['username'] == u]
     return df.sort_values(by='date', ascending=False)
 
@@ -234,7 +233,6 @@ div[data-testid="stMetric"], .stDataFrame, .stTabs, div[data-testid="stExpander"
 
 [data-testid="stSidebar"] { background: #090d16; border-right: 1px solid rgba(255, 255, 255, 0.05); }
 
-/* Menu Radio Button Diperbesar & Empuk */
 div[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
     background: rgba(255, 255, 255, 0.01) !important; 
     border: 1px solid rgba(255, 255, 255, 0.03) !important;
@@ -460,30 +458,53 @@ st.sidebar.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# 🚀 UPDATE MENU: Semua Fitur Ultimate Masuk Sini
 menu_list = [
     "🖥️ DASHBOARD UTAMA",
-    "🛰️ AUTO SCANNER", 
-    "⚡ STRATEGY SCANNER",
-    "🕯️ POLA CANDLE AI",         
-    "⭐ WATCHLIST FAVORIT", 
-    "🎯 AUTO SUP/RES",           
-    "📅 SIKLUS MUSIMAN",         
-    "📟 CEK FUNDAMENTAL", 
-    "⚔️ ADU SAHAM", 
-    "🌐 PETA SEKTOR", 
-    "🧮 KALKULATOR TRADING",     
-    "💰 PEMBURU DIVIDEN", 
-    "🧬 KORELASI SAHAM", 
-    "🏛️ JEJAK BANDAR", 
-    "📰 BERITA PASAR", 
-    "💼 DOMPET TRADING",         
-    "🔒 KEAMANAN"
+    "NODE_SELECTIONS_KEY_1",
+    "NODE_SELECTIONS_KEY_2",
+    "NODE_SELECTIONS_KEY_3",         
+    "NODE_SELECTIONS_KEY_4", 
+    "NODE_SELECTIONS_KEY_5",           
+    "NODE_SELECTIONS_KEY_6",         
+    "NODE_SELECTIONS_KEY_7", 
+    "NODE_SELECTIONS_KEY_8", 
+    "NODE_SELECTIONS_KEY_9", 
+    "NODE_SELECTIONS_KEY_10",     
+    "NODE_SELECTIONS_KEY_11", 
+    "NODE_SELECTIONS_KEY_12", 
+    "NODE_SELECTIONS_KEY_13", 
+    "NODE_SELECTIONS_KEY_14", 
+    "NODE_SELECTIONS_KEY_15",         
+    "NODE_SELECTIONS_KEY_16"
 ]
-if role == "admin": 
-    menu_list.insert(16, "⚙️ USER MANAGEMENT")
 
-menu = st.sidebar.radio("Navigasi", menu_list, label_visibility="collapsed")
+# NAMA MENU ASLI DENGAN EMOJI
+menu_map = {
+    "🖥️ DASHBOARD UTAMA": "🖥️ DASHBOARD UTAMA",
+    "NODE_SELECTIONS_KEY_1": "🛰️ AUTO SCANNER",
+    "NODE_SELECTIONS_KEY_2": "⚡ STRATEGY SCANNER",
+    "NODE_SELECTIONS_KEY_3": "🕯️ POLA CANDLE AI",
+    "NODE_SELECTIONS_KEY_4": "⭐ WATCHLIST FAVORIT",
+    "NODE_SELECTIONS_KEY_5": "🎯 AUTO SUP/RES",
+    "NODE_SELECTIONS_KEY_6": "📅 SIKLUS MUSIMAN",
+    "NODE_SELECTIONS_KEY_7": "📟 CEK FUNDAMENTAL",
+    "NODE_SELECTIONS_KEY_8": "⚔️ ADU SAHAM",
+    "NODE_SELECTIONS_KEY_9": "🌐 PETA SEKTOR",
+    "NODE_SELECTIONS_KEY_10": "🧮 KALKULATOR TRADING",
+    "NODE_SELECTIONS_KEY_11": "💰 PEMBURU DIVIDEN",
+    "NODE_SELECTIONS_KEY_12": "🧬 KORELASI SAHAM",
+    "NODE_SELECTIONS_KEY_13": "🏛️ JEJAK BANDAR",
+    "NODE_SELECTIONS_KEY_14": "📰 BERITA PASAR",
+    "NODE_SELECTIONS_KEY_15": "💼 DOMPET TRADING",
+    "NODE_SELECTIONS_KEY_16": "🔒 KEAMANAN"
+}
+
+if role == "admin": 
+    menu_list.insert(16, "NODE_SELECTIONS_KEY_17")
+    menu_map["NODE_SELECTIONS_KEY_17"] = "⚙️ USER MANAGEMENT"
+
+selected_key = st.sidebar.radio("Navigasi", menu_list, format_func=lambda x: menu_map.get(x, x), label_visibility="collapsed")
+menu = menu_map.get(selected_key, selected_key)
 
 st.sidebar.write("---")
 if st.sidebar.button("🔴 KELUAR APLIKASI", use_container_width=True):
@@ -522,8 +543,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
             """, unsafe_allow_html=True)
     except: st.warning("Gagal memuat data IHSG.")
 
-    # PORTOFOLIO SUMMARY
+    # PORTOFOLIO SUMMARY (PRIVAT DEFAULT OTOMATIS HIDDEN SAAT FIRST ENTER)
     st.markdown("<h3 style='font-size:1rem; color:#00f0ff;'>💼 Ringkasan Portofolio Pribadimu</h3>", unsafe_allow_html=True)
+    
+    # SALDO OTOMATIS PRIVAT
+    show_saldo_dash = st.checkbox("👁️ Tampilkan Saldo", value=False)
+    fmt_dash = lambda v: f"Rp {v:,.0f}" if show_saldo_dash else "Rp *****"
+
     df_p = get_user_portfolio(user_now, role)
     t_inv, t_pl = 0, 0
     if not df_p.empty:
@@ -543,9 +569,9 @@ if menu == "🖥️ DASHBOARD UTAMA":
         t_inv, t_pl = df_p['Cost'].sum(), df_p['P/L'].sum()
         
     c1, c2, c3 = st.columns(3)
-    c1.metric("MODAL TERPAKAI", f"Rp {t_inv:,.0f}")
-    c2.metric("UNTUNG/RUGI (P/L)", f"Rp {t_pl:,.0f}", f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%")
-    c3.metric("TOTAL UANG SEKARANG", f"Rp {(t_inv + t_pl):,.0f}")
+    c1.metric("MODAL TERPAKAI", fmt_dash(t_inv))
+    c2.metric("UNTUNG/RUGI (P/L)", fmt_dash(t_pl), f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%")
+    c3.metric("TOTAL UANG SEKARANG", fmt_dash(t_inv + t_pl))
     
     st.markdown("---")
     
@@ -602,7 +628,6 @@ elif menu == "🕯️ POLA CANDLE AI":
                     p_o, p_c = float(prev['Open']), float(prev['Close'])
                     c_o, c_c, c_h, c_l = float(curr['Open']), float(curr['Close']), float(curr['High']), float(curr['Low'])
                     
-                    # LOGIK DETEKSI POLA SEDERHANA
                     body = abs(c_c - c_o)
                     lower_shadow = (c_o - c_l) if c_c > c_o else (c_c - c_l)
                     upper_shadow = (c_h - c_c) if c_c > c_o else (c_h - c_o)
@@ -620,11 +645,11 @@ elif menu == "🕯️ POLA CANDLE AI":
                     if is_bull_engulfing:
                         pola = "🚀 BULLISH ENGULFING TERDETEKSI!"
                         warna = "#78ff00"
-                        kesimpulan = "Luar Biasa! Terdapat candle hijau besar yang 'menelan' candle merah sebelumnya. Ini adalah sinyal kuat bandar mulai akumulasi agresif. Harga bersiap berbalik naik."
+                        kesimpulan = "Luar Biasa! Terdapat candle hijau besar yang 'menelan' candle merah sebelumnya. Sinyal kuat bandar mulai akumulasi agresif. Harga bersiap berbalik naik."
                     elif is_hammer:
                         pola = "🔨 HAMMER (PALU) TERDETEKSI!"
                         warna = "#78ff00"
-                        kesimpulan = "Bagus! Ekor bawah yang panjang menandakan adanya perlawanan kuat dari *buyer* (pembeli) saat harga mencoba dijatuhkan. Potensi harga memantul naik sangat tinggi."
+                        kesimpulan = "Bagus! Ekor bawah yang panjang menandakan perlawanan kuat dari *buyer* (pembeli) saat harga mencoba dijatuhkan. Potensi memantul naik sangat tinggi."
                     elif is_bear_engulfing:
                         pola = "⚠️ BEARISH ENGULFING TERDETEKSI!"
                         warna = "#ff4b4b"
@@ -632,15 +657,14 @@ elif menu == "🕯️ POLA CANDLE AI":
                     elif is_shooting_star:
                         pola = "🌠 SHOOTING STAR TERDETEKSI!"
                         warna = "#ff4b4b"
-                        kesimpulan = "Hati-hati! Ekor atas yang panjang menandakan *buyer* gagal mengangkat harga karena tekanan jual bandar di atas sangat kuat. Rawan terkoreksi."
+                        kesimpulan = "Hati-hati! Ekor atas panjang menandakan *buyer* gagal mengangkat harga karena tekanan jual bandar di atas sangat kuat."
                     elif is_doji:
                         pola = "⚖️ POLA DOJI TERDETEKSI!"
                         warna = "#00f0ff"
-                        kesimpulan = "Pasar sedang bimbang/bingung. Kekuatan pembeli dan penjual saat ini seimbang. Bersiap untuk ledakan arah harga berikutnya."
+                        kesimpulan = "Pasar sedang bimbang/bingung. Bersiap untuk ledakan arah harga berikutnya."
                         
                     st.markdown(f"<div style='background:rgba(13,18,30,0.8); border:2px solid {warna}; padding:20px; border-radius:12px; text-align:center;'><h3 style='margin:0; color:{warna};'>{pola}</h3><p style='color:#fff; font-size:14px; margin-top:10px;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
                     
-                    # Tampilkan Grafik 15 Hari Terakhir
                     df_chart = df_c.tail(15)
                     fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='Candle')])
                     fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
@@ -662,7 +686,7 @@ elif menu == "🛰️ AUTO SCANNER":
 
     if st.session_state.results is not None:
         df = st.session_state.results
-        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang bagus. Kolom 'BANDAR' menunjukkan apakah saham ini sedang diborong institusi (Akumulasi) atau hanya jebakan ritel.")
+        st.info(f"💡 **Kesimpulan:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum kenaikan yang bagus.")
 
         tab1, tab2, tab3 = st.tabs(["📱 KARTU RINGKAS", "📊 TABEL DATA", "📈 GRAFIK (CHART)"])
         with tab1: draw_mobile_cards(df)
