@@ -176,19 +176,23 @@ def get_sector(ticker):
     try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
     except: return "Lainnya"
 
+# --- PERBAIKAN: ANTI NaN UNTUK TICKER TAPE ---
 @st.cache_data(ttl=300)
 def get_ticker_data():
     try:
-        data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="2d", interval="1d", progress=False)['Close']
+        # Menggunakan 5d agar aman jika libur
+        data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="5d", interval="1d", progress=False)['Close']
         if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
         items = []
         for tk, name in zip(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], ['IHSG', 'BBCA', 'BBRI', 'BMRI', 'TLKM']):
             try:
-                c_now = float(data[tk].iloc[-1])
-                c_prev = float(data[tk].iloc[-2])
-                pct = (c_now - c_prev)/c_prev*100
-                color = "#10B981" if pct > 0 else "#EF4444"
-                items.append(f"<span class='ticker-item'>{name} {c_now:,.0f} <span style='color:{color};'>({pct:+.2f}%)</span></span>")
+                tk_data = data[tk].dropna() # Buang data kosong
+                if len(tk_data) >= 2:
+                    c_now = float(tk_data.iloc[-1])
+                    c_prev = float(tk_data.iloc[-2])
+                    pct = (c_now - c_prev)/c_prev*100
+                    color = "#10B981" if pct > 0 else "#EF4444"
+                    items.append(f"<span class='ticker-item'>{name} {c_now:,.0f} <span style='color:{color};'>({pct:+.2f}%)</span></span>")
             except: pass
         return " &nbsp;&nbsp; | &nbsp;&nbsp; ".join(items) * 4 
     except: return ""
@@ -286,9 +290,9 @@ div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMet
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
 }
 div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
-    transform: translateY(-4px); /* Terangkat ke atas */
-    box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; /* Biru Glowing Halus */
-    border-color: #BFDBFE !important; /* Border ikut membiru */
+    transform: translateY(-4px); 
+    box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; 
+    border-color: #BFDBFE !important; 
 }
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
 
@@ -300,7 +304,7 @@ input, select, textarea {
     color: #0F172A !important; 
     font-family: 'JetBrains Mono', monospace !important; 
     border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
-    box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; /* Efek tenggelam 3D */
+    box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; 
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 input:focus, select:focus {
@@ -317,23 +321,17 @@ input:focus, select:focus {
     background-color: #2563EB !important; border: none !important; border-radius: 8px !important; 
     min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; 
     transition: background-color 0.2s ease, transform 0.1s ease; 
-    position: relative; overflow: hidden; /* Syarat Shimmer */
+    position: relative; overflow: hidden; 
 }
 .stButton>button p, .stButton>button span, .stButton>button div { 
     color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2;
 }
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 
-/* Algoritma Cahaya Berkilap */
 .stButton>button::after {
-    content: "";
-    position: absolute;
-    top: 0; left: -100%;
-    width: 50%; height: 100%;
+    content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
     background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
-    transform: skewX(-20deg);
-    animation: shimmer 3s infinite;
-    z-index: 1;
+    transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1;
 }
 @keyframes shimmer { 100% { left: 200%; } }
 
@@ -396,7 +394,7 @@ def run_scan(tickers, mode):
 
     progress = st.progress(0, text="📡 Memindai Bursa Efek...")
     try:
-        data = yf.download(tickers, period="2mo", interval="1d", group_by="ticker", threads=True, progress=False)
+        data = yf.download(tickers, period="5d", interval="1d", group_by="ticker", threads=True, progress=False)
     except:
         st.error("Gagal terhubung ke data bursa.")
         return pd.DataFrame()
@@ -407,7 +405,8 @@ def run_scan(tickers, mode):
             progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
             df = data[t].copy() if len(tickers) > 1 else data.copy()
             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            if df.empty or len(df) < 20: continue
+            df = df.dropna()
+            if df.empty or len(df) < 14: continue
 
             c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
             if math.isnan(c_now) or math.isnan(c_prev): continue
@@ -420,14 +419,14 @@ def run_scan(tickers, mode):
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
             rsi = 100 - (100 / (1 + (gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0)))
 
-            high_20 = df['High'].rolling(20).max().iloc[-2]
-            vol_avg = df['Volume'].rolling(20).mean().iloc[-1]
+            high_20 = df['High'].rolling(20).max().iloc[-2] if len(df) >= 20 else c_prev
+            vol_avg = df['Volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else df['Volume'].mean()
             is_breakout = (c_now > high_20) and (df['Volume'].iloc[-1] > vol_avg * vol_m)
 
             if chg < min_chg or val_tr < min_val: continue
 
             multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-            cmf_series = (multiplier * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
+            cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
             cmf_series = cmf_series.fillna(0)
             cmf = float(cmf_series.iloc[-1])
 
@@ -461,7 +460,9 @@ def get_trend_signals(ticker_list):
             
             if isinstance(df.columns, pd.MultiIndex): 
                 df.columns = df.columns.get_level_values(0)
-                
+            df = df.dropna()
+            if len(df) < 50: continue
+            
             df['MA20'] = df['Close'].rolling(20).mean()
             df['MA50'] = df['Close'].rolling(50).mean()
             
@@ -596,10 +597,10 @@ if menu == "🖥️ DASHBOARD UTAMA":
     up, down, flat = 0, 0, 0
     # --- BAGIAN 1: IHSG ---
     try:
-        ihsg_data = yf.download("^JKSE", period="2d", interval="1d", progress=False)
+        # PERBAIKAN: Gunakan 5d dan dropna() agar aman dari hari libur/weekend
+        ihsg_data = yf.download("^JKSE", period="5d", interval="1d", progress=False)['Close'].dropna()
         if not ihsg_data.empty and len(ihsg_data) >= 2:
-            if isinstance(ihsg_data.columns, pd.MultiIndex): ihsg_data.columns = ihsg_data.columns.get_level_values(0)
-            ihsg_last, ihsg_prev = float(ihsg_data['Close'].iloc[-1]), float(ihsg_data['Close'].iloc[-2])
+            ihsg_last, ihsg_prev = float(ihsg_data.iloc[-1]), float(ihsg_data.iloc[-2])
             ihsg_pct = ((ihsg_last - ihsg_prev) / ihsg_prev) * 100
             ihsg_color = "#16A34A" if ihsg_pct > 0 else "#DC2626"
             ihsg_status = "BULLISH 🚀" if ihsg_pct > 0.5 else ("BEARISH ⚠️" if ihsg_pct < -0.5 else "SIDEWAYS 💤")
@@ -608,21 +609,22 @@ if menu == "🖥️ DASHBOARD UTAMA":
             st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color}; border-top: 1px solid #E2E8F0 !important; padding: 20px;'>
                 <p class='text-muted' style='margin:0; font-weight:600;'>IHSG (HARGA SAHAM GABUNGAN)</p>
                 <h2 style='margin:5px 0; color:{ihsg_color}; font-family:"JetBrains Mono";'>{ihsg_last:,.2f} <span style='font-size:1rem;'>({'+' if ihsg_pct>0 else ''}{ihsg_pct:.2f}%)</span></h2>
-                <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Hari Ini: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
+                <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Terakhir: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
             </div>""", unsafe_allow_html=True)
     except: st.warning("Sedang mengambil data IHSG...")
 
     # --- BAGIAN 2: MARKET BREADTH ---
     with st.spinner("Memindai Kesehatan Pasar..."):
         try:
-            br_data = yf.download(proxy_market, period="2d", interval="1d", progress=False)['Close']
-            if isinstance(br_data.columns, pd.MultiIndex): br_data.columns = br_data.columns.get_level_values(0)
+            br_data = yf.download(proxy_market, period="5d", interval="1d", progress=False)['Close']
             for tk in proxy_market:
                 try:
-                    c_l, c_p = float(br_data[tk].iloc[-1]), float(br_data[tk].iloc[-2])
-                    if c_l > c_p: up += 1
-                    elif c_l < c_p: down += 1
-                    else: flat += 1
+                    tk_data = br_data[tk].dropna()
+                    if len(tk_data) >= 2:
+                        c_l, c_p = float(tk_data.iloc[-1]), float(tk_data.iloc[-2])
+                        if c_l > c_p: up += 1
+                        elif c_l < c_p: down += 1
+                        else: flat += 1
                 except: pass
             total_valid = up + down + flat
             if total_valid > 0:
@@ -644,10 +646,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
             avg_cmfs = []
             for tk in big_banks:
                 try:
-                    df_f = pd.DataFrame({'High': flow_data['High'][tk], 'Low': flow_data['Low'][tk], 'Close': flow_data['Close'][tk], 'Volume': flow_data['Volume'][tk]})
-                    mult = ((df_f['Close'] - df_f['Low']) - (df_f['High'] - df_f['Close'])) / (df_f['High'] - df_f['Low'] + 1e-9)
-                    cmf_20 = (mult * df_f['Volume']).rolling(20).sum() / df_f['Volume'].rolling(20).sum()
-                    avg_cmfs.append(cmf_20.iloc[-1])
+                    df_f = pd.DataFrame({'High': flow_data['High'][tk], 'Low': flow_data['Low'][tk], 'Close': flow_data['Close'][tk], 'Volume': flow_data['Volume'][tk]}).dropna()
+                    if len(df_f) > 20:
+                        mult = ((df_f['Close'] - df_f['Low']) - (df_f['High'] - df_f['Close'])) / (df_f['High'] - df_f['Low'] + 1e-9)
+                        cmf_20 = (mult * df_f['Volume']).rolling(20).sum() / df_f['Volume'].rolling(20).sum()
+                        cmf_20 = cmf_20.dropna()
+                        if not cmf_20.empty:
+                            avg_cmfs.append(cmf_20.iloc[-1])
                 except: pass
             
             net_flow = sum(avg_cmfs) / len(avg_cmfs) if avg_cmfs else 0
@@ -704,7 +709,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     if not df_p.empty:
         tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique()]
         try:
-            live_prices = yf.download(tickers_jk, period="1d", progress=False, threads=True)['Close'].iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(yf.download(tickers_jk, period="1d", progress=False)['Close'].iloc[-1])}
+            live_prices = yf.download(tickers_jk, period="5d", progress=False, threads=True)['Close'].dropna().iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(yf.download(tickers_jk, period="5d", progress=False)['Close'].dropna().iloc[-1])}
         except: live_prices = {}
         def calc_active(row):
             tk, bp, lots = f"{row['ticker']}.JK", row['buy_price'], row['lots']
@@ -749,30 +754,33 @@ if menu == "🖥️ DASHBOARD UTAMA":
             spikes = []
             for tk in proxy_market:
                 try:
-                    v_today = float(vol_data[tk].iloc[-1])
-                    v_avg20 = float(vol_data[tk][-21:-1].mean())
-                    if v_avg20 > 0 and v_today > (v_avg20 * 1.5):
-                        spikes.append({"Ticker": tk.replace(".JK",""), "Spike": v_today / v_avg20})
+                    tk_vol = vol_data[tk].dropna()
+                    if len(tk_vol) > 20:
+                        v_today = float(tk_vol.iloc[-1])
+                        v_avg20 = float(tk_vol[-21:-1].mean())
+                        if v_avg20 > 0 and v_today > (v_avg20 * 1.5):
+                            spikes.append({"Ticker": tk.replace(".JK",""), "Spike": v_today / v_avg20})
                 except: pass
             
             df_spikes = pd.DataFrame(spikes).sort_values("Spike", ascending=False).head(3)
             if not df_spikes.empty:
                 for _, row in df_spikes.iterrows():
                     st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-blue' style='float:right;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
-            else: st.info("Tidak ada anomali ledakan volume hari ini.")
+            else: st.info("Tidak ada anomali ledakan volume pada sesi ini.")
         except: st.info("Sistem volume radar sedang menyesuaikan data.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<h3 class='text-blue'>📈 Top Movers (Saham Blue Chips)</h3>", unsafe_allow_html=True)
     with st.spinner("Menarik data penggerak..."):
         try:
-            mov_data = yf.download(proxy_market, period="2d", interval="1d", progress=False)['Close']
-            if isinstance(mov_data.columns, pd.MultiIndex): mov_data.columns = mov_data.columns.get_level_values(0)
+            mov_data = yf.download(proxy_market, period="5d", interval="1d", progress=False)['Close']
             mov_list = []
             for tk in proxy_market:
                 try:
-                    c_last, c_prev = float(mov_data[tk].iloc[-1]), float(mov_data[tk].iloc[-2])
-                    mov_list.append({"Ticker": tk.replace(".JK",""), "Chg": ((c_last-c_prev)/c_prev)*100})
+                    tk_mov = mov_data[tk].dropna()
+                    if len(tk_mov) >= 2:
+                        c_last, c_prev = float(tk_mov.iloc[-1]), float(tk_mov.iloc[-2])
+                        mov_list.append({"Ticker": tk.replace(".JK",""), "Chg": ((c_last-c_prev)/c_prev)*100})
                 except: pass
             
             df_mov = pd.DataFrame(mov_list).sort_values("Chg", ascending=False)
@@ -802,7 +810,7 @@ elif menu == "🕯️ POLA CANDLE AI":
         with st.spinner("Mendeteksi anatomi grafik terakhir..."):
             try:
                 full_tk = f"{tk_candle}.JK" if not tk_candle.endswith(".JK") else tk_candle
-                df_c = yf.download(full_tk, period="1mo", interval="1d", progress=False)
+                df_c = yf.download(full_tk, period="1mo", interval="1d", progress=False).dropna()
                 
                 if not df_c.empty and len(df_c) >= 3:
                     if isinstance(df_c.columns, pd.MultiIndex): df_c.columns = df_c.columns.get_level_values(0)
@@ -881,7 +889,7 @@ elif menu == "🛰️ AUTO SCANNER":
         with tab3:
             sel_t = st.selectbox("Pilih Saham untuk Grafik:", df['TICKER'].tolist())
             full_t = df[df['TICKER'] == sel_t]['FULL'].values[0]
-            c_data = yf.download(full_t, period="6mo", interval="1d", progress=False)
+            c_data = yf.download(full_t, period="6mo", interval="1d", progress=False).dropna()
             if not c_data.empty:
                 c_data.columns = [c[0] if isinstance(c, tuple) else c for c in c_data.columns]
                 c_data['MA20'] = c_data['Close'].rolling(20).mean()
@@ -955,8 +963,8 @@ elif menu == "🎯 AUTO SUP/RES":
         with st.spinner("Menghitung kalkulasi Pivot Point..."):
             try:
                 full_tk = f"{tk_pivot}.JK" if not tk_pivot.endswith(".JK") else tk_pivot
-                df_piv = yf.download(full_tk, period="1mo", interval="1d", progress=False)
-                if not df_piv.empty:
+                df_piv = yf.download(full_tk, period="1mo", interval="1d", progress=False).dropna()
+                if not df_piv.empty and len(df_piv) >= 20:
                     if isinstance(df_piv.columns, pd.MultiIndex): df_piv.columns = df_piv.columns.get_level_values(0)
                     
                     recent_high = float(df_piv['High'][-20:].max())
@@ -1096,6 +1104,7 @@ elif menu == "🌐 PETA SEKTOR":
                         try:
                             df_t = data[t] if len(all_tickers) > 1 else data
                             if isinstance(df_t.columns, pd.MultiIndex): df_t.columns = df_t.columns.get_level_values(0)
+                            df_t = df_t.dropna()
                             if not df_t.empty and len(df_t) >= 2:
                                 c_now, c_prev = df_t['Close'].iloc[-1], df_t['Close'].iloc[-2]
                                 sec_changes.append(((c_now - c_prev) / c_prev) * 100)
@@ -1192,7 +1201,7 @@ elif menu == "🧬 KORELASI SAHAM":
         with st.spinner("Melakukan perbandingan algoritma..."):
             try:
                 raw_list = [t.strip().upper() + ".JK" for t in input_tkrs.split(",")]
-                data_corr = yf.download(raw_list, period="6mo", interval="1d", progress=False)['Close']
+                data_corr = yf.download(raw_list, period="6mo", interval="1d", progress=False)['Close'].dropna()
                 if not data_corr.empty:
                     if isinstance(data_corr.columns, pd.MultiIndex): data_corr.columns = data_corr.columns.get_level_values(0)
                     data_corr.columns = [c.replace(".JK", "") for c in data_corr.columns]
@@ -1216,8 +1225,8 @@ elif menu == "🏛️ JEJAK BANDAR":
         if st.button("Lacak Arus Masuk Keluar", width="stretch"):
             with st.spinner("Membongkar distribusi aliran..."):
                 try:
-                    df_ff = yf.download(f"{ff_tk}.JK" if not ff_tk.endswith(".JK") else ff_tk, period="3mo", interval="1d", progress=False)
-                    if not df_ff.empty:
+                    df_ff = yf.download(f"{ff_tk}.JK" if not ff_tk.endswith(".JK") else ff_tk, period="3mo", interval="1d", progress=False).dropna()
+                    if not df_ff.empty and len(df_ff) > 20:
                         if isinstance(df_ff.columns, pd.MultiIndex): df_ff.columns = df_ff.columns.get_level_values(0)
                         df_ff['Multiplier'] = ((df_ff['Close'] - df_ff['Low']) - (df_ff['High'] - df_ff['Close'])) / (df_ff['High'] - df_ff['Low'] + 1e-9)
                         df_ff['CMF_20'] = (df_ff['Multiplier'] * df_ff['Volume']).rolling(20).sum() / df_ff['Volume'].rolling(20).sum()
@@ -1248,7 +1257,7 @@ elif menu == "🏛️ JEJAK BANDAR":
                 try:
                     full_tk = f"{vwap_tk}.JK" if not vwap_tk.endswith(".JK") else vwap_tk
                     p_map = {"1 Minggu Terakhir": "5d", "1 Bulan Terakhir": "1mo", "3 Bulan Terakhir": "3mo"}
-                    df_v = yf.download(full_tk, period=p_map[period_vwap], interval="1d", progress=False)
+                    df_v = yf.download(full_tk, period=p_map[period_vwap], interval="1d", progress=False).dropna()
 
                     if not df_v.empty:
                         if isinstance(df_v.columns, pd.MultiIndex): df_v.columns = df_v.columns.get_level_values(0)
@@ -1293,7 +1302,7 @@ elif menu == "🏛️ JEJAK BANDAR":
             with st.spinner("Mengecek pergerakan di balik layar..."):
                 try:
                     full_tk = f"{div_tk}.JK" if not div_tk.endswith(".JK") else div_tk
-                    df_div = yf.download(full_tk, period="3mo", interval="1d", progress=False)
+                    df_div = yf.download(full_tk, period="3mo", interval="1d", progress=False).dropna()
                     if not df_div.empty and len(df_div) > 20:
                         if isinstance(df_div.columns, pd.MultiIndex): df_div.columns = df_div.columns.get_level_values(0)
                         
@@ -1440,7 +1449,7 @@ elif menu == "💼 DOMPET TRADING":
         if not df_p.empty:
             tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique()]
             try:
-                live_prices = yf.download(tickers_jk, period="1d", progress=False, threads=True)['Close'].iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(yf.download(tickers_jk, period="1d", progress=False)['Close'].iloc[-1])}
+                live_prices = yf.download(tickers_jk, period="5d", progress=False, threads=True)['Close'].dropna().iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(yf.download(tickers_jk, period="5d", progress=False)['Close'].dropna().iloc[-1])}
             except: live_prices = {}
 
             def calc_active(row):
