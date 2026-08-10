@@ -176,7 +176,24 @@ def get_sector(ticker):
     try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
     except: return "Lainnya"
 
-# --- 1. TEMA TERANG (CLEAN WHITE) + ANTI-OVERRIDE DARK MODE ---
+@st.cache_data(ttl=300)
+def get_ticker_data():
+    try:
+        data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="2d", interval="1d", progress=False)['Close']
+        if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+        items = []
+        for tk, name in zip(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], ['IHSG', 'BBCA', 'BBRI', 'BMRI', 'TLKM']):
+            try:
+                c_now = float(data[tk].iloc[-1])
+                c_prev = float(data[tk].iloc[-2])
+                pct = (c_now - c_prev)/c_prev*100
+                color = "#10B981" if pct > 0 else "#EF4444"
+                items.append(f"<span class='ticker-item'>{name} {c_now:,.0f} <span style='color:{color};'>({pct:+.2f}%)</span></span>")
+            except: pass
+        return " &nbsp;&nbsp; | &nbsp;&nbsp; ".join(items) * 4 
+    except: return ""
+
+# --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL EKSTRA ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -191,9 +208,7 @@ header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
 /* PAKSA SEMUA TEKS JADI GELAP (Anti White-on-White di Dark Mode HP) */
-p, span, label, li, div.stMarkdown, .stText {
-    color: #1E293B;
-}
+p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
 
 /* Heading Profesional */
 h1, h2, h3, h4, h5, h6 { 
@@ -203,99 +218,121 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.5px; 
 }
 h1 { font-size: 2.2rem !important; color: #2563EB !important; } 
+.stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
 
-/* Teks Caption Khusus */
-.stCaptionContainer p, [data-testid="stCaptionContainer"] p {
-    color: #64748B !important;
+/* --- EFEK 1: RUNNING TICKER TAPE --- */
+.ticker-wrap {
+    width: 100%;
+    overflow: hidden;
+    background-color: #0F172A;
+    color: #FFFFFF !important;
+    padding: 10px 0;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    white-space: nowrap;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.ticker {
+    display: inline-block;
+    white-space: nowrap;
+    padding-right: 100%;
+    box-sizing: content-box;
+    animation: ticker 40s linear infinite;
+}
+.ticker:hover { animation-play-state: paused; }
+.ticker-item {
+    display: inline-block;
+    padding: 0 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #F8FAFC;
+}
+@keyframes ticker {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-50%, 0, 0); }
 }
 
-/* --- SIDEBAR MENU (YANG HILANG DI HP) --- */
+/* --- EFEK 2: PULSING DOT ONLINE --- */
+.pulsing-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #10B981;
+    margin-right: 5px;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulse-dot 1.5s infinite;
+}
+@keyframes pulse-dot {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* --- EFEK 3: TAMPILAN TAB ALA iOS --- */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: #E2E8F0 !important;
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+    border-bottom: none !important;
+}
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    border: none !important;
+    margin: 0 !important;
+}
+.stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
+.stTabs [aria-selected="true"] {
+    background-color: #FFFFFF !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
+.stTabs [data-baseweb="tab-highlight"] { display: none !important; } /* Sembunyikan garis bawah tab bawaan */
+
+/* --- SIDEBAR MENU --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { 
-    background-color: #FFFFFF !important; 
-    border-right: 1px solid #E2E8F0 !important;
+    background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important;
 }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-    background: transparent !important; 
-    border: none !important;
-    border-radius: 8px !important; 
-    padding: 10px 14px !important; 
-    margin-bottom: 4px !important;
+    background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important;
 }
-/* Paksa teks radio di sidebar jadi gelap */
-section[data-testid="stSidebar"] .stRadio p, 
-section[data-testid="stSidebar"] .stRadio span,
-section[data-testid="stSidebar"] .stRadio label { 
-    font-family: 'Inter', sans-serif !important; 
-    font-size: 0.95rem !important; 
-    color: #334155 !important; /* Warna Slate */
-    font-weight: 600 !important; 
+section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { 
+    font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; 
 }
-/* Warna saat menu diklik (Aktif) */
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {
-    background-color: #F8FAFC !important;
-    border: 1px solid #E2E8F0 !important; 
-    border-left: 4px solid #2563EB !important; 
+    background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; 
 }
-section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p,
-section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { 
-    color: #2563EB !important; /* Biru terang */
-    font-weight: 800 !important;
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { 
+    color: #2563EB !important; font-weight: 800 !important;
 }
 
 /* --- KOTAK KONTAINER (CARDS) --- */
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .stDataFrame, .dash-box {
-    background-color: #FFFFFF !important; 
-    border: 1px solid #E2E8F0 !important; 
-    border-top: 3px solid #2563EB !important; 
-    border-radius: 12px; 
-    padding: 16px !important; 
-    margin-bottom: 16px !important;
+div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
+    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-top: 3px solid #2563EB !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
 }
-/* Hilangkan border top untuk dash-box custom kalau sudah ada inline style */
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
 
 /* --- INPUT FORM --- */
-div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { 
-    color: #2563EB !important; 
-    font-size: 0.85rem !important; 
-    font-weight: 600 !important; 
-}
+div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
 input, select, textarea {
-    background-color: #F8FAFC !important;
-    border: 1px solid #CBD5E1 !important;
-    color: #0F172A !important; 
-    font-family: 'JetBrains Mono', monospace !important;
-    border-radius: 8px !important; 
-    height: 44px !important; 
-    font-size: 15px !important;
-    font-weight: 600 !important;
+    background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important;
 }
 
-/* --- METRIK & TAB --- */
+/* --- METRIK --- */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
-
-.stTabs [data-baseweb="tab"] p { color: #64748B !important; font-weight: 600 !important; }
-.stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
-
-/* Teks dalam Expander (Dropdown) */
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
 
 /* --- TOMBOL --- */
 .stButton>button {
-    background-color: #2563EB !important; 
-    border: none !important; 
-    border-radius: 8px !important; 
-    min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px;
-    transition: background-color 0.2s ease;
+    background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease;
 }
-.stButton>button p, .stButton>button span, .stButton>button div {
-    color: #FFFFFF !important;
-    font-family: 'Inter', sans-serif !important; 
-    font-weight: 600 !important; 
-    font-size: 0.9rem !important;
-}
+.stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; }
 .stButton>button:hover { background-color: #1D4ED8 !important; }
 
 /* Warna Custom Teks Utility */
@@ -490,6 +527,11 @@ def draw_mobile_cards(df):
         </div>
         """, unsafe_allow_html=True)
 
+# Custom DataFrame Styling for Heatmap effect
+def style_dataframe(val):
+    if type(val) in [int, float] and val > 0: return 'color: #16A34A; font-weight: bold;'
+    elif type(val) in [int, float] and val < 0: return 'color: #DC2626; font-weight: bold;'
+    return ''
 
 # --- 4. NAVIGATION & SIDEBAR ---
 role = st.session_state.role
@@ -497,9 +539,9 @@ user_now = st.session_state.user
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:16px; background-color:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; margin-bottom:15px;'>
+    <div style='padding:16px; background-color:#FFFFFF; border-radius:12px; border:1px solid #E2E8F0; margin-bottom:15px; text-align:center;'>
         <h3 style='margin:0; font-size:1.1rem; color:#0F172A;'>{user_now.upper()}</h3>
-        <p style='margin:0; font-size:10px; color:#16A34A; font-weight:600; margin-top:4px;'>🟢 ONLINE | {role.upper()}</p>
+        <p style='margin:0; font-size:11px; color:#16A34A; font-weight:700; margin-top:4px;'><span class='pulsing-dot'></span> ONLINE | {role.upper()}</p>
         <hr style='border:0.5px solid #E2E8F0; margin:10px 0;'>
         <p style='font-size:10px; color:#64748B; margin:2px 0;'>LST: {last_l}</p>
         <p style='font-size:10px; color:#64748B; margin:2px 0;'>IP : {ip_l}</p>
@@ -507,23 +549,10 @@ st.sidebar.markdown(f"""
     """, unsafe_allow_html=True)
 
 menu_list = [
-    "🖥️ DASHBOARD UTAMA",
-    "🛰️ AUTO SCANNER", 
-    "⚡ STRATEGY SCANNER",
-    "🕯️ POLA CANDLE AI",         
-    "⭐ WATCHLIST FAVORIT", 
-    "🎯 AUTO SUP/RES",           
-    "📅 SIKLUS MUSIMAN",         
-    "📟 CEK FUNDAMENTAL", 
-    "⚔️ ADU SAHAM", 
-    "🌐 PETA SEKTOR", 
-    "🧮 KALKULATOR TRADING",     
-    "💰 PEMBURU DIVIDEN", 
-    "🧬 KORELASI SAHAM", 
-    "🏛️ JEJAK BANDAR",
-    "📰 BERITA PASAR", 
-    "💼 DOMPET TRADING",         
-    "🔒 KEAMANAN"
+    "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", "🕯️ POLA CANDLE AI",         
+    "⭐ WATCHLIST FAVORIT", "🎯 AUTO SUP/RES", "📅 SIKLUS MUSIMAN", "📟 CEK FUNDAMENTAL", 
+    "⚔️ ADU SAHAM", "🌐 PETA SEKTOR", "🧮 KALKULATOR TRADING", "💰 PEMBURU DIVIDEN", 
+    "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR", "💼 DOMPET TRADING", "🔒 KEAMANAN"
 ]
 if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: 
     menu_list.append("⚙️ USER MANAGEMENT")
@@ -539,6 +568,13 @@ if st.sidebar.button("Keluar (Logout)", use_container_width=True):
 
 
 # --- 5. CONTENT AREA ---
+
+# =========================================================================
+# 🔥 EFEK 1: RUNNING TICKER TAPE (DITAMPILKAN DI ATAS SEMUA MENU)
+# =========================================================================
+ticker_html = get_ticker_data()
+if ticker_html:
+    st.markdown(f"<div class='ticker-wrap'><div class='ticker'>{ticker_html}</div></div>", unsafe_allow_html=True)
 
 # =========================================================================
 # 🔥 MASTER COMMAND CENTER (DASHBOARD) 
@@ -836,7 +872,16 @@ elif menu == "🛰️ AUTO SCANNER":
 
         tab1, tab2, tab3 = st.tabs(["📱 RINGKASAN", "📊 DATA LENGKAP", "📈 GRAFIK"])
         with tab1: draw_mobile_cards(df)
-        with tab2: st.dataframe(df.drop(columns=['FULL'], errors='ignore'), use_container_width=True, hide_index=True)
+        with tab2: 
+            # EFEK 4: HEATMAP PADA TABEL DATA
+            def highlight_cols(s):
+                if s.name == 'CHG%':
+                    return ['background-color: #D1FAE5; color: #047857; font-weight:bold;' if v > 0 else 'background-color: #FEE2E2; color: #B91C1C; font-weight:bold;' for v in s]
+                return ['' for _ in s]
+            
+            styled_df = df.drop(columns=['FULL'], errors='ignore').style.apply(highlight_cols)
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+            
         with tab3:
             sel_t = st.selectbox("Pilih Saham untuk Grafik:", df['TICKER'].tolist())
             full_t = df[df['TICKER'] == sel_t]['FULL'].values[0]
@@ -1023,7 +1068,7 @@ elif menu == "⚔️ ADU SAHAM":
             try:
                 i1, i2 = yf.Ticker(f"{tk1}.JK").info, yf.Ticker(f"{tk2}.JK").info
                 get_val = lambda d, k: d.get(k, 0) or 0
-                st.markdown(f"<h2 style='text-align:center; color:#38BDF8;'>{tk1} <span style='color:#EF4444;'>VS</span> {tk2}</h2>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='text-align:center; color:#2563EB;'>{tk1} <span style='color:#EF4444;'>VS</span> {tk2}</h2>", unsafe_allow_html=True)
                 df_compare = pd.DataFrame({
                     "METRIK ANALISIS": ["Harga Pasar", "P/E Ratio", "PBV Ratio", "Tingkat Profit (ROE)"],
                     tk1: [f"Rp {get_val(i1, 'currentPrice'):,.0f}", f"{get_val(i1, 'trailingPE'):,.2f}x", f"{get_val(i1, 'priceToBook'):,.2f}x", f"{get_val(i1, 'returnOnEquity')*100:.2f}%"],
@@ -1183,10 +1228,10 @@ elif menu == "🏛️ JEJAK BANDAR":
                         latest_cmf = float(df_ff['CMF_20'].iloc[-1])
                         
                         if latest_cmf > 0.05: status_flow, color_flow = "AKUMULASI BESAR 🚀", "#16A34A"
-                        elif latest_cmf < -0.05: status_flow, color_flow = "DISTRIBUSI BESAR ⚠️", "#DC2626"
+                        elif latest_cmf < -0.05: status_flow, color_flow = "DISTRIBUSI BESAR ⚠️", "#EF4444"
                         else: status_flow, color_flow = "PERGERAKAN NETRAL 💤", "#38BDF8"
                         
-                        st.markdown(f"<div class='dash-box' style='text-align:center; border-top: 3px solid {color_flow};'><h3 style='color:{color_flow}; margin:0;'>{status_flow}</h3></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box' style='text-align:center; border-top: 3px solid {color_flow} !important;'><h3 style='color:{color_flow}; margin:0;'>{status_flow}</h3></div>", unsafe_allow_html=True)
                         fig_mf = px.area(df_ff.reset_index(), x='Date', y='CMF_20')
                         fig_mf.add_hline(y=0, line_dash="dash", line_color="gray")
                         fig_mf.update_layout(template="plotly_white", height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
@@ -1237,7 +1282,7 @@ elif menu == "🏛️ JEJAK BANDAR":
                                 st.error(f"Harga sudah jauh meroket menjauhi zona modal dasar bandar. Sangat rentan area Taking Profit.")
 
                             fig = go.Figure(data=[go.Candlestick(x=df_v.index, open=df_v['Open'], high=df_v['High'], low=df_v['Low'], close=df_v['Close'], increasing_line_color='#16A34A', decreasing_line_color='#DC2626')])
-                            fig.add_hline(y=vwap_price, line_dash="dash", line_color="#38BDF8", annotation_text="GARIS MODAL INSTITUSI (VWAP)")
+                            fig.add_hline(y=vwap_price, line_dash="dash", line_color="#2563EB", annotation_text="GARIS MODAL INSTITUSI (VWAP)")
                             fig.update_layout(template="plotly_white", height=400, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                             st.plotly_chart(fig, use_container_width=True)
                         else:
@@ -1275,7 +1320,7 @@ elif menu == "🏛️ JEJAK BANDAR":
                             status_div, warna_div = "🔴 HIDDEN DISTRIBUTION TERDETEKSI", "#DC2626"
                             desc = "Awas! Harga saham dikerek tinggi memancing kehebohan, namun Institusi perlahan mendistribusikan barang keluar jaring. Rentan menghadapi jatuhnya harga secara agresif."
                         elif price_change > 0 and adl_trend > 0:
-                            status_div, warna_div = "⚪ NORMAL UPTREND", "#38BDF8"
+                            status_div, warna_div = "⚪ NORMAL UPTREND", "#2563EB"
                             desc = "Kenaikan harga seiring dengan sehatnya permintaan pembelian. Tren valid tanpa sinyal anomali negatif."
                         elif price_change < 0 and adl_trend < 0:
                             status_div, warna_div = "⚪ NORMAL DOWNTREND", "#64748B"
@@ -1284,11 +1329,11 @@ elif menu == "🏛️ JEJAK BANDAR":
                             status_div, warna_div = "⚪ SIDEWAYS (KONSOLIDASI)", "#64748B"
                             desc = "Pergerakan volatilitas terhitung normal. Belum ada tanda intervensi bandar secara dominan."
 
-                        st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna_div}; text-align:center;'><h3 style='color:{warna_div};'>{status_div}</h3><p style='font-size:14px; margin-top:5px; color:#0F172A;'>{desc}</p></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna_div} !important; text-align:center;'><h3 style='color:{warna_div};'>{status_div}</h3><p style='font-size:14px; margin-top:5px; color:#0F172A;'>{desc}</p></div>", unsafe_allow_html=True)
                         
                         fig_div = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.6, 0.4])
                         fig_div.add_trace(go.Candlestick(x=df_div.index, open=df_div['Open'], high=df_div['High'], low=df_div['Low'], close=df_div['Close'], increasing_line_color='#16A34A', decreasing_line_color='#DC2626', name='Harga'), row=1, col=1)
-                        fig_div.add_trace(go.Scatter(x=df_div.index, y=df_div['ADL'], line=dict(color='#38BDF8', width=2), name='Accumulation Line'), row=2, col=1)
+                        fig_div.add_trace(go.Scatter(x=df_div.index, y=df_div['ADL'], line=dict(color='#2563EB', width=2), name='Accumulation Line'), row=2, col=1)
                         fig_div.update_layout(template="plotly_white", height=500, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                         st.plotly_chart(fig_div, use_container_width=True)
                 except: st.error("Malfungsi sistem saat mengkalkulasi divergensi tren.")
@@ -1340,7 +1385,7 @@ elif menu == "📰 BERITA PASAR":
                     sent_text, sent_color = analyze_sentiment(entry.title)
                     fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                     pub_date = entry.published if hasattr(entry, 'published') else ""
-                    st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#DC2626; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
             except: st.error("Malfungsi sambungan internet saat penarikan RSS.")
                 
     with t_spec:
@@ -1356,18 +1401,18 @@ elif menu == "📰 BERITA PASAR":
                         sent_text, sent_color = analyze_sentiment(entry.title)
                         fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                         pub_date = entry.published if hasattr(entry, 'published') else ""
-                        st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#DC2626; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
                 except: st.error("Layanan filter RSS sedang tidak beroperasi.")
                 
     with t_corp:
-        st.info("Penyaring agenda perusahaan Emiten agar kamu tidak terlambat mengikuti gelombang pembagian untung Dividen atau kewajiban aksi korporasi lainnya.")
+        st.info("💡 Pantau berita jadwal *Cum Date* Dividen atau Right Issue terbaru di sini agar tidak ketinggalan kereta.")
         with st.spinner("Memindai almanak korporasi..."):
             try:
                 feed_corp = feedparser.parse(requests.get("https://news.google.com/rss/search?q=jadwal+dividen+OR+right+issue+OR+cum+date+saham+indonesia&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
                 for entry in feed_corp.entries[:10]: 
                     fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                     pub_date = entry.published if hasattr(entry, 'published') else ""
-                    st.markdown(f"<div class='dash-box' style='border-left:4px solid #2563EB; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:#2563EB;'>📅 INFO CORPORATE ACTION</span><span style='font-size:11px; color:#DC2626; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='border-left:4px solid #2563EB; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:#2563EB;'>📅 INFO CORPORATE ACTION</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
             except: st.error("Kesalahan jaringan sewaktu meretas kalender bursa.")
 
 elif menu == "💼 DOMPET TRADING":
