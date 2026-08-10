@@ -198,6 +198,23 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+/* --- CUSTOM SCROLLBAR (MAC STYLE) --- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* --- ANIMASI FADE-IN (SMOOTH LOAD) --- */
+@keyframes fadeInUp {
+    0% { opacity: 0; transform: translateY(15px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Terapkan animasi ke komponen-komponen utama */
+.dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame {
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
 /* --- LATAR BELAKANG & TEKS DASAR --- */
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
@@ -251,6 +268,20 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
+/* --- EFEK 5: NOTIFIKASI ALERT MINIMALIS (CLEAN GLASS) --- */
+div[data-testid="stAlert"] {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+}
+div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("Berhasil")) { border-left: 4px solid #10B981 !important; }
+div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("Gagal")),
+div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("⚠️")) { border-left: 4px solid #EF4444 !important; }
+div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("💡")) { border-left: 4px solid #38BDF8 !important; }
+
+
 /* --- SIDEBAR MENU --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
@@ -258,18 +289,17 @@ section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .s
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
 
-/* --- EFEK 5: KOTAK KONTAINER (HOVER CARDS) --- */
+/* --- KOTAK KONTAINER (HOVER CARDS) --- */
 div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
-    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-top: 3px solid #2563EB !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important;
+    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
-    transition: transform 0.2s ease, box-shadow 0.2s ease; /* Transisi Halus */
+    transition: transform 0.2s ease, box-shadow 0.2s ease; 
 }
 /* Efek Mengambang Saat di-Hover/Sentuh */
 div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
     transform: translateY(-3px);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
-.dash-box { border-top: 1px solid #E2E8F0 !important; }
 
 /* --- INPUT FORM & LAINNYA --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
@@ -389,7 +419,7 @@ def run_scan(tickers, mode):
             results.append({
                 "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": round(chg, 2),
                 "RSI": round(rsi, 1), "VAL(M)": round(val_tr / 1_000_000, 1), 
-                "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
+                "BANDAR": "AKUMULASI 🚀" if cmf > 0 else "DISTRIBUSI ⚠️",
                 "AI_SCORE": round(ai_score, 2),
                 "BREAKOUT": "YA" if is_breakout else "TDK",
                 "TP 1": c_now + (1.5 * atr_val), "TP 2": c_now + (2.5 * atr_val), "EXIT/CL": c_now - (1.0 * atr_val), "FULL": t
@@ -457,7 +487,7 @@ def draw_mobile_cards(df):
         val_m     = row.get('VAL(M)', 0)
 
         st.markdown(f"""
-        <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
+        <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <b style="font-size: 1.2rem; color: #0F172A;">{row.get('TICKER','-')}</b>
                 <span style="color: {chg_color}; font-weight: 700; font-family: 'JetBrains Mono';">{'+' if chg>0 else ''}{chg}%</span>
@@ -545,9 +575,9 @@ if menu == "🖥️ DASHBOARD UTAMA":
             ihsg_pct = ((ihsg_last - ihsg_prev) / ihsg_prev) * 100
             ihsg_color = "#16A34A" if ihsg_pct > 0 else "#DC2626"
             ihsg_status = "BULLISH 🚀" if ihsg_pct > 0.5 else ("BEARISH ⚠️" if ihsg_pct < -0.5 else "SIDEWAYS 💤")
-            badge_ihsg = "badge-green" if ihsg_pct > 0 else "badge-red" # PILL BADGE
+            badge_ihsg = "badge-green" if ihsg_pct > 0 else "badge-red" 
             
-            st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color}; border-top: 1px solid #E2E8F0 !important; padding: 20px;'>
+            st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color};'>
                 <p class='text-muted' style='margin:0; font-weight:600;'>IHSG (HARGA SAHAM GABUNGAN)</p>
                 <h2 style='margin:5px 0; color:{ihsg_color}; font-family:"JetBrains Mono";'>{ihsg_last:,.2f} <span style='font-size:1rem;'>({'+' if ihsg_pct>0 else ''}{ihsg_pct:.2f}%)</span></h2>
                 <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Hari Ini: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
@@ -568,7 +598,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 except: pass
             total_valid = up + down + flat
             if total_valid > 0:
-                st.markdown(f"""<div class='dash-box' style='padding: 20px; border-top: 1px solid #E2E8F0 !important;'>
+                st.markdown(f"""<div class='dash-box' style='padding: 20px;'>
                     <p class='text-muted' style='margin:0 0 15px 0; text-align:center; font-weight:600;'>📊 MARKET BREADTH (KESEHATAN PASAR)</p>
                     <div style='display:flex; justify-content:space-around;'>
                         <div style='text-align:center;'><h2 class='text-green' style='margin:0;'>{up}</h2><span class='text-muted'>Naik 📈</span></div>
@@ -597,7 +627,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
             flow_status = "NET BUY (Masuk)" if net_flow > 0.05 else ("NET SELL (Keluar)" if net_flow < -0.05 else "NETRAL")
             badge_flow = "badge-green" if net_flow > 0.05 else ("badge-red" if net_flow < -0.05 else "badge-blue")
             
-            st.markdown(f"""<div class='dash-box' style='border-top: 3px solid {flow_color}; text-align:center; padding: 20px;'>
+            st.markdown(f"""<div class='dash-box' style='text-align:center; padding: 20px;'>
                 <p class='text-muted' style='margin:0 0 5px 0; font-weight:600;'>🦅 ARUS DANA ASING (BIG CAPS)</p>
                 <div style='margin:15px 0;'><span class='{badge_flow}' style='font-size:1.1rem; padding: 8px 16px;'>{flow_status}</span></div>
                 <p style='font-size:13px; color:#0F172A;'>Indikator Kekuatan: <b>{net_flow:.2f}</b></p>
@@ -619,7 +649,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 title = {'text': f"<br><span style='color:{fg_color}; font-size:16px; font-weight:700;'>{fg_status}</span>", 'font': {'size': 14, 'family': 'Inter'}},
                 gauge = {
                     'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#334155", 'visible': False},
-                    'bar': {'color': fg_color, 'thickness': 0.3}, 'bgcolor': "#0F172A",
+                    'bar': {'color': fg_color, 'thickness': 0.3}, 'bgcolor': "#FFFFFF",
                     'steps': [
                         {'range': [0, 30], 'color': "rgba(239, 68, 68, 0.15)"}, {'range': [30, 45], 'color': "rgba(245, 158, 11, 0.15)"},
                         {'range': [45, 55], 'color': "rgba(56, 189, 248, 0.15)"}, {'range': [55, 70], 'color': "rgba(16, 185, 129, 0.15)"},
@@ -671,9 +701,9 @@ if menu == "🖥️ DASHBOARD UTAMA":
             max_w = sec_weights.max()
             
             if max_w > 60:
-                st.markdown(f"<div class='dash-box' style='background-color:#FEF2F2; border-color:#DC2626;'><b class='text-red'>🛡️ Peringatan Risiko:</b> {max_w:.1f}% dana menumpuk di sektor <b>{max_sec}</b>. Segera diversifikasi agar lebih aman!</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='dash-box' style='background-color:#FEF2F2; border-left:4px solid #DC2626;'><b class='text-red'>🛡️ Peringatan Risiko:</b> {max_w:.1f}% dana menumpuk di sektor <b>{max_sec}</b>. Segera diversifikasi agar lebih aman!</div>", unsafe_allow_html=True)
             else:
-                st.markdown(f"<div class='dash-box' style='background-color:#F0FDF4; border-color:#16A34A;'><b class='text-green'>🛡️ Status Aman:</b> Diversifikasi portofoliomu sehat (Maksimal: {max_sec} {max_w:.1f}%).</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='dash-box' style='background-color:#F0FDF4; border-left:4px solid #16A34A;'><b class='text-green'>🛡️ Status Aman:</b> Diversifikasi portofoliomu sehat (Maksimal: {max_sec} {max_w:.1f}%).</div>", unsafe_allow_html=True)
             
             fig_pie = px.pie(df_p_aud, values='Cost', names='Sector', hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
             fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=2)))
@@ -700,7 +730,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
             df_spikes = pd.DataFrame(spikes).sort_values("Spike", ascending=False).head(3)
             if not df_spikes.empty:
                 for _, row in df_spikes.iterrows():
-                    st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-blue' style='float:right;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-blue' style='float:right;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada anomali ledakan volume hari ini.")
         except: st.info("Sistem volume radar sedang menyesuaikan data.")
 
@@ -784,7 +814,7 @@ elif menu == "🕯️ POLA CANDLE AI":
                         pola, warna, badge_c = "POLA DOJI TERDETEKSI", "#2563EB", "badge-blue"
                         kesimpulan = "Pasar sedang bimbang. Kekuatan beli dan jual seimbang. Bersiap untuk pergerakan arah berikutnya."
                         
-                    st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna}; text-align:center;'><br><span class='{badge_c}' style='font-size:1.2rem; padding:8px 16px;'>{pola}</span><p style='font-size:15px; margin-top:15px; color:#0F172A;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='text-align:center;'><br><span class='{badge_c}' style='font-size:1.2rem; padding:8px 16px;'>{pola}</span><p style='font-size:15px; margin-top:15px; color:#0F172A;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
                     
                     df_chart = df_c.tail(15)
                     fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='Candle', increasing_line_color='#16A34A', decreasing_line_color='#DC2626')])
@@ -813,7 +843,6 @@ elif menu == "🛰️ AUTO SCANNER":
         tab1, tab2, tab3 = st.tabs(["📱 RINGKASAN", "📊 DATA LENGKAP (HEATMAP)", "📈 GRAFIK"])
         with tab1: draw_mobile_cards(df)
         with tab2: 
-            # EFEK 4: HEATMAP PADA TABEL DATA
             def highlight_cols(s):
                 if s.name == 'CHG%':
                     return ['background-color: #D1FAE5; color: #065F46; font-weight:bold;' if v > 0 else 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;' for v in s]
@@ -968,7 +997,6 @@ elif menu == "📅 SIKLUS MUSIMAN":
             except: st.error("Data rentang waktu belum mencukupi.")
 
 elif menu == "📟 CEK FUNDAMENTAL":
-    st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
     st.markdown(f"<h2 class='gradient-text'>Cek Laporan Fundamental</h2>", unsafe_allow_html=True)
     st.caption("Memeriksa kesehatan rasio keuangan internal perusahaan (seperti P/E, PBV, Profit) untuk menilai apakah harga saham masih layak diinvestasikan.")
     col_in1, col_in2 = st.columns([3, 1])
