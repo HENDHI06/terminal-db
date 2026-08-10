@@ -193,76 +193,43 @@ def get_ticker_data():
         return " &nbsp;&nbsp; | &nbsp;&nbsp; ".join(items) * 4 
     except: return ""
 
-# --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL EKSTRA ---
+# --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL EKSTRA PREMIUM ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 /* --- LATAR BELAKANG & TEKS DASAR --- */
-.stApp {
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
-    font-family: 'Inter', sans-serif;
-}
+.stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
 /* PAKSA SEMUA TEKS JADI GELAP (Anti White-on-White di Dark Mode HP) */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
 
-/* Heading Profesional */
-h1, h2, h3, h4, h5, h6 { 
-    font-family: 'Inter', sans-serif !important; 
-    font-weight: 700 !important; 
-    color: #0F172A !important; 
-    letter-spacing: -0.5px; 
+/* --- HEADING & EFEK GRADASI (GRADIENT TEXT) --- */
+h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
+.gradient-text {
+    background: linear-gradient(90deg, #2563EB, #10B981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
 }
-h1 { font-size: 2.2rem !important; color: #2563EB !important; } 
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
 
 /* --- EFEK 1: RUNNING TICKER TAPE --- */
 .ticker-wrap {
-    width: 100%;
-    overflow: hidden;
-    background-color: #0F172A;
-    color: #FFFFFF !important;
-    padding: 10px 0;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    white-space: nowrap;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    width: 100%; overflow: hidden; background-color: #0F172A; color: #FFFFFF !important;
+    padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
-.ticker {
-    display: inline-block;
-    white-space: nowrap;
-    padding-right: 100%;
-    box-sizing: content-box;
-    animation: ticker 40s linear infinite;
-}
+.ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
-.ticker-item {
-    display: inline-block;
-    padding: 0 20px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #F8FAFC;
-}
-@keyframes ticker {
-    0% { transform: translate3d(0, 0, 0); }
-    100% { transform: translate3d(-50%, 0, 0); }
-}
+.ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #F8FAFC; }
+@keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
 
 /* --- EFEK 2: PULSING DOT ONLINE --- */
 .pulsing-dot {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: #10B981;
-    margin-right: 5px;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    animation: pulse-dot 1.5s infinite;
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite;
 }
 @keyframes pulse-dot {
     0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
@@ -270,76 +237,54 @@ h1 { font-size: 2.2rem !important; color: #2563EB !important; }
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* --- EFEK 3: TAMPILAN TAB ALA iOS --- */
-.stTabs [data-baseweb="tab-list"] {
-    background-color: #E2E8F0 !important;
-    border-radius: 12px;
-    padding: 4px;
-    gap: 4px;
-    border-bottom: none !important;
-}
-.stTabs [data-baseweb="tab"] {
-    background-color: transparent !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-    border: none !important;
-    margin: 0 !important;
-}
+/* --- EFEK 3: PILL BADGES (LABEL KAPSUL) --- */
+.badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+.badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+.badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+.badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+
+/* --- EFEK 4: TAMPILAN TAB ALA iOS --- */
+.stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
+.stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
-.stTabs [aria-selected="true"] {
-    background-color: #FFFFFF !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
+.stTabs [aria-selected="true"] { background-color: #FFFFFF !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
-.stTabs [data-baseweb="tab-highlight"] { display: none !important; } /* Sembunyikan garis bawah tab bawaan */
+.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
 /* --- SIDEBAR MENU --- */
-section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { 
-    background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important;
-}
-section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-    background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important;
-}
-section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { 
-    font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; 
-}
-section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] {
-    background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; 
-}
-section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { 
-    color: #2563EB !important; font-weight: 800 !important;
-}
+section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important; }
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
+section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; }
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
 
-/* --- KOTAK KONTAINER (CARDS) --- */
+/* --- EFEK 5: KOTAK KONTAINER (HOVER CARDS) --- */
 div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
     background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-top: 3px solid #2563EB !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
+    transition: transform 0.2s ease, box-shadow 0.2s ease; /* Transisi Halus */
+}
+/* Efek Mengambang Saat di-Hover/Sentuh */
+div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
 
-/* --- INPUT FORM --- */
+/* --- INPUT FORM & LAINNYA --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
-input, select, textarea {
-    background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important;
-}
-
-/* --- METRIK --- */
+input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
 
 /* --- TOMBOL --- */
-.stButton>button {
-    background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease;
-}
+.stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; }
 .stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; }
-.stButton>button:hover { background-color: #1D4ED8 !important; }
+.stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 
 /* Warna Custom Teks Utility */
-.text-green { color: #16A34A !important; } 
-.text-red { color: #DC2626 !important; } 
-.text-blue { color: #2563EB !important; } 
-.text-muted { color: #64748B !important; font-size: 13px; }
+.text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -356,7 +301,7 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     _, col2, _ = st.columns([1,1.5,1])
     with col2:
-        st.markdown("<div style='text-align:center; padding:50px 0;'><h1 style='font-size:2.5rem; margin-bottom:0; color:#2563EB;'>IDX PRO TERMINAL</h1><p class='text-muted' style='letter-spacing:2px; margin-top:5px;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:50px 0;'><h1 class='gradient-text'>IDX PRO TERMINAL</h1><p class='text-muted' style='letter-spacing:2px; margin-top:5px;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             u = st.text_input("User ID").strip()
             p = st.text_input("Password", type="password")
@@ -444,7 +389,7 @@ def run_scan(tickers, mode):
             results.append({
                 "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": round(chg, 2),
                 "RSI": round(rsi, 1), "VAL(M)": round(val_tr / 1_000_000, 1), 
-                "BANDAR": "AKUMULASI 🚀" if cmf > 0 else "DISTRIBUSI ⚠️",
+                "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
                 "AI_SCORE": round(ai_score, 2),
                 "BREAKOUT": "YA" if is_breakout else "TDK",
                 "TP 1": c_now + (1.5 * atr_val), "TP 2": c_now + (2.5 * atr_val), "EXIT/CL": c_now - (1.0 * atr_val), "FULL": t
@@ -482,19 +427,19 @@ def get_trend_signals(ticker_list):
             
             if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
                 if cmf_val > 0:
-                    status_text = "🟢 GOLDEN CROSS + AKUMULASI BANDAR (Sangat Kuat)"
+                    status_text = "GOLDEN CROSS + AKUMULASI"
                     color_code = "#16A34A"
                 else:
-                    status_text = "🟡 GOLDEN CROSS (Hati-hati, Bandar Distribusi)"
+                    status_text = "GOLDEN CROSS (Hati-hati Distribusi)"
                     color_code = "#F59E0B"
                 signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
             
             elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
                 if cmf_val < 0:
-                    status_text = "🔴 DEAD CROSS + DISTRIBUSI BANDAR (Sangat Bahaya)"
+                    status_text = "DEAD CROSS + DISTRIBUSI BANDAR"
                     color_code = "#DC2626"
                 else:
-                    status_text = "🟠 DEAD CROSS (Koreksi Normal Wajar)"
+                    status_text = "DEAD CROSS (Koreksi Normal Wajar)"
                     color_code = "#EA580C"
                 signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
         except Exception as e: 
@@ -529,8 +474,8 @@ def draw_mobile_cards(df):
 
 # Custom DataFrame Styling for Heatmap effect
 def style_dataframe(val):
-    if type(val) in [int, float] and val > 0: return 'color: #16A34A; font-weight: bold;'
-    elif type(val) in [int, float] and val < 0: return 'color: #DC2626; font-weight: bold;'
+    if type(val) in [int, float] and val > 0: return 'background-color: #D1FAE5; color: #065F46; font-weight:bold;'
+    elif type(val) in [int, float] and val < 0: return 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;'
     return ''
 
 # --- 4. NAVIGATION & SIDEBAR ---
@@ -580,7 +525,7 @@ if ticker_html:
 # 🔥 MASTER COMMAND CENTER (DASHBOARD) 
 # =========================================================================
 if menu == "🖥️ DASHBOARD UTAMA":
-    st.markdown(f"<h2 style='margin-bottom:5px; color:#0F172A;'>Ringkasan Pasar & Portofolio</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='gradient-text' style='margin-bottom:5px;'>Ringkasan Pasar & Portofolio</h2>", unsafe_allow_html=True)
     st.caption("Pantau metrik kesehatan pasar, psikologi trader, aliran asing, dan investasi pribadimu secara real-time.")
     st.write("---")
     
@@ -600,12 +545,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
             ihsg_pct = ((ihsg_last - ihsg_prev) / ihsg_prev) * 100
             ihsg_color = "#16A34A" if ihsg_pct > 0 else "#DC2626"
             ihsg_status = "BULLISH 🚀" if ihsg_pct > 0.5 else ("BEARISH ⚠️" if ihsg_pct < -0.5 else "SIDEWAYS 💤")
+            badge_ihsg = "badge-green" if ihsg_pct > 0 else "badge-red" # PILL BADGE
+            
             st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color}; border-top: 1px solid #E2E8F0 !important; padding: 20px;'>
                 <p class='text-muted' style='margin:0; font-weight:600;'>IHSG (HARGA SAHAM GABUNGAN)</p>
                 <h2 style='margin:5px 0; color:{ihsg_color}; font-family:"JetBrains Mono";'>{ihsg_last:,.2f} <span style='font-size:1rem;'>({'+' if ihsg_pct>0 else ''}{ihsg_pct:.2f}%)</span></h2>
-                <p style='margin:0; font-size:14px; color:#0F172A;'>Trend Pasar Hari Ini: <b style='color:{ihsg_color};'>{ihsg_status}</b></p>
+                <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Hari Ini: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
             </div>""", unsafe_allow_html=True)
-            st.caption("📈 **IHSG:** Indeks patokan pergerakan rata-rata seluruh saham di Bursa Efek Indonesia.")
     except: st.warning("Sedang mengambil data IHSG...")
 
     # --- BAGIAN 2: MARKET BREADTH ---
@@ -630,7 +576,6 @@ if menu == "🖥️ DASHBOARD UTAMA":
                         <div style='text-align:center;'><h2 class='text-red' style='margin:0;'>{down}</h2><span class='text-muted'>Turun 📉</span></div>
                     </div>
                 </div>""", unsafe_allow_html=True)
-                st.caption("⚖️ **Market Breadth:** Menghitung saham bluechip yang benar-benar naik vs turun untuk mendeteksi kesehatan bursa yang asli.")
         except: pass
 
     # --- BAGIAN 3: RADAR SENTIMEN & ARUS DANA ASING ---
@@ -649,14 +594,14 @@ if menu == "🖥️ DASHBOARD UTAMA":
             
             net_flow = sum(avg_cmfs) / len(avg_cmfs) if avg_cmfs else 0
             flow_color = "#10B981" if net_flow > 0 else "#EF4444"
-            flow_status = "NET BUY (Masuk) 🛒" if net_flow > 0.05 else ("NET SELL (Keluar) 💸" if net_flow < -0.05 else "NETRAL ⚖️")
+            flow_status = "NET BUY (Masuk)" if net_flow > 0.05 else ("NET SELL (Keluar)" if net_flow < -0.05 else "NETRAL")
+            badge_flow = "badge-green" if net_flow > 0.05 else ("badge-red" if net_flow < -0.05 else "badge-blue")
             
-            st.markdown(f"""<div class='dash-box' style='border-top: 3px solid {flow_color} !important; text-align:center; padding: 20px;'>
+            st.markdown(f"""<div class='dash-box' style='border-top: 3px solid {flow_color}; text-align:center; padding: 20px;'>
                 <p class='text-muted' style='margin:0 0 5px 0; font-weight:600;'>🦅 ARUS DANA ASING (BIG CAPS)</p>
-                <h3 style='color:{flow_color}; margin:10px 0;'>{flow_status}</h3>
-                <p style='font-size:13px; color:#0F172A;'>Indikator Kekuatan: {net_flow:.2f}</p>
+                <div style='margin:15px 0;'><span class='{badge_flow}' style='font-size:1.1rem; padding: 8px 16px;'>{flow_status}</span></div>
+                <p style='font-size:13px; color:#0F172A;'>Indikator Kekuatan: <b>{net_flow:.2f}</b></p>
             </div>""", unsafe_allow_html=True)
-            st.caption("🦅 **Dana Asing:** Melacak apakah hari ini uang asing sedang disuntik masuk atau ditarik keluar dari saham perbankan raksasa kita.")
         except: pass
             
         try:
@@ -683,17 +628,16 @@ if menu == "🖥️ DASHBOARD UTAMA":
             ))
             fig_fg.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)")
             
-            st.markdown("<div class='dash-box' style='padding:15px; border-top: 1px solid #E2E8F0 !important;'><p class='text-muted' style='margin:0 0 0 0; text-align:center; font-weight:600;'>🌡️ FEAR & GREED SENTIMENT</p>", unsafe_allow_html=True)
+            st.markdown("<div class='dash-box' style='padding:15px;'><p class='text-muted' style='margin:0 0 0 0; text-align:center; font-weight:600;'>🌡️ FEAR & GREED SENTIMENT</p>", unsafe_allow_html=True)
             st.plotly_chart(fig_fg, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
-            st.caption("🌡️ **Fear & Greed:** Mengukur kepanikan bursa. Dianjurkan membeli (Serok) saat pasar sedang ketakutan (Fear).")
         except: pass
 
     st.write("---")
 
     # --- BAGIAN 4: PRIVASI SALDO & RINGKASAN PORTOFOLIO ---
     c_title, c_toggle = st.columns([2.5, 1.5])
-    c_title.markdown("<h3 style='margin-top:5px; color:#2563EB;'>💼 Portofolio & AI Auditor</h3>", unsafe_allow_html=True)
+    c_title.markdown("<h3 style='margin-top:5px;' class='gradient-text'>💼 Portofolio & AI Auditor</h3>", unsafe_allow_html=True)
     show_saldo_dash = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False, key="privasi_dash")
     fmt_dash = lambda v: f"Rp {v:,.0f}" if show_saldo_dash else "Rp *****"
 
@@ -716,7 +660,6 @@ if menu == "🖥️ DASHBOARD UTAMA":
     c1.metric("MODAL", fmt_dash(t_inv))
     c2.metric("P/L", fmt_dash(t_pl), f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%" if show_saldo_dash else "*****")
     c3.metric("SEKARANG", fmt_dash(t_inv + t_pl))
-    st.caption("💼 **Portofolio:** Ringkasan sisa modal dan total kerugian/keuntungan (P/L) dari saham yang kamu miliki.")
 
     # --- AI PORTFOLIO AUDITOR ---
     if not df_p.empty and t_inv > 0:
@@ -736,12 +679,11 @@ if menu == "🖥️ DASHBOARD UTAMA":
             fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=2)))
             fig_pie.update_layout(template="plotly_white", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=False)
             st.plotly_chart(fig_pie, use_container_width=True)
-            st.caption("🛡️ **AI Auditor:** Mengawasi proporsi uangmu agar tidak menumpuk di satu sektor (Diversifikasi) untuk meminimalisir risiko.")
 
     st.write("---")
     
     # --- BAGIAN 5: UNUSUAL VOLUME & TOP MOVERS ---
-    st.markdown("### 🌋 Unusual Volume (Radar Bandar)")
+    st.markdown("<h3 class='text-blue'>🌋 Unusual Volume (Radar Bandar)</h3>", unsafe_allow_html=True)
     with st.spinner("Melacak ledakan volume..."):
         try:
             vol_data = yf.download(proxy_market, period="1mo", interval="1d", progress=False)['Volume']
@@ -758,13 +700,12 @@ if menu == "🖥️ DASHBOARD UTAMA":
             df_spikes = pd.DataFrame(spikes).sort_values("Spike", ascending=False).head(3)
             if not df_spikes.empty:
                 for _, row in df_spikes.iterrows():
-                    st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='text-blue' style='float:right; font-weight:700;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-blue' style='float:right;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
             else: st.info("Tidak ada anomali ledakan volume hari ini.")
         except: st.info("Sistem volume radar sedang menyesuaikan data.")
-    st.caption("🌋 **Unusual Volume:** Radar pendeteksi saham jika transaksinya meledak melebihi hari biasanya (Indikasi awal bandar masuk).")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📈 Top Movers (Saham Blue Chips)")
+    st.markdown("<h3 class='text-blue'>📈 Top Movers (Saham Blue Chips)</h3>", unsafe_allow_html=True)
     with st.spinner("Menarik data penggerak..."):
         try:
             mov_data = yf.download(proxy_market, period="2d", interval="1d", progress=False)['Close']
@@ -781,14 +722,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 st.success(f"🚀 **Top Gainer:** {df_mov.iloc[0]['Ticker']} (+{df_mov.iloc[0]['Chg']:.2f}%)")
                 st.error(f"⚠️ **Top Loser:** {df_mov.iloc[-1]['Ticker']} ({df_mov.iloc[-1]['Chg']:.2f}%)")
         except: st.info("Data Movers belum tersedia.")
-    st.caption("🏆 **Top Movers:** Saham-saham papan atas yang memimpin persentase kenaikan dan penurunan hari ini.")
 
 
 # =========================================================================
 # 🔥 FITUR 2: AI CANDLESTICK PATTERN DETECTOR
 # =========================================================================
 elif menu == "🕯️ POLA CANDLE AI":
-    st.title("Pola Candlestick AI")
+    st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI</h2>", unsafe_allow_html=True)
     st.caption("Mesin pendeteksi bentuk grafik terbaru untuk mencari tahu titik balik arah. Biarkan AI yang membacakan sentimen grafiknya untukmu.")
     with st.expander("📖 PANDUAN POLA GRAFIK", expanded=False):
         st.markdown("""
@@ -825,26 +765,26 @@ elif menu == "🕯️ POLA CANDLE AI":
                     is_shooting_star = (upper_shadow >= 2 * body) and (lower_shadow <= body) and body > 0
                     is_doji = body <= (c_h - c_l) * 0.1
                     
-                    pola, warna = "TIDAK ADA POLA SPESIFIK", "#64748B"
+                    pola, warna, badge_c = "TIDAK ADA POLA SPESIFIK", "#64748B", "badge-gray"
                     kesimpulan = "Grafik berjalan normal tanpa adanya pola pembalikan arah yang mencolok. Dianjurkan Wait and See."
                     
                     if is_bull_engulfing:
-                        pola, warna = "🚀 BULLISH ENGULFING TERDETEKSI", "#16A34A"
+                        pola, warna, badge_c = "BULLISH ENGULFING TERDETEKSI", "#16A34A", "badge-green"
                         kesimpulan = "Luar Biasa! Terdapat candle hijau besar yang 'menelan' candle merah sebelumnya. Sinyal kuat pembeli mendominasi."
                     elif is_hammer:
-                        pola, warna = "🔨 HAMMER (PALU) TERDETEKSI", "#16A34A"
+                        pola, warna, badge_c = "HAMMER (PALU) TERDETEKSI", "#16A34A", "badge-green"
                         kesimpulan = "Bagus! Ekor bawah yang panjang menandakan perlawanan kuat dari pembeli saat harga dijatuhkan."
                     elif is_bear_engulfing:
-                        pola, warna = "⚠️ BEARISH ENGULFING TERDETEKSI", "#DC2626"
+                        pola, warna, badge_c = "BEARISH ENGULFING TERDETEKSI", "#DC2626", "badge-red"
                         kesimpulan = "BAHAYA! Candle merah besar menelan candle hijau sebelumnya. Sinyal tekanan jual yang kuat."
                     elif is_shooting_star:
-                        pola, warna = "🌠 SHOOTING STAR TERDETEKSI", "#DC2626"
+                        pola, warna, badge_c = "SHOOTING STAR TERDETEKSI", "#DC2626", "badge-red"
                         kesimpulan = "Hati-hati! Ekor atas panjang menandakan pembeli gagal menahan harga di atas karena tekanan jual."
                     elif is_doji:
-                        pola, warna = "⚖️ POLA DOJI TERDETEKSI", "#2563EB"
+                        pola, warna, badge_c = "POLA DOJI TERDETEKSI", "#2563EB", "badge-blue"
                         kesimpulan = "Pasar sedang bimbang. Kekuatan beli dan jual seimbang. Bersiap untuk pergerakan arah berikutnya."
                         
-                    st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna}; text-align:center;'><h3 style='color:{warna};'>{pola}</h3><p style='font-size:15px; margin-top:10px; color:#0F172A;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna}; text-align:center;'><br><span class='{badge_c}' style='font-size:1.2rem; padding:8px 16px;'>{pola}</span><p style='font-size:15px; margin-top:15px; color:#0F172A;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
                     
                     df_chart = df_c.tail(15)
                     fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='Candle', increasing_line_color='#16A34A', decreasing_line_color='#DC2626')])
@@ -853,8 +793,8 @@ elif menu == "🕯️ POLA CANDLE AI":
             except: st.error("Data tidak cukup untuk melakukan deteksi pola.")
 
 elif menu == "🛰️ AUTO SCANNER":
-    st.title("Auto Scanner AI")
-    st.caption("Mesin pencari yang menyisir ratusan saham secara otomatis untuk menemukan saham dengan momentum pergerakan paling tinggi hari ini berdasarkan algoritma skor AI.")
+    st.markdown(f"<h2 class='gradient-text'>Auto Scanner AI</h2>", unsafe_allow_html=True)
+    st.caption("Mesin pencari otomatis untuk menemukan saham dengan momentum tarikan paling tinggi hari ini berdasarkan algoritma AI.")
     if 'results' not in st.session_state: st.session_state.results = None
     tickers = load_tickers()
     
@@ -870,15 +810,14 @@ elif menu == "🛰️ AUTO SCANNER":
         df = st.session_state.results
         st.info(f"💡 **Hasil:** Ditemukan **{len(df)} Saham** yang sedang memiliki momentum tarikan yang bagus.")
 
-        tab1, tab2, tab3 = st.tabs(["📱 RINGKASAN", "📊 DATA LENGKAP", "📈 GRAFIK"])
+        tab1, tab2, tab3 = st.tabs(["📱 RINGKASAN", "📊 DATA LENGKAP (HEATMAP)", "📈 GRAFIK"])
         with tab1: draw_mobile_cards(df)
         with tab2: 
             # EFEK 4: HEATMAP PADA TABEL DATA
             def highlight_cols(s):
                 if s.name == 'CHG%':
-                    return ['background-color: #D1FAE5; color: #047857; font-weight:bold;' if v > 0 else 'background-color: #FEE2E2; color: #B91C1C; font-weight:bold;' for v in s]
+                    return ['background-color: #D1FAE5; color: #065F46; font-weight:bold;' if v > 0 else 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;' for v in s]
                 return ['' for _ in s]
-            
             styled_df = df.drop(columns=['FULL'], errors='ignore').style.apply(highlight_cols)
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
             
@@ -901,7 +840,7 @@ elif menu == "🛰️ AUTO SCANNER":
                 st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "⚡ STRATEGY SCANNER":
-    st.title("Strategy Scanner (Crossover)")
+    st.markdown(f"<h2 class='gradient-text'>Strategy Scanner (Crossover)</h2>", unsafe_allow_html=True)
     st.caption("Mendeteksi persilangan (crossover) Moving Average pada saham unggulan. Mencari momen pergerakan harga yang berbalik dari turun menjadi naik tren utamanya.")
     try:
         df_saham = pd.read_excel("daftar_saham.xlsx")
@@ -915,11 +854,12 @@ elif menu == "⚡ STRATEGY SCANNER":
             if results:
                 st.success("💡 **Ditemukan!** Cari saham dengan status **Golden Cross (Hijau)** untuk momentum beli tren yang sehat.")
                 for res in results:
-                    st.markdown(f"<div class='dash-box' style='border-left: 4px solid {res['color']}; padding: 15px;'><h3 style='color:{res['color']}; margin:0; font-size:1.1rem;'>{res['status']}</h3><p style='margin:8px 0 0 0; color:#0F172A;'>Saham: <b style='color:#0F172A;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
+                    bg_badge = "badge-green" if "Sangat Kuat" in res['status'] else ("badge-red" if "Sangat Bahaya" in res['status'] else "badge-blue")
+                    st.markdown(f"<div class='dash-box' style='border-left: 4px solid {res['color']}; padding: 15px;'><span class='{bg_badge}' style='margin-bottom:8px;'>{res['status']}</span><p style='margin:8px 0 0 0; color:#0F172A;'>Saham: <b style='color:#0F172A; font-size:1.1rem;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
             else: st.info("Belum ada perpotongan tren yang signifikan hari ini.")
 
 elif menu == "⭐ WATCHLIST FAVORIT":
-    st.title("Watchlist Pribadi")
+    st.markdown(f"<h2 class='gradient-text'>Watchlist Pribadi</h2>", unsafe_allow_html=True)
     st.caption("Daftarkan saham andalanmu di sini agar sistem bisa menscan pergerakan momentumnya khusus untukmu setiap hari.")
     my_wl = get_watchlist(user_now)
     c_add, c_del = st.columns(2)
@@ -942,7 +882,7 @@ elif menu == "⭐ WATCHLIST FAVORIT":
             else: st.info("Belum ada momentum tarikan pada daftar sahammu.")
 
 elif menu == "🎯 AUTO SUP/RES":
-    st.title("Auto Support & Resistance")
+    st.markdown(f"<h2 class='gradient-text'>Auto Support & Resistance</h2>", unsafe_allow_html=True)
     st.caption("AI otomatis melukiskan garis lantai (Support) sebagai target beli harga bawah, dan garis atap (Resistance) sebagai target jual harga atas (Take Profit).")
     with st.expander("📖 PANDUAN LEVEL PIVOT", expanded=False):
         st.markdown("""
@@ -988,16 +928,16 @@ elif menu == "🎯 AUTO SUP/RES":
                     else: st.info(f"💡 Harga berada di area konsolidasi tengah (Netral).")
                     
                     df_chart = df_piv.tail(30)
-                    fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], increasing_line_color='#10B981', decreasing_line_color='#EF4444', name='Harga')])
-                    fig.add_hline(y=r2, line_dash="dash", line_color="#EF4444", annotation_text="R2"); fig.add_hline(y=r1, line_dash="solid", line_color="#EF4444", annotation_text="R1")
-                    fig.add_hline(y=pivot, line_dash="dot", line_color="#38BDF8", annotation_text="PIVOT")
-                    fig.add_hline(y=s1, line_dash="solid", line_color="#10B981", annotation_text="S1"); fig.add_hline(y=s2, line_dash="dash", line_color="#10B981", annotation_text="S2")
+                    fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], increasing_line_color='#16A34A', decreasing_line_color='#DC2626', name='Harga')])
+                    fig.add_hline(y=r2, line_dash="dash", line_color="#DC2626", annotation_text="R2"); fig.add_hline(y=r1, line_dash="solid", line_color="#DC2626", annotation_text="R1")
+                    fig.add_hline(y=pivot, line_dash="dot", line_color="#2563EB", annotation_text="PIVOT")
+                    fig.add_hline(y=s1, line_dash="solid", line_color="#16A34A", annotation_text="S1"); fig.add_hline(y=s2, line_dash="dash", line_color="#16A34A", annotation_text="S2")
                     fig.update_layout(template="plotly_white", height=450, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig, use_container_width=True)
             except: st.error("Data tidak mencukupi untuk menghitung batas support.")
 
 elif menu == "📅 SIKLUS MUSIMAN":
-    st.title("Siklus Musiman (Seasonality)")
+    st.markdown(f"<h2 class='gradient-text'>Siklus Musiman (Seasonality)</h2>", unsafe_allow_html=True)
     st.caption("Menggali probabilitas sejarah pergerakan harga 5 tahun terakhir. Cari tahu di bulan apa saham incaranmu punya kebiasaan berpesta hijau.")
     with st.form("f_season"):
         tk_season = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
@@ -1022,14 +962,14 @@ elif menu == "📅 SIKLUS MUSIMAN":
                     best_month = monthly_stats.loc[monthly_stats['Win Rate (%)'].idxmax()]
                     st.success(f"💡 Secara historis, peluang menang terbaik di saham **{tk_season}** jatuh pada bulan **{best_month['Bulan']}** (Akurasi: {best_month['Win Rate (%)']:.0f}%).")
                     
-                    fig_season = px.bar(monthly_stats, x='Bulan', y='Win Rate (%)', color='Win Rate (%)', color_continuous_scale=["#EF4444", "#0F172A", "#10B981"], text_auto='.0f')
+                    fig_season = px.bar(monthly_stats, x='Bulan', y='Win Rate (%)', color='Win Rate (%)', color_continuous_scale=["#EF4444", "#F8FAFC", "#16A34A"], text_auto='.0f')
                     fig_season.update_layout(template="plotly_white", height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig_season, use_container_width=True)
             except: st.error("Data rentang waktu belum mencukupi.")
 
 elif menu == "📟 CEK FUNDAMENTAL":
-    st.markdown("""<style>.stMetric {border-left: 4px solid #38BDF8 !important;}</style>""", unsafe_allow_html=True)
-    st.title("Cek Laporan Fundamental")
+    st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='gradient-text'>Cek Laporan Fundamental</h2>", unsafe_allow_html=True)
     st.caption("Memeriksa kesehatan rasio keuangan internal perusahaan (seperti P/E, PBV, Profit) untuk menilai apakah harga saham masih layak diinvestasikan.")
     col_in1, col_in2 = st.columns([3, 1])
     with col_in1: target_f = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
@@ -1057,7 +997,7 @@ elif menu == "📟 CEK FUNDAMENTAL":
             except: st.error("Data rasio tidak ditemukan.")
 
 elif menu == "⚔️ ADU SAHAM":
-    st.title("Adu Saham (Head-to-Head)")
+    st.markdown(f"<h2 class='gradient-text'>Adu Saham (Head-to-Head)</h2>", unsafe_allow_html=True)
     st.caption("Bandingkan rasio keuangan dari dua perusahaan di sektor yang sama untuk menemukan pilihan emiten terbaik.")
     col_in1, col_in2 = st.columns(2)
     with col_in1: tk1 = st.text_input("Saham Pilihan 1", value="BBCA").upper().strip()
@@ -1068,7 +1008,7 @@ elif menu == "⚔️ ADU SAHAM":
             try:
                 i1, i2 = yf.Ticker(f"{tk1}.JK").info, yf.Ticker(f"{tk2}.JK").info
                 get_val = lambda d, k: d.get(k, 0) or 0
-                st.markdown(f"<h2 style='text-align:center; color:#2563EB;'>{tk1} <span style='color:#EF4444;'>VS</span> {tk2}</h2>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='text-align:center; color:#2563EB;'>{tk1} <span style='color:#DC2626;'>VS</span> {tk2}</h2>", unsafe_allow_html=True)
                 df_compare = pd.DataFrame({
                     "METRIK ANALISIS": ["Harga Pasar", "P/E Ratio", "PBV Ratio", "Tingkat Profit (ROE)"],
                     tk1: [f"Rp {get_val(i1, 'currentPrice'):,.0f}", f"{get_val(i1, 'trailingPE'):,.2f}x", f"{get_val(i1, 'priceToBook'):,.2f}x", f"{get_val(i1, 'returnOnEquity')*100:.2f}%"],
@@ -1078,7 +1018,7 @@ elif menu == "⚔️ ADU SAHAM":
             except: st.error("Gagal menarik perbandingan data.")
 
 elif menu == "🌐 PETA SEKTOR":
-    st.title("Peta Aliran Sektor Industri")
+    st.markdown(f"<h2 class='gradient-text'>Peta Aliran Sektor Industri</h2>", unsafe_allow_html=True)
     st.caption("Lacak pergeseran arus uang antar sektor hari ini. Berdaganglah di sektor yang sedang menjadi pusat perhatian pasar.")
     sectors = {
         "Perbankan": ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK"],
@@ -1117,11 +1057,12 @@ elif menu == "🌐 PETA SEKTOR":
 # 🔥 KALKULATOR TRADING (RISIKO & AVERAGING DOWN)
 # =========================================================================
 elif menu == "🧮 KALKULATOR TRADING":
-    st.title("Kalkulator Manajemen Risiko")
+    st.markdown(f"<h2 class='gradient-text'>Kalkulator Manajemen Risiko</h2>", unsafe_allow_html=True)
     st.caption("Disiplin adalah kunci. Hitung dengan matematis berapa porsi lot yang aman agar seluruh modal tidak hangus saat pasar berbalik arah.")
     tab_risk, tab_avg = st.tabs(["🛡️ KALKULATOR RISIKO", "🛟 AVERAGING DOWN"])
     
     with tab_risk:
+        st.info("Hitung lot maksimal agar modal tidak habis saat terpaksa Cut Loss.")
         with st.form("risk_calc_form"):
             c1, c2 = st.columns(2)
             capital = c1.number_input("Modal Trading Disiapkan (Rp)", min_value=100000, value=10000000, step=500000)
@@ -1170,7 +1111,7 @@ elif menu == "🧮 KALKULATOR TRADING":
                 st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**. Jual posisi segera ketika harga mencapai titik ini.")
 
 elif menu == "💰 PEMBURU DIVIDEN":
-    st.title("Pemburu Dividen")
+    st.markdown(f"<h2 class='gradient-text'>Pemburu Dividen</h2>", unsafe_allow_html=True)
     st.caption("Pantau jejak catatan pembayaran dividen historis perusahaan. Menjadi pedoman untuk metode investasi pasif dan pencarian pasif income.")
     div_tk = st.text_input("Ketik Kode Saham", value="ITMG").upper().strip()
     if st.button("Lacak Riwayat Dividen", width="stretch"):
@@ -1188,7 +1129,7 @@ elif menu == "💰 PEMBURU DIVIDEN":
             except: st.error("Laporan riwayat dividen tidak ditemukan.")
 
 elif menu == "🧬 KORELASI SAHAM":
-    st.title("Korelasi Silang Saham")
+    st.markdown(f"<h2 class='gradient-text'>Korelasi Silang Saham</h2>", unsafe_allow_html=True)
     st.caption("Membantu diversifikasi portofolio. Cari tahu apakah beberapa saham selalu bergerak dengan arah yang sama persis (Hindari memiliki korelasi tinggi di 1 portofolio).")
     input_tkrs = st.text_input("MASUKKAN KODE SAHAM (DIPISAH KOMA)", value="BBCA, BBRI, AMRT, TLKM")
     if st.button("Kalkulasi Matriks Korelasi", width="stretch"):
@@ -1208,7 +1149,7 @@ elif menu == "🧬 KORELASI SAHAM":
 # 🔥 JEJAK BANDAR (CMF + VWAP + DIVERGENSI)
 # =========================================================================
 elif menu == "🏛️ JEJAK BANDAR":
-    st.title("Jejak Institusi & Bandar")
+    st.markdown(f"<h2 class='gradient-text'>Jejak Institusi & Bandar</h2>", unsafe_allow_html=True)
     st.caption("Pusat lacak radar intelijen aliran transaksi yang mendeteksi arah uang institusi skala raksasa. Jangan melawan arah arus Bandar.")
     
     tab_cmf, tab_vwap, tab_div = st.tabs(["🌊 CMF ARUS DANA", "🎯 VWAP HARGA MODAL", "🚨 RADAR DIVERGENSI"])
@@ -1227,11 +1168,11 @@ elif menu == "🏛️ JEJAK BANDAR":
                         df_ff['CMF_20'] = df_ff['CMF_20'].fillna(0) 
                         latest_cmf = float(df_ff['CMF_20'].iloc[-1])
                         
-                        if latest_cmf > 0.05: status_flow, color_flow = "AKUMULASI BESAR 🚀", "#16A34A"
-                        elif latest_cmf < -0.05: status_flow, color_flow = "DISTRIBUSI BESAR ⚠️", "#EF4444"
-                        else: status_flow, color_flow = "PERGERAKAN NETRAL 💤", "#38BDF8"
+                        if latest_cmf > 0.05: status_flow, badge_c = "AKUMULASI BESAR", "badge-green"
+                        elif latest_cmf < -0.05: status_flow, badge_c = "DISTRIBUSI BESAR", "badge-red"
+                        else: status_flow, badge_c = "PERGERAKAN NETRAL", "badge-blue"
                         
-                        st.markdown(f"<div class='dash-box' style='text-align:center; border-top: 3px solid {color_flow} !important;'><h3 style='color:{color_flow}; margin:0;'>{status_flow}</h3></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box' style='text-align:center;'><br><span class='{badge_c}' style='font-size:1.2rem; padding:8px 16px;'>{status_flow}</span><br><br></div>", unsafe_allow_html=True)
                         fig_mf = px.area(df_ff.reset_index(), x='Date', y='CMF_20')
                         fig_mf.add_hline(y=0, line_dash="dash", line_color="gray")
                         fig_mf.update_layout(template="plotly_white", height=300, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
@@ -1314,22 +1255,22 @@ elif menu == "🏛️ JEJAK BANDAR":
                         adl_trend = adl_end - adl_start 
                         
                         if price_change < -2 and adl_trend > 0:
-                            status_div, warna_div = "🟢 HIDDEN ACCUMULATION TERDETEKSI", "#16A34A"
+                            status_div, badge_div = "HIDDEN ACCUMULATION TERDETEKSI", "badge-green"
                             desc = "Perhatian! Harga dimanipulasi turun untuk menakuti pasar ritel. Namun data di layar belakang mendeteksi Institusi sedang melakukan pembelian akumulatif secara diam-diam. Momentum mantulan sangat dekat!"
                         elif price_change > 2 and adl_trend < 0:
-                            status_div, warna_div = "🔴 HIDDEN DISTRIBUTION TERDETEKSI", "#DC2626"
+                            status_div, badge_div = "HIDDEN DISTRIBUTION TERDETEKSI", "badge-red"
                             desc = "Awas! Harga saham dikerek tinggi memancing kehebohan, namun Institusi perlahan mendistribusikan barang keluar jaring. Rentan menghadapi jatuhnya harga secara agresif."
                         elif price_change > 0 and adl_trend > 0:
-                            status_div, warna_div = "⚪ NORMAL UPTREND", "#2563EB"
+                            status_div, badge_div = "NORMAL UPTREND", "badge-blue"
                             desc = "Kenaikan harga seiring dengan sehatnya permintaan pembelian. Tren valid tanpa sinyal anomali negatif."
                         elif price_change < 0 and adl_trend < 0:
-                            status_div, warna_div = "⚪ NORMAL DOWNTREND", "#64748B"
+                            status_div, badge_div = "NORMAL DOWNTREND", "badge-gray"
                             desc = "Kejatuhan harga memang murni divalidasi oleh tingginya suplai penjualan. Dianjurkan posisi menunggu."
                         else:
-                            status_div, warna_div = "⚪ SIDEWAYS (KONSOLIDASI)", "#64748B"
+                            status_div, badge_div = "SIDEWAYS KONSOLIDASI", "badge-gray"
                             desc = "Pergerakan volatilitas terhitung normal. Belum ada tanda intervensi bandar secara dominan."
 
-                        st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna_div} !important; text-align:center;'><h3 style='color:{warna_div};'>{status_div}</h3><p style='font-size:14px; margin-top:5px; color:#0F172A;'>{desc}</p></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box' style='text-align:center;'><br><span class='{badge_div}' style='font-size:1.1rem; padding:8px 16px;'>{status_div}</span><p style='font-size:14px; margin-top:15px; color:#0F172A;'>{desc}</p></div>", unsafe_allow_html=True)
                         
                         fig_div = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.6, 0.4])
                         fig_div.add_trace(go.Candlestick(x=df_div.index, open=df_div['Open'], high=df_div['High'], low=df_div['Low'], close=df_div['Close'], increasing_line_color='#16A34A', decreasing_line_color='#DC2626', name='Harga'), row=1, col=1)
@@ -1339,7 +1280,7 @@ elif menu == "🏛️ JEJAK BANDAR":
                 except: st.error("Malfungsi sistem saat mengkalkulasi divergensi tren.")
 
 elif menu == "📰 BERITA PASAR":
-    st.title("Financial Intelligence")
+    st.markdown(f"<h2 class='gradient-text'>Financial Intelligence Center</h2>", unsafe_allow_html=True)
     st.caption("Pusat komando analisis berita yang otomatis menyaring konten sentimen Positif dari Negatif, dan menangkap info Corporate Action harian.")
     
     st.markdown("### 🌍 Global Macro Radar")
@@ -1367,9 +1308,9 @@ elif menu == "📰 BERITA PASAR":
         pos_words = ['naik', 'laba', 'untung', 'lonjak', 'akuisisi', 'investasi', 'meroket', 'cuan', 'diborong', 'dividen', 'rekor']
         neg_words = ['turun', 'rugi', 'anjlok', 'suspend', 'kasus', 'gagal', 'merosot', 'jeblok', 'dilepas', 'resesi', 'denda']
         score = sum(1 for w in pos_words if w in text.lower()) - sum(1 for w in neg_words if w in text.lower())
-        if score > 0: return "🟢 POSITIF", "#16A34A"
-        elif score < 0: return "🔴 NEGATIF", "#DC2626"
-        else: return "⚪ NETRAL", "#64748B"
+        if score > 0: return "POSITIF", "badge-green"
+        elif score < 0: return "NEGATIF", "badge-red"
+        else: return "NETRAL", "badge-gray"
 
     def check_if_new(p_parsed):
         if p_parsed and (time.time() - mktime(p_parsed)) < (12 * 3600): return "🔥 HOT NEWS"
@@ -1382,10 +1323,10 @@ elif menu == "📰 BERITA PASAR":
             try:
                 feed = feedparser.parse(requests.get("https://news.google.com/rss/search?q=saham+indonesia+ihsg&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
                 for entry in feed.entries[:10]: 
-                    sent_text, sent_color = analyze_sentiment(entry.title)
+                    sent_text, badge_c = analyze_sentiment(entry.title)
                     fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                     pub_date = entry.published if hasattr(entry, 'published') else ""
-                    st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span class='{badge_c}'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
             except: st.error("Malfungsi sambungan internet saat penarikan RSS.")
                 
     with t_spec:
@@ -1398,10 +1339,10 @@ elif menu == "📰 BERITA PASAR":
                     feed_spec = feedparser.parse(requests.get(f"https://news.google.com/rss/search?q={search_t}+saham&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
                     if not feed_spec.entries: st.warning("Catatan berita tidak ditemukan terkait emiten tersebut.")
                     for entry in feed_spec.entries[:8]: 
-                        sent_text, sent_color = analyze_sentiment(entry.title)
+                        sent_text, badge_c = analyze_sentiment(entry.title)
                         fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                         pub_date = entry.published if hasattr(entry, 'published') else ""
-                        st.markdown(f"<div class='dash-box' style='border-left:4px solid {sent_color}; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:{sent_color};'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='dash-box'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span class='{badge_c}'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
                 except: st.error("Layanan filter RSS sedang tidak beroperasi.")
                 
     with t_corp:
@@ -1412,11 +1353,11 @@ elif menu == "📰 BERITA PASAR":
                 for entry in feed_corp.entries[:10]: 
                     fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
                     pub_date = entry.published if hasattr(entry, 'published') else ""
-                    st.markdown(f"<div class='dash-box' style='border-left:4px solid #2563EB; padding:14px;'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span style='font-size:11px; font-weight:600; color:#2563EB;'>📅 INFO CORPORATE ACTION</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='dash-box'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span class='badge-blue'>📅 INFO CORPORATE ACTION</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
             except: st.error("Kesalahan jaringan sewaktu meretas kalender bursa.")
 
 elif menu == "💼 DOMPET TRADING":
-    st.title("Dompet Portofolio & AI Jurnal")
+    st.markdown(f"<h2 class='gradient-text'>Dompet Portofolio & AI Jurnal</h2>", unsafe_allow_html=True)
     st.caption("Fasilitas pencatatan aset investasi harian. Modul AI Jurnal akan memberikan rapor/grading seberapa disiplin metode trading yang anda tetapkan.")
     
     c_title, c_toggle = st.columns([3, 1])
@@ -1464,7 +1405,7 @@ elif menu == "💼 DOMPET TRADING":
             for i, row in df_p.iterrows():
                 strat_label = row.get('strategy', 'Bebas')
                 with st.expander(f"📦 {row['ticker']} | {int(row['lots'])} Lots"):
-                    st.markdown(f"<span style='background:#F1F5F9; color:#2563EB; border:1px solid #CBD5E1; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:600;'>Kategori: {strat_label}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='badge-blue'>Kategori: {strat_label}</span>", unsafe_allow_html=True)
                     st.write("")
                     c_price, c_lots, c_btn = st.columns([2, 2, 1])
                     s_price = c_price.number_input("Eksekusi Jual di Harga (Rp)", value=float(row['Live']), key=f"s_prc_{row['id']}")
