@@ -193,12 +193,12 @@ def get_ticker_data():
         return " &nbsp;&nbsp; | &nbsp;&nbsp; ".join(items) * 4 
     except: return ""
 
-# --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL EKSTRA PREMIUM ---
+# --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL MAHKOTA ---
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* --- CUSTOM SCROLLBAR (MAC STYLE) --- */
+/* --- CUSTOM SCROLLBAR --- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
@@ -209,8 +209,6 @@ st.markdown("""
     0% { opacity: 0; transform: translateY(15px); }
     100% { opacity: 1; transform: translateY(0); }
 }
-
-/* Terapkan animasi ke komponen-komponen utama */
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame {
     animation: fadeInUp 0.6s ease-out forwards;
 }
@@ -220,10 +218,10 @@ st.markdown("""
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-/* PAKSA SEMUA TEKS JADI GELAP (Anti White-on-White di Dark Mode HP) */
+/* PAKSA SEMUA TEKS JADI GELAP */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
 
-/* --- HEADING & EFEK GRADASI (GRADIENT TEXT) --- */
+/* --- HEADING & EFEK GRADASI --- */
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
 .gradient-text {
     background: linear-gradient(90deg, #2563EB, #10B981);
@@ -233,16 +231,11 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
 
-/* --- EFEK 1: RUNNING TICKER TAPE (STICKY & GLASSMORPHISM) --- */
+/* --- EFEK 1: RUNNING TICKER TAPE --- */
 .ticker-wrap {
-    position: sticky; /* Membuatnya menempel saat discroll */
-    top: 0;
-    z-index: 9999;
-    width: 100%; overflow: hidden; 
-    background-color: rgba(15, 23, 42, 0.95); /* Sedikit transparan */
-    backdrop-filter: blur(10px); /* Efek Kaca Buram */
-    color: #FFFFFF !important;
-    padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; 
+    position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; 
+    background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); 
+    color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; 
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
@@ -261,13 +254,13 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* --- EFEK 3: PILL BADGES (LABEL KAPSUL) --- */
+/* --- EFEK 3: PILL BADGES --- */
 .badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 
-/* --- EFEK 4: TAMPILAN TAB ALA iOS --- */
+/* --- EFEK 4: TAMPILAN TAB iOS --- */
 .stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
@@ -275,24 +268,10 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* --- EFEK 5: NOTIFIKASI ALERT MINIMALIS (CLEAN GLASS) --- */
-div[data-testid="stAlert"] {
-    background-color: rgba(255, 255, 255, 0.6) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
-}
-div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("Berhasil")) { border-left: 4px solid #10B981 !important; }
-div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("Gagal")),
-div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("⚠️")) { border-left: 4px solid #EF4444 !important; }
-div[data-testid="stAlert"]:has(div[data-testid="stMarkdownContainer"] p:contains("💡")) { border-left: 4px solid #38BDF8 !important; }
-
-
-/* --- SIDEBAR MENU (GLASSMORPHISM) --- */
+/* --- EFEK 5: SIDEBAR MENU GLASSMORPHISM --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { 
-    background-color: rgba(255, 255, 255, 0.95) !important; /* Transparan halus */
-    backdrop-filter: blur(12px) !important; /* Kaca Buram */
+    background-color: rgba(255, 255, 255, 0.95) !important; 
+    backdrop-filter: blur(12px) !important; 
     border-right: 1px solid #E2E8F0 !important; 
 }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
@@ -300,30 +279,63 @@ section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .s
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
 
-/* --- KOTAK KONTAINER (HOVER CARDS) --- */
+/* --- EFEK 6: KOTAK GLOWING HOVER & NEUMORPHISM --- */
 div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
     background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
-    transition: transform 0.2s ease, box-shadow 0.2s ease; 
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
 }
-/* Efek Mengambang Saat di-Hover/Sentuh */
 div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateY(-4px); /* Terangkat ke atas */
+    box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; /* Biru Glowing Halus */
+    border-color: #BFDBFE !important; /* Border ikut membiru */
 }
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
 
-/* --- INPUT FORM & LAINNYA --- */
+/* --- EFEK 7: INPUT NEUMORPHISM (INNER SHADOW 3D) --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
-input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; }
+input, select, textarea { 
+    background-color: #F8FAFC !important; 
+    border: 1px solid #CBD5E1 !important; 
+    color: #0F172A !important; 
+    font-family: 'JetBrains Mono', monospace !important; 
+    border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
+    box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; /* Efek tenggelam 3D */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+input:focus, select:focus {
+    border-color: #38BDF8 !important;
+    box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06), 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+}
+
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
 
-/* --- TOMBOL --- */
-.stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; }
-.stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; }
+/* --- EFEK 8: SHIMMER SWEEP PADA TOMBOL --- */
+.stButton>button { 
+    background-color: #2563EB !important; border: none !important; border-radius: 8px !important; 
+    min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; 
+    transition: background-color 0.2s ease, transform 0.1s ease; 
+    position: relative; overflow: hidden; /* Syarat Shimmer */
+}
+.stButton>button p, .stButton>button span, .stButton>button div { 
+    color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2;
+}
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
+
+/* Algoritma Cahaya Berkilap */
+.stButton>button::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+    transform: skewX(-20deg);
+    animation: shimmer 3s infinite;
+    z-index: 1;
+}
+@keyframes shimmer { 100% { left: 200%; } }
 
 /* Warna Custom Teks Utility */
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
@@ -1013,7 +1025,6 @@ elif menu == "📅 SIKLUS MUSIMAN":
             except: st.error("Data rentang waktu belum mencukupi.")
 
 elif menu == "📟 CEK FUNDAMENTAL":
-    st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
     st.markdown(f"<h2 class='gradient-text'>Cek Laporan Fundamental</h2>", unsafe_allow_html=True)
     st.caption("Memeriksa kesehatan rasio keuangan internal perusahaan (seperti P/E, PBV, Profit) untuk menilai apakah harga saham masih layak diinvestasikan.")
     col_in1, col_in2 = st.columns([3, 1])
