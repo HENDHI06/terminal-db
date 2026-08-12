@@ -28,7 +28,7 @@ st.set_page_config(
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# --- DATABASE & LOGIC FUNGSI ---
+# --- DATABASE & AUTH FUNGSI ---
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
     for url in providers:
@@ -173,6 +173,9 @@ def update_password_db(u, new_p):
         return True
     return False
 
+# =========================================================================
+# --- FUNGSI INTI ALGORITMA TRADING (YANG SEMPAT HILANG) ---
+# =========================================================================
 @st.cache_data(ttl=86400)
 def get_sector(ticker):
     try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
@@ -205,7 +208,168 @@ def get_hot_news_tickers():
         return text_content
     except: return ""
 
+@st.cache_data(ttl=86400)
+def load_tickers():
+    try:
+        url = "https://raw.githubusercontent.com/datasets-id/idx-stocks/main/data/stock_codes.csv"
+        df_idx = pd.read_csv(url)
+        tickers = [str(t).strip().upper() + ".JK" for t in df_idx['ticker'].tolist() if len(str(t)) <= 5]
+        if len(tickers) > 100: return tickers
+    except: pass
+    try:
+        df = pd.read_excel("daftar_saham.xlsx")
+        col = 'Kode' if 'Kode' in df.columns else df.columns[0]
+        return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
+    except: return []
+
+def run_scan(tickers, mode):
+    tickers = list(set(tickers))
+    results = []
+    if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 100_000_000, 1.1
+    elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 2.5, 55, 1_000_000_000, 1.4
+    else: min_chg, min_rsi, min_val, vol_m = 4.0, 60, 2_000_000_000, 1.8
+
+    hot_news_text = get_hot_news_tickers()
+    progress = st.progress(0, text="📡 Memindai Bursa Efek...")
+    try:
+        data = yf.download(tickers, period="20d", interval="1d", group_by="ticker", threads=True, progress=False)
+    except: return pd.DataFrame()
+
+    total = len(tickers)
+    for i, t in enumerate(tickers):
+        try:
+            progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
+            df = data[t].copy() if len(tickers) > 1 else data.copy()
+            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+            df = df.dropna(subset=['Close', 'Volume']) 
+            if df.empty or len(df) < 14: continue
+
+            c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
+            if math.isnan(c_now) or math.isnan(c_prev) or c_prev == 0: continue
+
+            chg = ((c_now - c_prev) / c_prev) * 100
+            val_tr = float(df['Volume'].iloc[-1]) * c_now
+            
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+            rsi = 100 - (100 / (1 + (gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0)))
+
+            high_20 = df['High'].rolling(20).max().iloc[-2] if len(df) >= 20 else c_prev
+            vol_avg = df['Volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else df['Volume'].mean()
+            is_breakout = (c_now > high_20) and (df['Volume'].iloc[-1] > vol_avg * vol_m)
+
+            if chg < min_chg or val_tr < min_val: continue
+
+            multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
+            cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
+            cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
+            
+            tr1 = df['High'] - df['Low']
+            tr2 = (df['High'] - df['Close'].shift()).abs()
+            tr3 = (df['Low'] - df['Close'].shift()).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr_val = float(tr.rolling(14).mean().iloc[-1])
+                
+            if math.isnan(atr_val): atr_val = c_now * 0.03
+            ideal_entry = c_now - (0.4 * atr_val)
+            ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
+
+            vpa_status = "NORMAL (Searah)"
+            if float(df['Volume'].iloc[-1]) > (vol_avg * 1.5):
+                if chg < 1.0 and chg > -1.0: vpa_status = "⚠️ ANOMALI VPA (Tertahan)"
+                elif chg >= 2.0: vpa_status = "🚀 VALID BREAKOUT"
+            
+            katalis = "🔥 ADA BERITA" if t.replace(".JK", "") in hot_news_text else "TIDAK ADA"
+            score_mom = min(max(rsi, 0), 100)
+            score_bndr = min(max((cmf + 0.5) * 100, 0), 100)
+            score_trnd = 80 if c_now > df['Close'].rolling(20).mean().iloc[-1] else 30
+            score_vol = min(100, (atr_val / c_now) * 1000)
+
+            results.append({
+                "TICKER": t.replace(".JK", ""), 
+                "LAST": c_now, 
+                "CHG%": chg, 
+                "VAL(M)": (val_tr / 1_000_000), 
+                "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
+                "VPA_STATUS": vpa_status, "KATALIS": katalis,
+                "AI_SCORE": ai_score,
+                "SCORE_MOM": score_mom, "SCORE_BNDR": score_bndr, "SCORE_TRND": score_trnd, "SCORE_VOL": score_vol,
+                "ENTRY": ideal_entry, 
+                "TP 1": ideal_entry + (1.5 * atr_val), 
+                "TP 2": ideal_entry + (2.5 * atr_val), 
+                "EXIT/CL": ideal_entry - (1.0 * atr_val), 
+                "FULL": t
+            })
+        except: continue
+    progress.empty()
+    return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
+
+def get_trend_signals(ticker_list):
+    signals = []
+    for ticker in ticker_list:
+        try:
+            df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
+            if df.empty: continue
+            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+            df = df.dropna(subset=['Close'])
+            if len(df) < 50: continue
+            
+            df['MA20'] = df['Close'].rolling(20).mean()
+            df['MA50'] = df['Close'].rolling(50).mean()
+            df['Multiplier'] = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
+            df['CMF_20'] = (df['Multiplier'] * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
+            df['CMF_20'] = df['CMF_20'].fillna(0)
+            
+            last_ma20, last_ma50 = float(df['MA20'].iloc[-1]), float(df['MA50'].iloc[-1])
+            prev_ma20, prev_ma50 = float(df['MA20'].iloc[-2]), float(df['MA50'].iloc[-2])
+            current_price, cmf_val = float(df['Close'].iloc[-1]), float(df['CMF_20'].iloc[-1])
+            if math.isnan(current_price) or math.isnan(last_ma20) or math.isnan(last_ma50): continue
+            
+            if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
+                if cmf_val > 0: status_text, color_code = "GOLDEN CROSS + AKUMULASI", "#16A34A"
+                else: status_text, color_code = "GOLDEN CROSS (Hati-hati Distribusi)", "#F59E0B"
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
+            elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
+                if cmf_val < 0: status_text, color_code = "DEAD CROSS + DISTRIBUSI BANDAR", "#DC2626"
+                else: status_text, color_code = "DEAD CROSS (Koreksi Normal Wajar)", "#EA580C"
+                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
+        except Exception as e: 
+            continue
+    return signals
+
+def draw_mobile_cards(df):
+    for _, row in df.iterrows():
+        chg, chg_color = row.get('CHG%', 0), "#16A34A" if row.get('CHG%', 0) > 0 else "#DC2626"
+        val_last, val_entry = row.get('LAST', 0), row.get('ENTRY', row.get('Entry', row.get('LAST', 0)))
+        val_tp1, val_cl, val_m = row.get('TP 1', 0), row.get('EXIT/CL', 0), row.get('VAL(M)', 0)
+
+        st.markdown(f"""
+        <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <b style="font-size: 1.2rem; color: #0F172A;">{row.get('TICKER','-')}</b>
+                <span style="color: {chg_color}; font-weight: 700; font-family: 'JetBrains Mono';">{'+' if chg>0 else ''}{chg:.2f}%</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #64748B;">
+                <div>Harga Berjalan: <b style="color:#0F172A;">Rp {val_last:,.0f}</b></div>
+                <div>Transaksi: <b style="color:#0F172A;">{val_m:,.1f} M</b></div>
+                <div style="color: #2563EB; font-weight: 600;">Antre Beli: Rp {float(val_entry):,.0f}</div>
+                <div style="color: #16A34A; font-weight: 600;">Jual Untung: Rp {float(val_tp1):,.0f}</div>
+                <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): Rp {float(val_cl):,.0f}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def style_dataframe(val):
+    if type(val) in [int, float] and val > 0: return 'background-color: #D1FAE5; color: #065F46; font-weight:bold;'
+    elif type(val) in [int, float] and val < 0: return 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;'
+    if isinstance(val, str) and "⚠️" in val: return 'color: #DC2626; font-weight:bold;'
+    if isinstance(val, str) and "🔥" in val: return 'background-color: #FEF2F2; color: #DC2626; font-weight:bold;'
+    return ''
+
+# =========================================================================
 # --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL MAHKOTA ---
+# =========================================================================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -329,6 +493,7 @@ if not st.session_state.logged_in:
                     else: st.error("Akses Ditolak. User ID atau Password salah.")
     st.stop()
 
+
 # --- 4. NAVIGATION & SIDEBAR ---
 role = st.session_state.role
 user_now = st.session_state.user
@@ -354,7 +519,8 @@ menu_list = [
     "⚔️ ADU SAHAM", "🌐 PETA SEKTOR", "🧮 KALKULATOR TRADING", "💰 PEMBURU DIVIDEN", 
     "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR", "💼 DOMPET TRADING", "🔒 KEAMANAN"
 ]
-if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: menu_list.append("⚙️ USER MANAGEMENT")
+if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: 
+    menu_list.append("⚙️ USER MANAGEMENT")
 
 menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility="collapsed")
 
@@ -422,7 +588,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 fig_spark.update_traces(line_color=ihsg_color, line_width=3)
                 fig_spark.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), xaxis=dict(visible=False), yaxis=dict(visible=False), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, hovermode=False)
                 st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
-    except: st.warning("Sedang mengambil data IHSG...")
+    except: st.warning("Sedang memproses sambungan IHSG...")
 
     with st.spinner("Memindai Kesehatan Pasar..."):
         try:
@@ -519,9 +685,13 @@ if menu == "🖥️ DASHBOARD UTAMA":
     if not df_p.empty:
         tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique()]
         try:
-            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].ffill().dropna()
-            live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(live_prices_df.iloc[-1])}
+            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close']
+            live_prices = {}
+            for t in tickers_jk:
+                try: live_prices[t] = float(live_prices_df[t].dropna().iloc[-1])
+                except: pass
         except: live_prices = {}
+        
         def calc_active(row):
             tk, bp, lots = f"{row['ticker']}.JK", row['buy_price'], row['lots']
             curr = float(live_prices.get(tk, bp))
@@ -736,16 +906,16 @@ elif menu == "🛰️ AUTO SCANNER":
     st.markdown(f"<h2 class='gradient-text'>Auto Scanner AI (VPA & Radar)</h2>", unsafe_allow_html=True)
     with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
         st.markdown("""
-        **1. CARA MEMILIH SAHAM:**
+        **1. CARA MEMILIH SAHAM (Cari Bintang Utama):**
         * Fokus pada saham dengan **AI_SCORE** paling tinggi.
         * Pilih yang status Bandar-nya **AKUMULASI** (Bandar sedang kumpul barang).
-        * Pilih yang **VPA_STATUS** berstatus "NORMAL" atau "VALID BREAKOUT". Hindari "ANOMALI VPA".
-        * Carilah yang ada label **🔥 ADA BERITA**.
+        * Pilih yang **VPA_STATUS** berstatus "NORMAL" atau "VALID BREAKOUT". Hindari "ANOMALI VPA" karena rawan diguyur bandar.
+        * Sangat direkomendasikan memilih saham yang memiliki label **🔥 ADA BERITA** (artinya sedang di-goreng sentimen publik).
 
-        **2. CARA EKSEKUSI BELI & JUAL (TRADING PLAN):**
-        * **ENTRY (Area Beli):** JANGAN beli di harga berjalan (LAST). Lakukan antre beli (*Buy on Weakness*) di angka **ENTRY** agar dapat diskon dan terhindar dari FOMO (nyangkut di pucuk).
-        * **TP 1 & TP 2 (Target Jual Untung):** Jika sudah terbeli, segera pasang antrean jual otomatis di harga ini.
-        * **EXIT/CL (Cut Loss):** PENTING! Jika harga malah anjlok menembus angka ini, SEGERA JUAL RUGI untuk menyelamatkan modal Anda dari kebangkrutan.
+        **2. CARA EKSEKUSI TRADING PLAN (Beli & Jual):**
+        * **ENTRY (Area Beli Aman):** JANGAN kejar harga pucuk (LAST). Lakukan antre beli (*Buy on Weakness*) di angka **ENTRY** agar Anda dapat harga diskon.
+        * **TP 1 & TP 2 (Target Jual Untung):** Segera pasang antrean jual otomatis (Take Profit) di angka ini agar tidak keburu turun lagi.
+        * **EXIT/CL (Cut Loss):** PENTING! Jika prediksi salah dan harga malah anjlok menembus angka ini, **SEGERA JUAL RUGI** tanpa mikir. Ini akan menyelamatkan uang Anda dari nyangkut parah.
         """)
         
     if 'results' not in st.session_state: st.session_state.results = None
@@ -758,86 +928,8 @@ elif menu == "🛰️ AUTO SCANNER":
         st.write("##")
         btn_scan = st.button("Mulai Scan Pasar", use_container_width=True)
 
-    def run_scan_accurate(tickers, mode):
-        tickers = list(set(tickers))
-        results = []
-        if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 100_000_000, 1.1
-        elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 2.5, 55, 1_000_000_000, 1.4
-        else: min_chg, min_rsi, min_val, vol_m = 4.0, 60, 2_000_000_000, 1.8
-
-        hot_news_text = get_hot_news_tickers()
-        progress = st.progress(0, text="📡 Memindai Bursa Efek...")
-        try:
-            data = yf.download(tickers, period="20d", interval="1d", group_by="ticker", threads=True, progress=False)
-        except: return pd.DataFrame()
-
-        total = len(tickers)
-        for i, t in enumerate(tickers):
-            try:
-                progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
-                df = data[t].copy() if len(tickers) > 1 else data.copy()
-                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-                df = df.dropna(subset=['Close', 'Volume']) 
-                if df.empty or len(df) < 14: continue
-
-                c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
-                if math.isnan(c_now) or math.isnan(c_prev) or c_prev == 0: continue
-
-                chg = ((c_now - c_prev) / c_prev) * 100
-                val_tr = float(df['Volume'].iloc[-1]) * c_now
-                
-                delta = df['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                rsi = 100 - (100 / (1 + (gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0)))
-
-                high_20 = df['High'].rolling(20).max().iloc[-2] if len(df) >= 20 else c_prev
-                vol_avg = df['Volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else df['Volume'].mean()
-                is_breakout = (c_now > high_20) and (df['Volume'].iloc[-1] > vol_avg * vol_m)
-
-                if chg < min_chg or val_tr < min_val: continue
-
-                multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-                cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
-                cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
-                
-                tr1 = df['High'] - df['Low']
-                tr2 = (df['High'] - df['Close'].shift()).abs()
-                tr3 = (df['Low'] - df['Close'].shift()).abs()
-                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                atr_val = float(tr.rolling(14).mean().iloc[-1])
-                    
-                if math.isnan(atr_val): atr_val = c_now * 0.03
-                ideal_entry = c_now - (0.4 * atr_val)
-                ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
-
-                vpa_status = "NORMAL (Searah)"
-                if float(df['Volume'].iloc[-1]) > (vol_avg * 1.5):
-                    if chg < 1.0 and chg > -1.0: vpa_status = "⚠️ ANOMALI VPA (Tertahan)"
-                    elif chg >= 2.0: vpa_status = "🚀 VALID BREAKOUT"
-                
-                katalis = "🔥 ADA BERITA" if t.replace(".JK", "") in hot_news_text else "TIDAK ADA"
-                score_mom = min(max(rsi, 0), 100)
-                score_bndr = min(max((cmf + 0.5) * 100, 0), 100)
-                score_trnd = 80 if c_now > df['Close'].rolling(20).mean().iloc[-1] else 30
-                score_vol = min(100, (atr_val / c_now) * 1000)
-
-                results.append({
-                    "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": chg,
-                    "VAL(M)": (val_tr / 1_000_000), 
-                    "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
-                    "VPA_STATUS": vpa_status, "KATALIS": katalis,
-                    "AI_SCORE": ai_score,
-                    "SCORE_MOM": score_mom, "SCORE_BNDR": score_bndr, "SCORE_TRND": score_trnd, "SCORE_VOL": score_vol,
-                    "ENTRY": ideal_entry, "TP 1": ideal_entry + (1.5 * atr_val), 
-                    "TP 2": ideal_entry + (2.5 * atr_val), "EXIT/CL": ideal_entry - (1.0 * atr_val), "FULL": t
-                })
-            except: continue
-        progress.empty()
-        return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
-
     if btn_scan:
-        res = run_scan_accurate(tickers, mode_scan)
+        res = run_scan(tickers, mode_scan)
         if not res.empty: 
             if filter_sektor != "Semua Sektor":
                 res['SEKTOR'] = res['FULL'].apply(get_sector)
@@ -1728,6 +1820,15 @@ elif menu == "💼 DOMPET TRADING":
 
     with tab3: 
         if 'df_h' in locals() and not df_h.empty:
+            st.markdown("### 🤖 JURNAL EVALUASI MENTOR AI")
+            
+            with st.expander("📖 CARA BACA KURVA EKUITAS", expanded=False):
+                st.markdown("""
+                * Grafik di bawah menunjukkan perjalanan saldo keuntungan/kerugian Anda dari waktu ke waktu.
+                * Jika garis biru menanjak lurus ke atas dari kiri ke kanan, berarti gaya trading Anda sangat sehat dan konsisten untung.
+                * Jika grafik bergerigi tajam ke bawah (Rollercoaster), pertimbangkan untuk mengecilkan lot Anda (lihat fitur Kelly Criterion).
+                """)
+
             df_h_sorted = df_h.sort_values('date')
             df_h_sorted['Cumulative_PnL'] = df_h_sorted['pnl'].cumsum()
             
