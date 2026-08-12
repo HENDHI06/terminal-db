@@ -181,8 +181,7 @@ def get_sector(ticker):
 @st.cache_data(ttl=60) 
 def get_ticker_data():
     try:
-        data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="10d", interval="1d", progress=False)['Close']
-        if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+        data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="7d", interval="1d", progress=False)['Close']
         items = []
         for tk, name in zip(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], ['IHSG', 'BBCA', 'BBRI', 'BMRI', 'TLKM']):
             try:
@@ -197,21 +196,6 @@ def get_ticker_data():
         return " &nbsp;&nbsp; | &nbsp;&nbsp; ".join(items) * 4 
     except: return ""
 
-# --- MENGEMBALIKAN FUNGSI INTI YANG TERHAPUS ---
-@st.cache_data(ttl=86400)
-def load_tickers():
-    try:
-        url = "https://raw.githubusercontent.com/datasets-id/idx-stocks/main/data/stock_codes.csv"
-        df_idx = pd.read_csv(url)
-        tickers = [str(t).strip().upper() + ".JK" for t in df_idx['ticker'].tolist() if len(str(t)) <= 5]
-        if len(tickers) > 100: return tickers
-    except: pass
-    try:
-        df = pd.read_excel("daftar_saham.xlsx")
-        col = 'Kode' if 'Kode' in df.columns else df.columns[0]
-        return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
-    except: return []
-
 @st.cache_data(ttl=600)
 def get_hot_news_tickers():
     try:
@@ -220,151 +204,6 @@ def get_hot_news_tickers():
         text_content = " ".join([entry.title for entry in feed.entries]).upper()
         return text_content
     except: return ""
-
-def run_scan(tickers, mode):
-    tickers = list(set(tickers))
-    results = []
-    if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 100_000_000, 1.1
-    elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 2.5, 55, 1_000_000_000, 1.4
-    else: min_chg, min_rsi, min_val, vol_m = 4.0, 60, 2_000_000_000, 1.8
-
-    hot_news_text = get_hot_news_tickers()
-    progress = st.progress(0, text="📡 Memindai Bursa Efek...")
-    try:
-        data = yf.download(tickers, period="10d", interval="1d", group_by="ticker", threads=True, progress=False)
-    except: return pd.DataFrame()
-
-    total = len(tickers)
-    for i, t in enumerate(tickers):
-        try:
-            progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
-            df = data[t].copy() if len(tickers) > 1 else data.copy()
-            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            df = df.dropna(subset=['Close', 'Volume']) 
-            if df.empty or len(df) < 2: continue
-
-            c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
-            if math.isnan(c_now) or math.isnan(c_prev) or c_prev == 0: continue
-
-            chg = ((c_now - c_prev) / c_prev) * 100
-            val_tr = float(df['Volume'].iloc[-1]) * c_now
-            
-            if len(df) >= 14:
-                delta = df['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                rsi = 100 - (100 / (1 + (gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0)))
-            else: rsi = 50
-
-            high_20 = df['High'].rolling(20).max().iloc[-2] if len(df) >= 20 else c_prev
-            vol_avg = df['Volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else df['Volume'].mean()
-            is_breakout = (c_now > high_20) and (df['Volume'].iloc[-1] > vol_avg * vol_m)
-
-            if chg < min_chg or val_tr < min_val: continue
-
-            if len(df) >= 14:
-                multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-                cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
-                cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
-                tr1 = df['High'] - df['Low']
-                tr2 = (df['High'] - df['Close'].shift()).abs()
-                tr3 = (df['Low'] - df['Close'].shift()).abs()
-                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                atr_val = float(tr.rolling(14).mean().iloc[-1])
-            else:
-                cmf = 0
-                atr_val = c_now * 0.03
-                
-            if math.isnan(atr_val): atr_val = c_now * 0.03
-            ideal_entry = c_now - (0.4 * atr_val)
-            ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
-
-            vpa_status = "NORMAL (Searah)"
-            if float(df['Volume'].iloc[-1]) > (vol_avg * 1.5):
-                if chg < 1.0 and chg > -1.0: vpa_status = "⚠️ ANOMALI VPA (Tertahan)"
-                elif chg >= 2.0: vpa_status = "🚀 VALID BREAKOUT"
-            
-            katalis = "🔥 ADA BERITA" if t.replace(".JK", "") in hot_news_text else "TIDAK ADA"
-            score_mom = min(max(rsi, 0), 100)
-            score_bndr = min(max((cmf + 0.5) * 100, 0), 100)
-            score_trnd = 80 if c_now > df['Close'].rolling(20).mean().iloc[-1] else 30
-            score_vol = min(100, (atr_val / c_now) * 1000)
-
-            results.append({
-                "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": round(chg, 2),
-                "VAL(M)": round(val_tr / 1_000_000, 1), 
-                "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
-                "VPA_STATUS": vpa_status, "KATALIS": katalis,
-                "AI_SCORE": round(ai_score, 2),
-                "SCORE_MOM": score_mom, "SCORE_BNDR": score_bndr, "SCORE_TRND": score_trnd, "SCORE_VOL": score_vol,
-                "ENTRY": ideal_entry, "TP 1": ideal_entry + (1.5 * atr_val), 
-                "TP 2": ideal_entry + (2.5 * atr_val), "EXIT/CL": ideal_entry - (1.0 * atr_val), "FULL": t
-            })
-        except: continue
-    progress.empty()
-    return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
-
-def get_trend_signals(ticker_list):
-    signals = []
-    for ticker in ticker_list:
-        try:
-            df = yf.download(f"{ticker}", period="6mo", interval="1d", progress=False)
-            if df.empty: continue
-            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            df = df.dropna(subset=['Close'])
-            if len(df) < 50: continue
-            
-            df['MA20'] = df['Close'].rolling(20).mean()
-            df['MA50'] = df['Close'].rolling(50).mean()
-            df['Multiplier'] = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-            df['CMF_20'] = (df['Multiplier'] * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
-            df['CMF_20'] = df['CMF_20'].fillna(0)
-            
-            last_ma20, last_ma50 = float(df['MA20'].iloc[-1]), float(df['MA50'].iloc[-1])
-            prev_ma20, prev_ma50 = float(df['MA20'].iloc[-2]), float(df['MA50'].iloc[-2])
-            current_price, cmf_val = float(df['Close'].iloc[-1]), float(df['CMF_20'].iloc[-1])
-            if math.isnan(current_price) or math.isnan(last_ma20) or math.isnan(last_ma50): continue
-            
-            if prev_ma20 < prev_ma50 and last_ma20 > last_ma50:
-                if cmf_val > 0: status_text, color_code = "GOLDEN CROSS + AKUMULASI", "#16A34A"
-                else: status_text, color_code = "GOLDEN CROSS (Hati-hati Distribusi)", "#F59E0B"
-                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
-            elif prev_ma20 > prev_ma50 and last_ma20 < last_ma50:
-                if cmf_val < 0: status_text, color_code = "DEAD CROSS + DISTRIBUSI BANDAR", "#DC2626"
-                else: status_text, color_code = "DEAD CROSS (Koreksi Normal Wajar)", "#EA580C"
-                signals.append({"ticker": ticker.replace(".JK", ""), "status": status_text, "price": current_price, "color": color_code})
-        except Exception as e: 
-            continue
-    return signals
-
-def draw_mobile_cards(df):
-    for _, row in df.iterrows():
-        chg, chg_color = row.get('CHG%', 0), "#16A34A" if row.get('CHG%', 0) > 0 else "#DC2626"
-        val_last, val_entry = row.get('LAST', 0), row.get('ENTRY', row.get('Entry', row.get('LAST', 0)))
-        val_tp1, val_cl, val_m = row.get('TP 1', 0), row.get('EXIT/CL', 0), row.get('VAL(M)', 0)
-
-        st.markdown(f"""
-        <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <b style="font-size: 1.2rem; color: #0F172A;">{row.get('TICKER','-')}</b>
-                <span style="color: {chg_color}; font-weight: 700; font-family: 'JetBrains Mono';">{'+' if chg>0 else ''}{chg}%</span>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #64748B;">
-                <div>Harga Berjalan: <b style="color:#0F172A;">Rp {val_last:,.0f}</b></div>
-                <div>Transaksi: <b style="color:#0F172A;">{val_m} M</b></div>
-                <div style="color: #2563EB; font-weight: 600;">Antre Beli: Rp {float(val_entry):,.0f}</div>
-                <div style="color: #16A34A; font-weight: 600;">Jual Untung: Rp {float(val_tp1):,.0f}</div>
-                <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): Rp {float(val_cl):,.0f}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-def style_dataframe(val):
-    if type(val) in [int, float] and val > 0: return 'background-color: #D1FAE5; color: #065F46; font-weight:bold;'
-    elif type(val) in [int, float] and val < 0: return 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;'
-    if isinstance(val, str) and "⚠️" in val: return 'color: #DC2626; font-weight:bold;'
-    if isinstance(val, str) and "🔥" in val: return 'background-color: #FEF2F2; color: #DC2626; font-weight:bold;'
-    return ''
 
 # --- 1. TEMA TERANG (CLEAN WHITE) + EFEK VISUAL MAHKOTA ---
 st.markdown("""
@@ -490,7 +329,6 @@ if not st.session_state.logged_in:
                     else: st.error("Akses Ditolak. User ID atau Password salah.")
     st.stop()
 
-
 # --- 4. NAVIGATION & SIDEBAR ---
 role = st.session_state.role
 user_now = st.session_state.user
@@ -516,8 +354,7 @@ menu_list = [
     "⚔️ ADU SAHAM", "🌐 PETA SEKTOR", "🧮 KALKULATOR TRADING", "💰 PEMBURU DIVIDEN", 
     "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR", "💼 DOMPET TRADING", "🔒 KEAMANAN"
 ]
-if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: 
-    menu_list.append("⚙️ USER MANAGEMENT")
+if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list: menu_list.append("⚙️ USER MANAGEMENT")
 
 menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility="collapsed")
 
@@ -543,11 +380,19 @@ if ticker_html:
     st.markdown(f"<div class='ticker-wrap'><div class='ticker'>{ticker_html}</div></div>", unsafe_allow_html=True)
 
 # =========================================================================
-# 🔥 MASTER COMMAND CENTER (DASHBOARD) 
+# 🖥️ MENU: DASHBOARD UTAMA
 # =========================================================================
 if menu == "🖥️ DASHBOARD UTAMA":
     st.markdown(f"<h2 class='gradient-text' style='margin-bottom:5px;'>Ringkasan Pasar & Portofolio</h2>", unsafe_allow_html=True)
-    st.caption("Pantau metrik kesehatan pasar, psikologi trader, aliran asing, dan investasi pribadimu secara real-time.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Membaca Dashboard Seperti Profesional:**
+        * **IHSG (Indeks Harga Saham Gabungan):** Ini adalah rapor bursa kita. Jika statusnya `BULLISH 🚀`, artinya aman untuk membeli saham. Jika `BEARISH ⚠️`, lebih baik simpan uang tunai (*cash*).
+        * **Market Breadth:** Lihat angka `Naik` vs `Turun`. Walaupun IHSG hijau, tapi kalau saham yang 'Turun' lebih banyak, artinya kenaikan indeks hanya tipuan dari beberapa saham raksasa saja.
+        * **Arus Dana Asing (Net Buy/Sell):** Uang asing adalah bensin bursa kita. Selalu trading searah dengan asing. Jika status `NET BUY`, ikutlah masuk pasar.
+        * **Fear & Greed:** Beli saat pasar ketakutan (Jarum di area merah / Extreme Fear), dan juallah barang Anda saat pasar sedang serakah (Jarum di area hijau / Extreme Greed).
+        * **Top Traded Value:** Ini adalah tempat uang besar (Triliunan) sedang berpesta hari ini. Sangat disarankan *trading* di 3 saham ini karena sangat liquid (gampang masuk dan keluar).
+        """)
     st.write("---")
     
     proxy_market = ["BBCA.JK","BBRI.JK","BMRI.JK","BBNI.JK","ASII.JK","TLKM.JK","AMRT.JK","ADRO.JK",
@@ -581,8 +426,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
 
     with st.spinner("Memindai Kesehatan Pasar..."):
         try:
-            br_data_full = yf.download(proxy_market, period="5d", interval="1d", progress=False)
-            if isinstance(br_data_full.columns, pd.MultiIndex): br_data_full.columns = br_data_full.columns.get_level_values(0)
+            br_data_full = yf.download(proxy_market, period="10d", interval="1d", progress=False)
             br_data = br_data_full['Close']
             vol_data_today = br_data_full['Volume']
             
@@ -751,20 +595,20 @@ if menu == "🖥️ DASHBOARD UTAMA":
 
 
 # =========================================================================
-# 🔥 FITUR CANDLESTICK MULTI-TIMEFRAME & SMART TARGET
+# 🕯️ MENU: POLA CANDLE AI
 # =========================================================================
 elif menu == "🕯️ POLA CANDLE AI":
     st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI & Proyeksi</h2>", unsafe_allow_html=True)
-    st.caption("Deteksi bentuk grafik masa lalu (Candlestick) dan simulasikan prediksi harga di masa depan menggunakan algoritma Kuantitatif.")
-    
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Menggunakan Mesin Pindai Grafik:**
+        * **Tab Deteksi Pola:** Ketik kode saham Anda. Jika AI mendeteksi 'Bullish Engulfing' atau 'Hammer', itu adalah sinyal emas untuk **BELI**. Segera pasang antrean beli sesuai angka "AI Smart Target" di kotak hijau.
+        * **Tab Proyeksi Monte Carlo:** Ini adalah alat cenayang matematika. Fokus pada angka probabilitas di akhir. Jika probabilitas naik > 60%, saham ini layak di-*hold* untuk sebulan ke depan. Jika probabilitasnya < 40%, segera jual (*Take Profit/Cut Loss*).
+        """)
+        
     tab_candle, tab_monte = st.tabs(["🕯️ DETEKSI POLA CANDLE", "🔮 PROYEKSI MONTE CARLO (AI)"])
     
     with tab_candle:
-        with st.expander("📖 PANDUAN POLA GRAFIK", expanded=False):
-            st.markdown("""
-            * **Bullish Engulfing / Hammer:** Tanda perlawanan pembeli kuat di area bawah. Harga siap mantul naik! 🚀
-            * **Bearish Engulfing / Shooting Star:** Tanda tekanan jual bandar di area atas. Harga rawan longsor! ⚠️
-            """)
         with st.form("f_candle"):
             c1, c2 = st.columns(2)
             tk_candle = c1.text_input("Ketik Kode Saham", value="BBRI").upper().strip()
@@ -843,13 +687,6 @@ elif menu == "🕯️ POLA CANDLE AI":
                 except: st.error("Data tidak cukup untuk melakukan deteksi pola.")
 
     with tab_monte:
-        with st.expander("📖 CARA MEMBACA PROYEKSI MONTE CARLO", expanded=False):
-            st.markdown("""
-            * **Monte Carlo Simulation** adalah metode *Kuantitatif* yang digunakan *Hedge Fund* untuk memprediksi harga masa depan.
-            * Garis-garis yang Anda lihat di grafik adalah **100 kemungkinan jalan harga** dalam 30 hari ke depan berdasarkan gejolak/volatilitas masa lalu.
-            * Area **titik kumpul terbanyak** adalah probabilitas harga yang paling besar/logis terjadi di masa depan.
-            """)
-        
         with st.form("f_mc"):
             tk_mc = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
             btn_mc = st.form_submit_button("Mulai Simulasi Proyeksi", width="stretch")
@@ -880,7 +717,6 @@ elif menu == "🕯️ POLA CANDLE AI":
                         for p in paths:
                             fig_mc.add_trace(go.Scatter(y=p, mode='lines', line=dict(color='rgba(37, 99, 235, 0.1)', width=1), showlegend=False))
                             
-                        # Garis Rata-rata dari semua skenario
                         avg_path = np.mean(paths, axis=0)
                         fig_mc.add_trace(go.Scatter(y=avg_path, mode='lines', line=dict(color='#DC2626', width=3), name='Rata-Rata Proyeksi'))
                         
@@ -894,11 +730,24 @@ elif menu == "🕯️ POLA CANDLE AI":
                 except Exception as e: st.error("Gagal melakukan simulasi kuantitatif.")
 
 # =========================================================================
-# 🔥 AUTO SCANNER AI (VPA, KATALIS BERITA, TREEMAP, RADAR)
+# 🛰️ MENU: AUTO SCANNER AI
 # =========================================================================
 elif menu == "🛰️ AUTO SCANNER":
     st.markdown(f"<h2 class='gradient-text'>Auto Scanner AI (VPA & Radar)</h2>", unsafe_allow_html=True)
-    st.caption("Sistem radar kuantitatif mendeteksi lonjakan harga, anomali volume (VPA), serta memindai katalis berita secara langsung.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **1. CARA MEMILIH SAHAM:**
+        * Fokus pada saham dengan **AI_SCORE** paling tinggi.
+        * Pilih yang status Bandar-nya **AKUMULASI** (Bandar sedang kumpul barang).
+        * Pilih yang **VPA_STATUS** berstatus "NORMAL" atau "VALID BREAKOUT". Hindari "ANOMALI VPA".
+        * Carilah yang ada label **🔥 ADA BERITA**.
+
+        **2. CARA EKSEKUSI BELI & JUAL (TRADING PLAN):**
+        * **ENTRY (Area Beli):** JANGAN beli di harga berjalan (LAST). Lakukan antre beli (*Buy on Weakness*) di angka **ENTRY** agar dapat diskon dan terhindar dari FOMO (nyangkut di pucuk).
+        * **TP 1 & TP 2 (Target Jual Untung):** Jika sudah terbeli, segera pasang antrean jual otomatis di harga ini.
+        * **EXIT/CL (Cut Loss):** PENTING! Jika harga malah anjlok menembus angka ini, SEGERA JUAL RUGI untuk menyelamatkan modal Anda dari kebangkrutan.
+        """)
+        
     if 'results' not in st.session_state: st.session_state.results = None
     tickers = load_tickers()
     
@@ -909,8 +758,86 @@ elif menu == "🛰️ AUTO SCANNER":
         st.write("##")
         btn_scan = st.button("Mulai Scan Pasar", use_container_width=True)
 
+    def run_scan_accurate(tickers, mode):
+        tickers = list(set(tickers))
+        results = []
+        if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 100_000_000, 1.1
+        elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 2.5, 55, 1_000_000_000, 1.4
+        else: min_chg, min_rsi, min_val, vol_m = 4.0, 60, 2_000_000_000, 1.8
+
+        hot_news_text = get_hot_news_tickers()
+        progress = st.progress(0, text="📡 Memindai Bursa Efek...")
+        try:
+            data = yf.download(tickers, period="20d", interval="1d", group_by="ticker", threads=True, progress=False)
+        except: return pd.DataFrame()
+
+        total = len(tickers)
+        for i, t in enumerate(tickers):
+            try:
+                progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
+                df = data[t].copy() if len(tickers) > 1 else data.copy()
+                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+                df = df.dropna(subset=['Close', 'Volume']) 
+                if df.empty or len(df) < 14: continue
+
+                c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
+                if math.isnan(c_now) or math.isnan(c_prev) or c_prev == 0: continue
+
+                chg = ((c_now - c_prev) / c_prev) * 100
+                val_tr = float(df['Volume'].iloc[-1]) * c_now
+                
+                delta = df['Close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                rsi = 100 - (100 / (1 + (gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0)))
+
+                high_20 = df['High'].rolling(20).max().iloc[-2] if len(df) >= 20 else c_prev
+                vol_avg = df['Volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else df['Volume'].mean()
+                is_breakout = (c_now > high_20) and (df['Volume'].iloc[-1] > vol_avg * vol_m)
+
+                if chg < min_chg or val_tr < min_val: continue
+
+                multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
+                cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
+                cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
+                
+                tr1 = df['High'] - df['Low']
+                tr2 = (df['High'] - df['Close'].shift()).abs()
+                tr3 = (df['Low'] - df['Close'].shift()).abs()
+                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                atr_val = float(tr.rolling(14).mean().iloc[-1])
+                    
+                if math.isnan(atr_val): atr_val = c_now * 0.03
+                ideal_entry = c_now - (0.4 * atr_val)
+                ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
+
+                vpa_status = "NORMAL (Searah)"
+                if float(df['Volume'].iloc[-1]) > (vol_avg * 1.5):
+                    if chg < 1.0 and chg > -1.0: vpa_status = "⚠️ ANOMALI VPA (Tertahan)"
+                    elif chg >= 2.0: vpa_status = "🚀 VALID BREAKOUT"
+                
+                katalis = "🔥 ADA BERITA" if t.replace(".JK", "") in hot_news_text else "TIDAK ADA"
+                score_mom = min(max(rsi, 0), 100)
+                score_bndr = min(max((cmf + 0.5) * 100, 0), 100)
+                score_trnd = 80 if c_now > df['Close'].rolling(20).mean().iloc[-1] else 30
+                score_vol = min(100, (atr_val / c_now) * 1000)
+
+                results.append({
+                    "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": chg,
+                    "VAL(M)": (val_tr / 1_000_000), 
+                    "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
+                    "VPA_STATUS": vpa_status, "KATALIS": katalis,
+                    "AI_SCORE": ai_score,
+                    "SCORE_MOM": score_mom, "SCORE_BNDR": score_bndr, "SCORE_TRND": score_trnd, "SCORE_VOL": score_vol,
+                    "ENTRY": ideal_entry, "TP 1": ideal_entry + (1.5 * atr_val), 
+                    "TP 2": ideal_entry + (2.5 * atr_val), "EXIT/CL": ideal_entry - (1.0 * atr_val), "FULL": t
+                })
+            except: continue
+        progress.empty()
+        return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
+
     if btn_scan:
-        res = run_scan(tickers, mode_scan)
+        res = run_scan_accurate(tickers, mode_scan)
         if not res.empty: 
             if filter_sektor != "Semua Sektor":
                 res['SEKTOR'] = res['FULL'].apply(get_sector)
@@ -937,7 +864,16 @@ elif menu == "🛰️ AUTO SCANNER":
             st.plotly_chart(fig_tree, use_container_width=True)
             
         with tab3: 
-            styled_df = df.drop(columns=['FULL', 'SCORE_MOM', 'SCORE_BNDR', 'SCORE_TRND', 'SCORE_VOL'], errors='ignore').style.applymap(style_dataframe)
+            def highlight_cols(s):
+                if s.name == 'CHG%': return ['background-color: #D1FAE5; color: #065F46; font-weight:bold;' if pd.to_numeric(v, errors='coerce') > 0 else 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;' for v in s]
+                return ['' for _ in s]
+                
+            format_mapping = {
+                'LAST': 'Rp {:,.0f}', 'CHG%': '{:.2f}%', 'VAL(M)': '{:,.1f} M', 'AI_SCORE': '{:.1f}',
+                'ENTRY': 'Rp {:,.0f}', 'TP 1': 'Rp {:,.0f}', 'TP 2': 'Rp {:,.0f}', 'EXIT/CL': 'Rp {:,.0f}'
+            }
+            
+            styled_df = df.drop(columns=['FULL', 'SCORE_MOM', 'SCORE_BNDR', 'SCORE_TRND', 'SCORE_VOL'], errors='ignore').style.format(format_mapping).applymap(style_dataframe).apply(highlight_cols)
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
             csv = df.drop(columns=['FULL', 'SCORE_MOM', 'SCORE_BNDR', 'SCORE_TRND', 'SCORE_VOL'], errors='ignore').to_csv(index=False).encode('utf-8')
             st.download_button("💾 Download Hasil Scan (CSV)", csv, f"scanner_results_{datetime.now(pytz.timezone('Asia/Jakarta')).strftime('%d%m%Y')}.csv", "text/csv", use_container_width=True)
@@ -948,7 +884,7 @@ elif menu == "🛰️ AUTO SCANNER":
                 sel_t = st.selectbox("Pilih Saham untuk Analisis Mendalam:", df['TICKER'].tolist())
                 sel_row = df[df['TICKER'] == sel_t].iloc[0]
                 full_t = sel_row['FULL']
-                st.markdown(f"<div class='dash-box' style='text-align:center;'><h1 class='text-blue' style='margin:0;'>{sel_t}</h1><p class='badge-blue'>Skor Keseluruhan: {sel_row['AI_SCORE']}</p></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='dash-box' style='text-align:center;'><h1 class='text-blue' style='margin:0;'>{sel_t}</h1><p class='badge-blue'>Skor Keseluruhan: {sel_row['AI_SCORE']:.1f}</p></div>", unsafe_allow_html=True)
             
             with c_rad:
                 categories = ['Momentum Kenaikan', 'Kekuatan Bandar', 'Tren Menengah', 'Volatilitas Kuat', 'Fundamental Umum']
@@ -975,9 +911,18 @@ elif menu == "🛰️ AUTO SCANNER":
                 fig.update_layout(template="plotly_white", height=450, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
 
+# =========================================================================
+# ⚡ MENU: STRATEGY SCANNER
+# =========================================================================
 elif menu == "⚡ STRATEGY SCANNER":
     st.markdown(f"<h2 class='gradient-text'>Strategy Scanner (Crossover)</h2>", unsafe_allow_html=True)
-    st.caption("Mendeteksi persilangan (crossover) Moving Average pada saham unggulan. Mencari momen pergerakan harga yang berbalik dari turun menjadi naik tren utamanya.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Menggunakan Sinyal Crossover:**
+        * Menu ini mendeteksi perubahan tren utama dengan melihat persilangan Moving Average (MA20 dan MA50).
+        * 🟢 **Beli (Entry):** Jika statusnya **GOLDEN CROSS**. Artinya tren harga baru saja berbalik dari turun menjadi naik. Sangat aman untuk di-hold mingguan/bulanan.
+        * 🔴 **Jual (Exit):** Jika statusnya **DEAD CROSS**. Artinya tren naik sudah patah dan akan terjun bebas. Segera jual atau hindari membeli saham ini.
+        """)
     try:
         df_saham = pd.read_excel("daftar_saham.xlsx")
         watchlist = [t.strip() + ".JK" for t in df_saham['Kode'].dropna().astype(str).tolist()]
@@ -990,13 +935,22 @@ elif menu == "⚡ STRATEGY SCANNER":
             if results:
                 st.success("💡 **Ditemukan!** Cari saham dengan status **Golden Cross (Hijau)** untuk momentum beli tren yang sehat.")
                 for res in results:
-                    bg_badge = "badge-green" if "Sangat Kuat" in res['status'] else ("badge-red" if "Sangat Bahaya" in res['status'] else "badge-blue")
+                    bg_badge = "badge-green" if "Sangat Kuat" in res['status'] or "AKUMULASI" in res['status'] else ("badge-red" if "DISTRIBUSI" in res['status'] else "badge-blue")
                     st.markdown(f"<div class='dash-box' style='border-left: 4px solid {res['color']}; padding: 15px;'><span class='{bg_badge}' style='margin-bottom:8px;'>{res['status']}</span><p style='margin:8px 0 0 0; color:#0F172A;'>Saham: <b style='color:#0F172A; font-size:1.1rem;'>{res['ticker']}</b> | Harga: Rp {res['price']:,.0f}</p></div>", unsafe_allow_html=True)
             else: st.info("Belum ada perpotongan tren yang signifikan hari ini.")
 
+# =========================================================================
+# ⭐ MENU: WATCHLIST FAVORIT
+# =========================================================================
 elif menu == "⭐ WATCHLIST FAVORIT":
     st.markdown(f"<h2 class='gradient-text'>Watchlist Pribadi</h2>", unsafe_allow_html=True)
-    st.caption("Daftarkan saham andalanmu di sini agar sistem bisa menscan pergerakan momentumnya khusus untukmu setiap hari.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Fungsi Laci Saham Pribadi:**
+        * Masukkan kode saham andalan Anda di sini (misal: BBCA, AMMN, BREN).
+        * Cukup tekan **"Scan Saham Favorit Saya"** setiap malam atau pagi.
+        * AI akan memberitahu apakah saham-saham pilihan Anda ini sedang memiliki momentum tarikan bandar hari ini atau malah sedang lesu.
+        """)
     my_wl = get_watchlist(user_now)
     c_add, c_del = st.columns(2)
     with c_add:
@@ -1017,13 +971,17 @@ elif menu == "⭐ WATCHLIST FAVORIT":
             if not res_wl.empty: draw_mobile_cards(res_wl)
             else: st.info("Belum ada momentum tarikan pada daftar sahammu.")
 
+# =========================================================================
+# 🎯 MENU: AUTO SUP/RES
+# =========================================================================
 elif menu == "🎯 AUTO SUP/RES":
     st.markdown(f"<h2 class='gradient-text'>Auto Support & Resistance</h2>", unsafe_allow_html=True)
-    st.caption("AI otomatis melukiskan garis lantai (Support) sebagai target beli harga bawah, dan garis atap (Resistance) sebagai target jual harga atas (Take Profit).")
-    with st.expander("📖 PANDUAN LEVEL PIVOT", expanded=False):
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
         st.markdown("""
-        * 🟢 **SUPPORT:** Harga terendah harian. Cocok untuk mulai menyicil beli (Buy on Weakness).
-        * 🔴 **RESISTANCE:** Harga tertinggi harian. Cocok untuk bersiap melakukan aksi jual untung.
+        **Titik Pantul Harga (Pivot Strategy):**
+        * 🟢 **Beli (ENTRY):** Lakukan pembelian saat "Harga Saat Ini" mendekati atau menyentuh garis **SUPPORT 1** atau **SUPPORT 2**. Ini adalah area lantai di mana harga susah turun lagi.
+        * 🔴 **Jual (TAKE PROFIT):** Segera lepas barang (jual) saat harga mendekati **RESISTANCE 1** atau **RESISTANCE 2**. Ini adalah area atap di mana harga biasanya akan membentur dan kembali turun.
+        * 🔵 **Titik Pivot:** Ini adalah batas tengah (Garis netral).
         """)
         
     with st.form("f_pivot"):
@@ -1072,9 +1030,18 @@ elif menu == "🎯 AUTO SUP/RES":
                     st.plotly_chart(fig, use_container_width=True)
             except: st.error("Data tidak mencukupi untuk menghitung batas support.")
 
+# =========================================================================
+# 📅 MENU: SIKLUS MUSIMAN
+# =========================================================================
 elif menu == "📅 SIKLUS MUSIMAN":
     st.markdown(f"<h2 class='gradient-text'>Siklus Musiman (Seasonality)</h2>", unsafe_allow_html=True)
-    st.caption("Menggali probabilitas sejarah pergerakan harga 5 tahun terakhir. Cari tahu di bulan apa saham incaranmu punya kebiasaan berpesta hijau.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mencuri Start dengan Siklus:**
+        * Grafik menampilkan persentase kemungkinan (*Win Rate*) saham tersebut naik di bulan-bulan tertentu.
+        * **Kapan Beli?** Belilah saham tersebut di akhir bulan atau **1 bulan sebelum** bulan hijau tertingginya. (Contoh: Jika BBCA selalu naik 100% di bulan April, maka belilah BBCA di akhir bulan Maret).
+        * Jangan sentuh saham ini di bulan-bulan yang barnya paling pendek/merah.
+        """)
     with st.form("f_season"):
         tk_season = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
         btn_season = st.form_submit_button("Analisis Data 5 Tahun", width="stretch")
@@ -1104,12 +1071,18 @@ elif menu == "📅 SIKLUS MUSIMAN":
             except: st.error("Data rentang waktu belum mencukupi.")
 
 # =========================================================================
-# 🔥 FITUR TAMBAHAN: MULTI-GURU VALUASI (CEK FUNDAMENTAL + DDM)
+# 📟 MENU: CEK FUNDAMENTAL
 # =========================================================================
 elif menu == "📟 CEK FUNDAMENTAL":
     st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
     st.markdown(f"<h2 class='gradient-text'>Cek Laporan Fundamental</h2>", unsafe_allow_html=True)
-    st.caption("Memeriksa kesehatan rasio keuangan internal perusahaan (seperti P/E, PBV, Profit) untuk menilai apakah harga saham masih layak diinvestasikan.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Menggunakan Radar Investor Miliarder:**
+        * **Pilih Saham Undervalued:** Fokuslah membeli saham yang status "Benjamin Graham"-nya bertuliskan **MURAH** (Harga berjalan lebih rendah dari Harga Wajar).
+        * **Pilih Growth:** Jika Anda mencari saham teknologi/tambang yang sedang ekspansi, pastikan "Peter Lynch" PEG Ratio-nya di bawah angka 1 (**SANGAT MURAH**).
+        * **Beli untuk Pensiun (DDM):** Jika Anda ingin makan dari dividen seumur hidup tanpa jual saham, pastikan saham tersebut "LAYAK DITABUNG" di kolom DDM Model.
+        """)
     col_in1, col_in2 = st.columns([3, 1])
     with col_in1: target_f = st.text_input("Ketik Kode Saham", value="BBCA").upper().strip()
     with col_in2: st.write("##"); btn_analyze = st.button("Periksa Emiten", width="stretch")
@@ -1174,9 +1147,17 @@ elif menu == "📟 CEK FUNDAMENTAL":
                         st.warning("Bukan Saham Pembagi Dividen.")
             except: st.error("Data rasio fundamental tidak ditemukan di server.")
 
+# =========================================================================
+# ⚔️ MENU: ADU SAHAM
+# =========================================================================
 elif menu == "⚔️ ADU SAHAM":
     st.markdown(f"<h2 class='gradient-text'>Adu Saham (Head-to-Head)</h2>", unsafe_allow_html=True)
-    st.caption("Bandingkan rasio keuangan dari dua perusahaan di sektor yang sama untuk menemukan pilihan emiten terbaik.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mencari Pemenang Duel:**
+        * Adu 2 saham di industri yang sama (Contoh: BBCA vs BBRI).
+        * **Pemenang Sejati:** Pilih saham yang angka **P/E dan PBV-nya LEBIH KECIL** (artinya lebih murah harganya), tapi angka **ROE-nya LEBIH BESAR** (artinya perusahaan tersebut lebih pintar mencetak untung dari uang Anda).
+        """)
     col_in1, col_in2 = st.columns(2)
     with col_in1: tk1 = st.text_input("Saham Pilihan 1", value="BBCA").upper().strip()
     with col_in2: tk2 = st.text_input("Saham Pilihan 2", value="BBRI").upper().strip()
@@ -1196,11 +1177,17 @@ elif menu == "⚔️ ADU SAHAM":
             except: st.error("Gagal menarik perbandingan data.")
 
 # =========================================================================
-# 🔥 FITUR RRG (PETA ROTASI SEKTOR)
+# 🌐 MENU: PETA SEKTOR (RRG)
 # =========================================================================
 elif menu == "🌐 PETA SEKTOR":
     st.markdown(f"<h2 class='gradient-text'>Peta Rotasi Sektor Industri</h2>", unsafe_allow_html=True)
-    st.caption("Lacak pergeseran arus uang antar sektor. Berdaganglah di sektor yang sedang memimpin pasar (Leading).")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        * **Leading (Kanan Atas):** Sektor sedang jadi primadona bandar dan mengalahkan IHSG. (Waktunya Tahan Barang / Hold).
+        * **Weakening (Kanan Bawah):** Sektor masih kuat tapi mulai lelah. (Waktunya Take Profit).
+        * **Lagging (Kiri Bawah):** Sektor sedang mati atau dihindari. (Waktunya Jauhi / Cut Loss).
+        * **Improving (Kiri Atas):** Sektor sedang diakumulasi diam-diam untuk meledak. (Waktunya Cicil Beli).
+        """)
     sectors = {
         "Financials": "BBCA.JK",
         "Energy": "ADRO.JK",
@@ -1233,14 +1220,6 @@ elif menu == "🌐 PETA SEKTOR":
                     st.plotly_chart(fig_sec, use_container_width=True)
 
     with tab_rrg:
-        with st.expander("📖 CARA BACA PETA ROTASI (RRG)", expanded=False):
-            st.markdown("""
-            * **Leading (Kanan Atas):** Sektor sedang jadi primadona bandar dan mengalahkan IHSG. (Waktunya Tahan Barang / Hold).
-            * **Weakening (Kanan Bawah):** Sektor masih kuat tapi mulai lelah. (Waktunya Take Profit).
-            * **Lagging (Kiri Bawah):** Sektor sedang mati atau dihindari. (Waktunya Jauhi / Cut Loss).
-            * **Improving (Kiri Atas):** Sektor sedang diakumulasi diam-diam untuk meledak. (Waktunya Cicil Beli).
-            """)
-        
         if st.button("Analisis Rotasi Sektor (RRG)", use_container_width=True):
             with st.spinner("Mengkalkulasi kekuatan relatif terhadap IHSG..."):
                 try:
@@ -1276,11 +1255,18 @@ elif menu == "🌐 PETA SEKTOR":
                 except Exception as e: st.error("Data tidak cukup untuk membangun Peta Rotasi (RRG).")
 
 # =========================================================================
-# 🔥 FITUR KELLY CRITERION (KALKULATOR TRADING)
+# 🧮 MENU: KALKULATOR TRADING
 # =========================================================================
 elif menu == "🧮 KALKULATOR TRADING":
     st.markdown(f"<h2 class='gradient-text'>Kalkulator Manajemen Risiko</h2>", unsafe_allow_html=True)
-    st.caption("Disiplin adalah kunci. Hitung dengan matematis porsi lot, average down, hingga alokasi risiko ala Hedge Fund.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Menyelamatkan Uang Anda:**
+        * **Kalkulator Risiko:** Sebelum beli saham, masukkan modal dan batas rugi. Beli lot sesuai angka "BELI MAKSIMAL". Jangan serakah!
+        * **Averaging Down:** Khusus kalau Anda sudah nyangkut parah. Kalkulator ini mencari titik impas baru (BEP) jika Anda membeli lagi di harga bawah.
+        * **Kelly Criterion:** Rumus Anti-Bangkrut kasino. AI akan melihat rekam jejak jurnal Anda (Win Rate). Jika disarankan alokasi 10%, berarti jangan beli 1 saham pakai 100% uang Anda!
+        """)
+        
     tab_risk, tab_avg, tab_comp, tab_kelly = st.tabs(["🛡️ KALK. RISIKO", "🛟 AVERAGING DOWN", "📈 JALUR 1 MILIAR", "⚖️ KELLY CRITERION"])
     
     with tab_risk:
@@ -1361,12 +1347,6 @@ elif menu == "🧮 KALKULATOR TRADING":
                 st.info(f"💡 Dengan modal awal **Rp {p_awal:,.0f}** dan konsistensi profit **{r_bulan}% tiap bulan** tanpa ditarik, kekuatan bunga berbunga (*compounding interest*) akan melipatgandakan aset Anda menjadi Rp 1 Miliar dalam waktu **{years} tahun {months} bulan**. Tetap disiplin dan bersabar!")
 
     with tab_kelly:
-        with st.expander("📖 APA ITU KELLY CRITERION?", expanded=False):
-            st.markdown("""
-            * Ditemukan oleh ilmuwan John Kelly Jr., ini adalah rumus matematika yang dipakai Kasino dan *Hedge Fund* agar **MUSTAHIL BANGKRUT**.
-            * Mesin ini akan memberi tahu Anda **persentase maksimal dari modal Anda yang boleh dibelikan pada satu saham**, berdasarkan histori tingkat kemenangan Anda (Win Rate). Jangan pernah *all-in* secara asal!
-            """)
-            
         with st.form("kelly_form"):
             c1, c2 = st.columns(2)
             w_rate = c1.number_input("Win Rate Trading Anda (%) (Lihat Jurnal AI)", min_value=1.0, max_value=100.0, value=55.0)
@@ -1387,9 +1367,19 @@ elif menu == "🧮 KALKULATOR TRADING":
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success(f"💡 Pemenang Nobel Matematika menyarankan Anda untuk TIDAK menggunakan lebih dari **{kelly_pct*100:.1f}% total modal Anda** untuk membeli 1 saham (berdasarkan statistik pribadi Anda). Ini adalah batas pertahanan agar portofolio Anda tidak akan pernah hancur (margin call).")
 
+# =========================================================================
+# 💰 MENU: PEMBURU DIVIDEN
+# =========================================================================
 elif menu == "💰 PEMBURU DIVIDEN":
     st.markdown(f"<h2 class='gradient-text'>Pemburu Dividen</h2>", unsafe_allow_html=True)
-    st.caption("Pantau jejak catatan pembayaran dividen historis perusahaan. Menjadi pedoman untuk metode investasi pasif dan pencarian pasif income.")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mencari Saham Pensiun:**
+        * Masukkan saham pertambangan/bank besar.
+        * Perhatikan angka **PERSENTASE YIELD TAHUNAN**.
+        * Jika angkanya **di atas 6%** (Mengalahkan bunga deposito Bank/SBN), saham tersebut sangat bagus untuk ditabung jangka panjang.
+        * Cek tabel riwayat di bawahnya. Apakah mereka rutin bagi dividen setiap tahun? Jika banyak bolongnya, lupakan!
+        """)
     div_tk = st.text_input("Ketik Kode Saham", value="ITMG").upper().strip()
     if st.button("Lacak Riwayat Dividen", width="stretch"):
         with st.spinner("Memproses rekam jejak..."):
@@ -1405,9 +1395,18 @@ elif menu == "💰 PEMBURU DIVIDEN":
                     st.dataframe(df_divs.sort_values(by='Tanggal Penyaluran', ascending=False).head(10), use_container_width=True, hide_index=True)
             except: st.error("Laporan riwayat dividen tidak ditemukan.")
 
+# =========================================================================
+# 🧬 MENU: KORELASI SAHAM
+# =========================================================================
 elif menu == "🧬 KORELASI SAHAM":
     st.markdown(f"<h2 class='gradient-text'>Korelasi Silang Saham</h2>", unsafe_allow_html=True)
-    st.caption("Membantu diversifikasi portofolio. Cari tahu apakah beberapa saham selalu bergerak dengan arah yang sama persis (Hindari memiliki korelasi tinggi di 1 portofolio).")
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mengatur Proteksi Portofolio:**
+        * Jangan taruh telur di keranjang yang sama!
+        * Di dalam grafik kotak, cari angka korelasinya. Jika **mendekati +1** (warna merah pekat), berarti kedua saham itu bergerak searah. (Jika satu anjlok, yang lain ikut anjlok).
+        * Jika angka **mendekati 0 atau Negatif** (warna biru), artinya saham tersebut tahan banting (saling menyeimbangkan). **Belilah saham-saham ini untuk diversifikasi!**
+        """)
     input_tkrs = st.text_input("MASUKKAN KODE SAHAM (DIPISAH KOMA)", value="BBCA, BBRI, AMRT, TLKM")
     if st.button("Kalkulasi Matriks Korelasi", width="stretch"):
         with st.spinner("Melakukan perbandingan algoritma..."):
@@ -1422,14 +1421,22 @@ elif menu == "🧬 KORELASI SAHAM":
                     st.plotly_chart(fig_corr, use_container_width=True)
             except: st.error("Kalkulasi terhambat akibat data saham tidak valid.")
 
+# =========================================================================
+# 🏛️ MENU: JEJAK BANDAR
+# =========================================================================
 elif menu == "🏛️ JEJAK BANDAR":
     st.markdown(f"<h2 class='gradient-text'>Jejak Institusi & Bandar</h2>", unsafe_allow_html=True)
-    st.caption("Pusat lacak radar intelijen aliran transaksi yang mendeteksi arah uang institusi skala raksasa. Jangan melawan arah arus Bandar.")
-    
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Membongkar Manipulasi Pasar:**
+        * **Tab CMF Arus Dana:** Pantau statusnya. JANGAN beli jika statusnya "DISTRIBUSI BESAR" (Bandar sedang kabur/jualan). Beli HANYA jika tertulis "AKUMULASI BESAR".
+        * **Tab VWAP Harga Modal:** Garis VWAP adalah Harga Rata-Rata Bandar. Jika "Harga Saat Ini" ADA DI BAWAH Garis VWAP, berarti saham lagi Diskon di bawah harga bandar. Waktunya SEROK BAWAH!
+        * **Tab Divergensi:** Ini untuk mencari cuci piring (manipulasi). Jika Harga Saham Turun TAPI Garis Biru (Akumulasi) Naik, artinya harga sedang ditekan turun secara paksa padahal aslinya bandar sedang kumpul barang (Siap Meledak 🚀).
+        """)
+        
     tab_cmf, tab_vwap, tab_div = st.tabs(["🌊 CMF ARUS DANA", "🎯 VWAP HARGA MODAL", "🚨 RADAR DIVERGENSI"])
     
     with tab_cmf:
-        st.info("💡 **Chaikin Money Flow:** Alat ini melacak apakah ada pembelian institusi secara besar-besaran atau pembuangan barang massal.")
         ff_tk = st.text_input("Ketik Kode Saham", value="BBRI", key="tk_cmf").upper().strip()
         if st.button("Lacak Arus Masuk Keluar", width="stretch"):
             with st.spinner("Membongkar distribusi aliran..."):
@@ -1454,7 +1461,6 @@ elif menu == "🏛️ JEJAK BANDAR":
                 except: st.error("Kode saham tidak terdeteksi oleh radar arus.")
 
     with tab_vwap:
-        st.info("💡 **VWAP Estimation:** Mengestimasi titik berat nilai transaksi harian/bulanan untuk mencari level Harga Rata-Rata Bandar institusi.")
         with st.form("f_vwap"):
             c1, c2 = st.columns(2)
             vwap_tk = c1.text_input("Ketik Kode Saham", value="BBRI", key="tk_vwap").upper().strip()
@@ -1505,7 +1511,6 @@ elif menu == "🏛️ JEJAK BANDAR":
                 except: st.error("Data tidak berhasil ditarik.")
 
     with tab_div:
-        st.info("💡 **Divergensi Anomali:** Indikator rahasia jika market maker menekan turun harga untuk mencuci investor ritel, sementara indikator volume uang asli justru sedang meningkat tajam (akumulasi senyap).")
         div_tk = st.text_input("Ketik Kode Saham", value="BBRI", key="tk_div").upper().strip()
         if st.button("Mulai Analisis Anomali", width="stretch"):
             with st.spinner("Mengecek pergerakan di balik layar..."):
@@ -1553,10 +1558,19 @@ elif menu == "🏛️ JEJAK BANDAR":
                         st.plotly_chart(fig_div, use_container_width=True)
                 except: st.error("Malfungsi sistem saat mengkalkulasi divergensi tren.")
 
+# =========================================================================
+# 📰 MENU: BERITA PASAR
+# =========================================================================
 elif menu == "📰 BERITA PASAR":
     st.markdown(f"<h2 class='gradient-text'>Financial Intelligence Center</h2>", unsafe_allow_html=True)
-    st.caption("Pusat komando analisis berita yang otomatis menyaring konten sentimen Positif dari Negatif, dan menangkap info Corporate Action harian.")
-    
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mencari Bensin Market:**
+        * Saham sulit terbang tanpa sentimen (berita). Mesin ini menyaring puluhan portal berita keuangan untuk Anda secara otomatis.
+        * Carilah berita dengan lencana **POSITIF** (hijau) atau tulisan **🔥 HOT NEWS** (berita belum basi/baru rilis kurang dari 12 jam).
+        * Jika saham incaran Anda di Scanner muncul di Tab Corporate Action (jadwal bagi dividen), itu adalah waktu yang tepat untuk melakukan akumulasi pembelian!
+        """)
+        
     st.markdown("### 🌍 Global Macro Radar")
     with st.spinner("Mensinkronisasi dengan bursa global..."):
         try:
@@ -1620,7 +1634,6 @@ elif menu == "📰 BERITA PASAR":
                 except: st.error("Layanan filter RSS sedang tidak beroperasi.")
                 
     with t_corp:
-        st.info("💡 Pantau berita jadwal *Cum Date* Dividen atau Right Issue terbaru di sini agar tidak ketinggalan kereta.")
         with st.spinner("Memindai almanak korporasi..."):
             try:
                 feed_corp = feedparser.parse(requests.get("https://news.google.com/rss/search?q=jadwal+dividen+OR+right+issue+OR+cum+date+saham+indonesia&hl=id&gl=ID&ceid=ID:id", headers=headers, timeout=5).content)
@@ -1631,12 +1644,18 @@ elif menu == "📰 BERITA PASAR":
             except: st.error("Kesalahan jaringan sewaktu meretas kalender bursa.")
 
 # =========================================================================
-# 🔥 FITUR 4: NEW FITUR! KURVA EKUITAS TRADING
+# 💼 MENU: DOMPET TRADING
 # =========================================================================
 elif menu == "💼 DOMPET TRADING":
     st.markdown(f"<h2 class='gradient-text'>Dompet Portofolio & AI Jurnal</h2>", unsafe_allow_html=True)
-    st.caption("Fasilitas pencatatan aset investasi harian. Modul AI Jurnal akan memberikan rapor/grading seberapa disiplin metode trading yang anda tetapkan.")
-    
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Disiplin Menggunakan AI Jurnal:**
+        * **Catat Semua Tanpa Terkecuali!** Setiap kali Anda beli saham dari fitur Scanner, masukkan ke tab *'Kepemilikan'*. Setiap kali Anda Take Profit/Cut Loss, klik Likuidasi.
+        * **Tab Audit Jurnal AI:** Mesin akan menghitung Win Rate (Akurasi Menang) dari sejarah trading Anda. Jangan pernah tambahkan uang ke rekening saham Anda jika Win Rate Anda belum tembus 55% secara konsisten! 
+        * **Kurva Ekuitas:** Pastikan gunung biru (saldo Anda) melandai naik dari kiri ke kanan.
+        """)
+        
     c_title, c_toggle = st.columns([3, 1])
     show_saldo = c_toggle.checkbox("👁️ Penampakan Saldo", value=False)
     format_privacy = lambda v: f"Rp {v:,.0f}" if show_saldo else "Rp *****"
@@ -1709,15 +1728,6 @@ elif menu == "💼 DOMPET TRADING":
 
     with tab3: 
         if 'df_h' in locals() and not df_h.empty:
-            st.markdown("### 🤖 JURNAL EVALUASI MENTOR AI")
-            
-            with st.expander("📖 CARA BACA KURVA EKUITAS", expanded=False):
-                st.markdown("""
-                * Grafik di bawah menunjukkan perjalanan saldo keuntungan/kerugian Anda dari waktu ke waktu.
-                * Jika garis biru menanjak lurus ke atas dari kiri ke kanan, berarti gaya trading Anda sangat sehat dan konsisten untung.
-                * Jika grafik bergerigi tajam ke bawah (Rollercoaster), pertimbangkan untuk mengecilkan lot Anda (lihat fitur Kelly Criterion).
-                """)
-
             df_h_sorted = df_h.sort_values('date')
             df_h_sorted['Cumulative_PnL'] = df_h_sorted['pnl'].cumsum()
             
@@ -1743,6 +1753,9 @@ elif menu == "💼 DOMPET TRADING":
             c1.metric("KEMAMPUAN MENANG (WIN RATE)", f"{win_rate:.1f}%")
             c2.metric("REKAMAN FREKUENSI TRANSAKSI", f"{total_trades} Entri")
 
+# =========================================================================
+# ⚙️ MENU: PORTAL ADMINISTRATIF
+# =========================================================================
 elif menu == "⚙️ USER MANAGEMENT":
     st.markdown(f"<h2 class='gradient-text'>Portal Administratif</h2>", unsafe_allow_html=True)
     st.caption("Super-user dashboard untuk pengurusan identitas anggota sistem terminal.")
@@ -1757,6 +1770,9 @@ elif menu == "⚙️ USER MANAGEMENT":
         if st.form_submit_button("BLOKIR AKSES PERMANEN", width="stretch"):
             if delete_user_db(du): st.warning("Akses Terminal Berhasil Dihanguskan!"); st.rerun()
 
+# =========================================================================
+# 🔒 MENU: KEAMANAN
+# =========================================================================
 elif menu == "🔒 KEAMANAN":
     st.markdown(f"<h2 class='gradient-text'>Keamanan Node Terminal</h2>", unsafe_allow_html=True)
     st.caption("Pusat perlindungan enkripsi akses ke modul portofolio privat Anda.")
