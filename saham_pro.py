@@ -382,7 +382,6 @@ def load_tickers():
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
 
-# PERBAIKAN: Gunakan .dropna() spesifik agar tidak terganggu hari libur
 def run_scan(tickers, mode):
     tickers = list(set(tickers))
     results = []
@@ -442,7 +441,6 @@ def run_scan(tickers, mode):
                 
             if math.isnan(atr_val): atr_val = c_now * 0.03
             
-            # Harga Antre Beli (Pullback Strategy)
             ideal_entry = c_now - (0.4 * atr_val)
                 
             ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
@@ -539,6 +537,7 @@ def draw_mobile_cards(df):
         </div>
         """, unsafe_allow_html=True)
 
+# Custom DataFrame Styling for Heatmap effect
 def style_dataframe(val):
     if type(val) in [int, float] and val > 0: return 'background-color: #D1FAE5; color: #065F46; font-weight:bold;'
     elif type(val) in [int, float] and val < 0: return 'background-color: #FEE2E2; color: #991B1B; font-weight:bold;'
@@ -610,7 +609,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     big_banks = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK"]
 
     up, down, flat = 0, 0, 0
-    # --- BAGIAN 1: IHSG ---
+    # --- BAGIAN 1: IHSG + NEW SPARKLINE ---
     try:
         ihsg_data = yf.download("^JKSE", period="10d", interval="1d", progress=False)['Close'].dropna()
         if not ihsg_data.empty and len(ihsg_data) >= 2:
@@ -620,11 +619,19 @@ if menu == "🖥️ DASHBOARD UTAMA":
             ihsg_status = "BULLISH 🚀" if ihsg_pct > 0.5 else ("BEARISH ⚠️" if ihsg_pct < -0.5 else "SIDEWAYS 💤")
             badge_ihsg = "badge-green" if ihsg_pct > 0 else "badge-red" 
             
-            st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color}; border-top: 1px solid #E2E8F0 !important; padding: 20px;'>
+            st.markdown(f"""<div class='dash-box' style='border-left: 4px solid {ihsg_color}; border-top: 1px solid #E2E8F0 !important; padding: 20px; margin-bottom: 0px !important;'>
                 <p class='text-muted' style='margin:0; font-weight:600;'>IHSG (HARGA SAHAM GABUNGAN)</p>
                 <h2 style='margin:5px 0; color:{ihsg_color}; font-family:"JetBrains Mono";'>{ihsg_last:,.2f} <span style='font-size:1rem;'>({'+' if ihsg_pct>0 else ''}{ihsg_pct:.2f}%)</span></h2>
                 <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Terakhir: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
             </div>""", unsafe_allow_html=True)
+            
+            # FITUR BARU 1: SPARKLINE IHSG
+            if len(ihsg_data) >= 7:
+                fig_spark = px.line(ihsg_data.tail(7), x=ihsg_data.tail(7).index, y=ihsg_data.tail(7).values)
+                fig_spark.update_traces(line_color=ihsg_color, line_width=3)
+                fig_spark.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), xaxis=dict(visible=False), yaxis=dict(visible=False), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, hovermode=False)
+                st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
+
     except: st.warning("Sedang mengambil data IHSG...")
 
     # --- BAGIAN 2: MARKET BREADTH ---
@@ -727,7 +734,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     if not df_p.empty:
         tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique()]
         try:
-            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].dropna()
+            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].ffill().dropna()
             live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(live_prices_df.iloc[-1])}
         except: live_prices = {}
         def calc_active(row):
@@ -811,11 +818,11 @@ if menu == "🖥️ DASHBOARD UTAMA":
 
 
 # =========================================================================
-# 🔥 FITUR 2: NEW FITUR! AI CANDLESTICK MULTI-TIMEFRAME
+# 🔥 FITUR 2: NEW FITUR! AI CANDLESTICK MULTI-TIMEFRAME & SMART TARGET
 # =========================================================================
 elif menu == "🕯️ POLA CANDLE AI":
-    st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI (Multi-Timeframe)</h2>", unsafe_allow_html=True)
-    st.caption("Mesin pendeteksi bentuk grafik dari harian hingga bulanan untuk mencari tahu titik balik arah. Biarkan AI yang membacakan sentimen grafiknya untukmu.")
+    st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI (Smart Target)</h2>", unsafe_allow_html=True)
+    st.caption("Mesin pendeteksi bentuk grafik dari harian hingga bulanan. Dilengkapi algoritma yang akan menghitung target untung dan rugi secara otomatis.")
     with st.expander("📖 PANDUAN POLA GRAFIK", expanded=False):
         st.markdown("""
         * **Bullish Engulfing / Hammer:** Tanda perlawanan pembeli kuat di area bawah. Harga siap mantul naik! 🚀
@@ -837,7 +844,7 @@ elif menu == "🕯️ POLA CANDLE AI":
                 
                 df_c = yf.download(full_tk, period=p_map_c[tf_candle], interval=tf_map[tf_candle], progress=False).dropna()
                 
-                if not df_c.empty and len(df_c) >= 3:
+                if not df_c.empty and len(df_c) >= 14:
                     if isinstance(df_c.columns, pd.MultiIndex): df_c.columns = df_c.columns.get_level_values(0)
                     
                     prev = df_c.iloc[-2]
@@ -859,6 +866,17 @@ elif menu == "🕯️ POLA CANDLE AI":
                     pola, warna, badge_c = "TIDAK ADA POLA SPESIFIK", "#64748B", "badge-gray"
                     kesimpulan = "Grafik berjalan normal tanpa adanya pola pembalikan arah yang mencolok. Dianjurkan Wait and See."
                     
+                    # FITUR BARU 2: KALKULASI SMART TARGET (ATR Based)
+                    tr1 = df_c['High'] - df_c['Low']
+                    tr2 = (df_c['High'] - df_c['Close'].shift()).abs()
+                    tr3 = (df_c['Low'] - df_c['Close'].shift()).abs()
+                    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                    atr = float(tr.rolling(14).mean().iloc[-1])
+                    if math.isnan(atr): atr = c_c * 0.03
+                    
+                    target_price = c_c + (2 * atr)
+                    stop_loss = c_c - atr
+                    
                     if is_bull_engulfing:
                         pola, warna, badge_c = "BULLISH ENGULFING TERDETEKSI", "#16A34A", "badge-green"
                         kesimpulan = "Luar Biasa! Terdapat candle hijau besar yang 'menelan' candle merah sebelumnya. Sinyal kuat pembeli mendominasi."
@@ -877,8 +895,18 @@ elif menu == "🕯️ POLA CANDLE AI":
                         
                     st.markdown(f"<div class='dash-box' style='border-top: 3px solid {warna}; text-align:center;'><br><span class='{badge_c}' style='font-size:1.2rem; padding:8px 16px;'>{pola}</span><p style='font-size:15px; margin-top:15px; color:#0F172A;'>{kesimpulan}</p></div>", unsafe_allow_html=True)
                     
+                    # Tampilkan Smart Target Jika Pola Bagus
+                    if pola != "TIDAK ADA POLA SPESIFIK" and warna == "#16A34A":
+                        st.info(f"🎯 **AI Smart Target:** Disarankan Jual Untung di **Rp {target_price:,.0f}** dan Cut Loss jika harga turun ke **Rp {stop_loss:,.0f}**.")
+                    
                     df_chart = df_c.tail(15)
                     fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name='Candle', increasing_line_color='#16A34A', decreasing_line_color='#DC2626')])
+                    
+                    # Tambahkan Garis Target ke Chart
+                    if pola != "TIDAK ADA POLA SPESIFIK" and warna == "#16A34A":
+                        fig.add_hline(y=target_price, line_dash="dash", line_color="#16A34A", annotation_text="TARGET (TP)")
+                        fig.add_hline(y=stop_loss, line_dash="dash", line_color="#DC2626", annotation_text="STOP LOSS")
+                        
                     fig.update_layout(template="plotly_white", height=400, margin=dict(l=0,r=0,t=10,b=0), xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig, use_container_width=True)
             except: st.error("Data tidak cukup untuk melakukan deteksi pola.")
@@ -1058,7 +1086,7 @@ elif menu == "📅 SIKLUS MUSIMAN":
             except: st.error("Data rentang waktu belum mencukupi.")
 
 # =========================================================================
-# 🔥 FITUR 3: NEW FITUR! MULTI-GURU VALUASI (CEK FUNDAMENTAL)
+# 🔥 FITUR 3: NEW FITUR! MULTI-GURU VALUASI (CEK FUNDAMENTAL + DDM)
 # =========================================================================
 elif menu == "📟 CEK FUNDAMENTAL":
     st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
@@ -1078,6 +1106,7 @@ elif menu == "📟 CEK FUNDAMENTAL":
                 roe = (info.get('returnOnEquity', 0) or 0) * 100
                 der = info.get('debtToEquity', 0) or 0
                 peg = info.get('pegRatio', 0) or 0
+                div_rate = info.get('trailingAnnualDividendRate', 0) or 0
                 
                 st.markdown(f"### 🏢 {info.get('longName', target_f)}")
                 c1, c2, c3, c4 = st.columns(4)
@@ -1087,32 +1116,48 @@ elif menu == "📟 CEK FUNDAMENTAL":
                 st.markdown("---")
                 st.markdown("<h4 style='color:#2563EB;'>🧠 Analisis Valuasi Multi-Guru</h4>", unsafe_allow_html=True)
                 
-                # Benjamin Graham Valuation
-                graham = math.sqrt(22.5 * eps * bvps) if (eps > 0 and bvps > 0) else 0
-                c_grah, c_lyn = st.columns(2)
-                with c_grah:
-                    st.markdown("**1. Benjamin Graham (Value Investing)**")
-                    st.caption("Fokus pada aset dan laba inti perusahaan.")
-                    if current_price < graham: st.success(f"💡 Valuasi: **MURAH (Undervalued)**\n\nHarga Wajar: Rp {graham:,.0f}")
-                    else: st.error(f"💡 Valuasi: **MAHAL (Overvalued)**\n\nHarga Wajar: Rp {graham:,.0f}")
+                c_grah, c_lyn, c_ddm = st.columns(3)
                 
-                # Peter Lynch Valuation
+                # Benjamin Graham Valuation (Value)
+                graham = math.sqrt(22.5 * eps * bvps) if (eps > 0 and bvps > 0) else 0
+                with c_grah:
+                    st.markdown("**1. Benjamin Graham**")
+                    st.caption("Fokus: Nilai Aset Laba")
+                    if graham == 0:
+                        st.warning("Data EPS/BVPS minus.")
+                    elif current_price < graham: 
+                        st.success(f"💡 **MURAH (Undervalued)**\n\nNilai Wajar: Rp {graham:,.0f}")
+                    else: 
+                        st.error(f"💡 **MAHAL (Overvalued)**\n\nNilai Wajar: Rp {graham:,.0f}")
+                
+                # Peter Lynch Valuation (Growth)
                 with c_lyn:
-                    st.markdown("**2. Peter Lynch (Growth Investing)**")
-                    st.caption("Fokus pada potensi pertumbuhan bisnis (PEG Ratio).")
+                    st.markdown("**2. Peter Lynch**")
+                    st.caption("Fokus: Growth (PEG)")
                     if peg > 0 and peg <= 1:
-                        lynch_stat, lynch_col = "SANGAT MURAH (Growth Tinggi) 🚀", "success"
+                        st.success(f"💡 **SANGAT MURAH 🚀**\n\nPEG Ratio: {peg}x")
                     elif peg > 1 and peg <= 1.5:
-                        lynch_stat, lynch_col = "WAJAR (Fair Value) ⚖️", "info"
+                        st.info(f"💡 **WAJAR (Fair) ⚖️**\n\nPEG Ratio: {peg}x")
                     elif peg > 1.5:
-                        lynch_stat, lynch_col = "MAHAL (Overvalued) ⚠️", "error"
+                        st.error(f"💡 **MAHAL ⚠️**\n\nPEG Ratio: {peg}x")
                     else:
-                        lynch_stat, lynch_col = "Data PEG Tidak Tersedia", "warning"
-                    
-                    if lynch_col == "success": st.success(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
-                    elif lynch_col == "info": st.info(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
-                    elif lynch_col == "error": st.error(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
-                    else: st.warning(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: N/A")
+                        st.warning("Data PEG Tidak Tersedia")
+                        
+                # DDM Valuation (Dividend)
+                with c_ddm:
+                    st.markdown("**3. DDM Model**")
+                    st.caption("Fokus: Pasif Income")
+                    if div_rate > 0:
+                        # Asumsi Rata-rata Return Pasar 10% dan Pertumbuhan Dividen 5%
+                        r_expected = 0.10
+                        g_expected = 0.05
+                        ddm_value = (div_rate * (1 + g_expected)) / (r_expected - g_expected)
+                        if current_price < ddm_value:
+                            st.success(f"💡 **LAYAK DITABUNG 💰**\n\nNilai Wajar: Rp {ddm_value:,.0f}")
+                        else:
+                            st.error(f"💡 **DIVIDEN KEKECILAN 📉**\n\nNilai Wajar: Rp {ddm_value:,.0f}")
+                    else:
+                        st.warning("Bukan Saham Pembagi Dividen.")
             except: st.error("Data rasio fundamental tidak ditemukan di server.")
 
 elif menu == "⚔️ ADU SAHAM":
@@ -1293,9 +1338,6 @@ elif menu == "🧬 KORELASI SAHAM":
                     st.plotly_chart(fig_corr, use_container_width=True)
             except: st.error("Kalkulasi terhambat akibat data saham tidak valid.")
 
-# =========================================================================
-# 🔥 JEJAK BANDAR (CMF + VWAP + DIVERGENSI)
-# =========================================================================
 elif menu == "🏛️ JEJAK BANDAR":
     st.markdown(f"<h2 class='gradient-text'>Jejak Institusi & Bandar</h2>", unsafe_allow_html=True)
     st.caption("Pusat lacak radar intelijen aliran transaksi yang mendeteksi arah uang institusi skala raksasa. Jangan melawan arah arus Bandar.")
@@ -1504,6 +1546,9 @@ elif menu == "📰 BERITA PASAR":
                     st.markdown(f"<div class='dash-box'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span class='badge-blue'>📅 INFO CORPORATE ACTION</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
             except: st.error("Kesalahan jaringan sewaktu meretas kalender bursa.")
 
+# =========================================================================
+# 🔥 FITUR 4: NEW FITUR! KURVA EKUITAS TRADING
+# =========================================================================
 elif menu == "💼 DOMPET TRADING":
     st.markdown(f"<h2 class='gradient-text'>Dompet Portofolio & AI Jurnal</h2>", unsafe_allow_html=True)
     st.caption("Fasilitas pencatatan aset investasi harian. Modul AI Jurnal akan memberikan rapor/grading seberapa disiplin metode trading yang anda tetapkan.")
@@ -1582,6 +1627,16 @@ elif menu == "💼 DOMPET TRADING":
         if 'df_h' in locals() and not df_h.empty:
             st.markdown("### 🤖 JURNAL EVALUASI MENTOR AI")
             st.caption("Robot penganalisa probabilitas ini membedah metodologi Anda berdasarkan hasil rekap nyata trading di masa lalu.")
+            
+            # FITUR BARU 4: KURVA EKUITAS (EQUITY CURVE)
+            df_h_sorted = df_h.sort_values('date')
+            df_h_sorted['Cumulative_PnL'] = df_h_sorted['pnl'].cumsum()
+            
+            fig_eq = px.area(df_h_sorted, x='date', y='Cumulative_PnL', title="📈 Kurva Pertumbuhan Ekuitas (Kinerja Trading)")
+            fig_eq.update_traces(line_color='#2563EB', fillcolor='rgba(37, 99, 235, 0.2)')
+            fig_eq.update_layout(template="plotly_white", height=300, margin=dict(l=0,r=0,t=40,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig_eq, use_container_width=True)
+            
             if 'strategy' in df_h.columns:
                 strat_analysis = df_h.groupby('strategy').apply(
                     lambda x: pd.Series({'Total Trading': len(x), 'Win Rate (%)': (x['pnl'] > 0).mean() * 100})
