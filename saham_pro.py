@@ -176,17 +176,15 @@ def get_sector(ticker):
     try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
     except: return "Lainnya"
 
-# --- PERBAIKAN: MENGGUNAKAN LOGIK ANTI-NaN UNTUK TICKER ---
-@st.cache_data(ttl=60) # Cukup 1 menit agar data selalu fresh
+@st.cache_data(ttl=60) 
 def get_ticker_data():
     try:
-        # Tarik data 10 hari ke belakang agar dijamin dapat 2 hari aktif biarpun libur panjang
         data = yf.download(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], period="10d", interval="1d", progress=False)['Close']
         if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
         items = []
         for tk, name in zip(['^JKSE', 'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK'], ['IHSG', 'BBCA', 'BBRI', 'BMRI', 'TLKM']):
             try:
-                tk_data = data[tk].dropna() # HANYA buang data NaN untuk saham ini secara spesifik
+                tk_data = data[tk].dropna() 
                 if len(tk_data) >= 2:
                     c_now = float(tk_data.iloc[-1])
                     c_prev = float(tk_data.iloc[-2])
@@ -406,7 +404,7 @@ def run_scan(tickers, mode):
             progress.progress(int((i + 1) / total * 100), text=f"🔍 Analisa {t}")
             df = data[t].copy() if len(tickers) > 1 else data.copy()
             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            df = df.dropna(subset=['Close', 'Volume']) # HANYA drop yang benar-benar kosong
+            df = df.dropna(subset=['Close', 'Volume']) 
             if df.empty or len(df) < 2: continue
 
             c_now, c_prev = float(df['Close'].iloc[-1]), float(df['Close'].iloc[-2])
@@ -443,6 +441,9 @@ def run_scan(tickers, mode):
                 atr_val = c_now * 0.03
                 
             if math.isnan(atr_val): atr_val = c_now * 0.03
+            
+            # Harga Antre Beli (Pullback Strategy)
+            ideal_entry = c_now - (0.4 * atr_val)
                 
             ai_score = (chg * 0.4) + (rsi * 0.2) + ((val_tr / 1e9) * 0.2) + (10 if is_breakout else 0) + (cmf * 20)
 
@@ -452,7 +453,11 @@ def run_scan(tickers, mode):
                 "BANDAR": "AKUMULASI 🚀" if cmf > 0 else "DISTRIBUSI ⚠️",
                 "AI_SCORE": round(ai_score, 2),
                 "BREAKOUT": "YA" if is_breakout else "TDK",
-                "TP 1": c_now + (1.5 * atr_val), "TP 2": c_now + (2.5 * atr_val), "EXIT/CL": c_now - (1.0 * atr_val), "FULL": t
+                "ENTRY": ideal_entry, 
+                "TP 1": ideal_entry + (1.5 * atr_val), 
+                "TP 2": ideal_entry + (2.5 * atr_val), 
+                "EXIT/CL": ideal_entry - (1.0 * atr_val), 
+                "FULL": t
             })
         except: continue
     progress.empty()
@@ -525,9 +530,9 @@ def draw_mobile_cards(df):
                 <span style="color: {chg_color}; font-weight: 700; font-family: 'JetBrains Mono';">{'+' if chg>0 else ''}{chg}%</span>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #64748B;">
-                <div>Harga: <b style="color:#0F172A;">Rp {val_last:,.0f}</b></div>
-                <div>Trx: <b style="color:#0F172A;">{val_m} Miliar</b></div>
-                <div style="color: #2563EB; font-weight: 600;">Rencana Beli: Rp {float(val_entry):,.0f}</div>
+                <div>Harga Berjalan: <b style="color:#0F172A;">Rp {val_last:,.0f}</b></div>
+                <div>Transaksi: <b style="color:#0F172A;">{val_m} M</b></div>
+                <div style="color: #2563EB; font-weight: 600;">Antre Beli: Rp {float(val_entry):,.0f}</div>
                 <div style="color: #16A34A; font-weight: 600;">Jual Untung: Rp {float(val_tp1):,.0f}</div>
                 <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): Rp {float(val_cl):,.0f}</div>
             </div>
@@ -570,7 +575,6 @@ if role == "admin" and "⚙️ USER MANAGEMENT" not in menu_list:
 menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility="collapsed")
 
 st.sidebar.write("---")
-# TOMBOL REFRESH DATA (Membersihkan Cache Yahoo Finance jika nyangkut)
 if st.sidebar.button("🔄 Refresh Data Pasar", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
@@ -608,7 +612,6 @@ if menu == "🖥️ DASHBOARD UTAMA":
     up, down, flat = 0, 0, 0
     # --- BAGIAN 1: IHSG ---
     try:
-        # PERBAIKAN: Gunakan dropna(subset=['Close']) agar membuang hari libur sempurna
         ihsg_data = yf.download("^JKSE", period="10d", interval="1d", progress=False)['Close'].dropna()
         if not ihsg_data.empty and len(ihsg_data) >= 2:
             ihsg_last, ihsg_prev = float(ihsg_data.iloc[-1]), float(ihsg_data.iloc[-2])
@@ -627,7 +630,11 @@ if menu == "🖥️ DASHBOARD UTAMA":
     # --- BAGIAN 2: MARKET BREADTH ---
     with st.spinner("Memindai Kesehatan Pasar..."):
         try:
-            br_data = yf.download(proxy_market, period="10d", interval="1d", progress=False)['Close']
+            br_data_full = yf.download(proxy_market, period="5d", interval="1d", progress=False)
+            if isinstance(br_data_full.columns, pd.MultiIndex): br_data_full.columns = br_data_full.columns.get_level_values(0)
+            br_data = br_data_full['Close']
+            vol_data_today = br_data_full['Volume']
+            
             for tk in proxy_market:
                 try:
                     tk_data = br_data[tk].dropna()
@@ -757,58 +764,58 @@ if menu == "🖥️ DASHBOARD UTAMA":
 
     st.write("---")
     
-    # --- BAGIAN 5: UNUSUAL VOLUME & TOP MOVERS ---
-    st.markdown("<h3 class='text-blue'>🌋 Unusual Volume (Radar Bandar)</h3>", unsafe_allow_html=True)
-    with st.spinner("Melacak ledakan volume..."):
-        try:
-            vol_data = yf.download(proxy_market, period="1mo", interval="1d", progress=False)['Volume']
-            if isinstance(vol_data.columns, pd.MultiIndex): vol_data.columns = vol_data.columns.get_level_values(0)
-            spikes = []
-            for tk in proxy_market:
-                try:
-                    tk_vol = vol_data[tk].dropna()
-                    if len(tk_vol) > 20:
-                        v_today = float(tk_vol.iloc[-1])
-                        v_avg20 = float(tk_vol[-21:-1].mean())
-                        if v_avg20 > 0 and v_today > (v_avg20 * 1.5):
-                            spikes.append({"Ticker": tk.replace(".JK",""), "Spike": v_today / v_avg20})
-                except: pass
-            
-            df_spikes = pd.DataFrame(spikes).sort_values("Spike", ascending=False).head(3)
-            if not df_spikes.empty:
-                for _, row in df_spikes.iterrows():
-                    st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #2563EB; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-blue' style='float:right;'>Vol {row['Spike']:.1f}x Lipat 🚀</span></div>", unsafe_allow_html=True)
-            else: st.info("Tidak ada anomali ledakan volume pada sesi ini.")
-        except: st.info("Sistem volume radar sedang menyesuaikan data.")
+    # --- BAGIAN 5: NEW FITUR! TOP TRADED VALUE & TOP MOVERS ---
+    c_vol, c_mov = st.columns(2)
+    
+    with c_vol:
+        st.markdown("<h3 class='text-blue'>🔥 Top Traded Value (Paling Laris)</h3>", unsafe_allow_html=True)
+        with st.spinner("Menghitung perputaran uang terbesar..."):
+            try:
+                val_list = []
+                for tk in proxy_market:
+                    try:
+                        tk_close = br_data[tk].dropna().iloc[-1]
+                        tk_vol = vol_data_today[tk].dropna().iloc[-1]
+                        val_tr = tk_close * tk_vol
+                        if val_tr > 0:
+                            val_list.append({"Ticker": tk.replace(".JK",""), "Value": val_tr})
+                    except: pass
+                
+                df_val = pd.DataFrame(val_list).sort_values("Value", ascending=False).head(3)
+                if not df_val.empty:
+                    for _, row in df_val.iterrows():
+                        st.markdown(f"<div class='dash-box' style='background-color:#F8FAFC; border-left: 4px solid #10B981; border-top:1px solid #E2E8F0 !important; padding: 14px;'><b style='font-size:16px; color:#0F172A;'>{row['Ticker']}</b> <span class='badge-green' style='float:right;'>Trx: Rp {row['Value']/1e9:,.1f} Miliar 💵</span></div>", unsafe_allow_html=True)
+                else: st.info("Data transaksi saham belum tersedia.")
+            except: st.info("Sistem radar volume sedang menyesuaikan data.")
+        st.caption("🔥 **Top Traded Value:** 3 Saham dengan perputaran uang terbesar hari ini. Tempat teraman bertransaksi karena sangat liquid.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<h3 class='text-blue'>📈 Top Movers (Saham Blue Chips)</h3>", unsafe_allow_html=True)
-    with st.spinner("Menarik data penggerak..."):
-        try:
-            mov_data = yf.download(proxy_market, period="10d", interval="1d", progress=False)['Close']
-            if isinstance(mov_data.columns, pd.MultiIndex): mov_data.columns = mov_data.columns.get_level_values(0)
-            mov_list = []
-            for tk in proxy_market:
-                try:
-                    tk_mov = mov_data[tk].dropna()
-                    if len(tk_mov) >= 2:
-                        c_last, c_prev = float(tk_mov.iloc[-1]), float(tk_mov.iloc[-2])
-                        mov_list.append({"Ticker": tk.replace(".JK",""), "Chg": ((c_last-c_prev)/c_prev)*100})
-                except: pass
-            
-            df_mov = pd.DataFrame(mov_list).sort_values("Chg", ascending=False)
-            if len(df_mov) >= 2:
-                st.success(f"🚀 **Top Gainer:** {df_mov.iloc[0]['Ticker']} (+{df_mov.iloc[0]['Chg']:.2f}%)")
-                st.error(f"⚠️ **Top Loser:** {df_mov.iloc[-1]['Ticker']} ({df_mov.iloc[-1]['Chg']:.2f}%)")
-        except: st.info("Data Movers belum tersedia.")
+    with c_mov:
+        st.markdown("<h3 class='text-blue'>📈 Top Movers (Blue Chips)</h3>", unsafe_allow_html=True)
+        with st.spinner("Menarik data penggerak..."):
+            try:
+                mov_list = []
+                for tk in proxy_market:
+                    try:
+                        tk_mov = br_data[tk].dropna()
+                        if len(tk_mov) >= 2:
+                            c_last, c_prev = float(tk_mov.iloc[-1]), float(tk_mov.iloc[-2])
+                            mov_list.append({"Ticker": tk.replace(".JK",""), "Chg": ((c_last-c_prev)/c_prev)*100})
+                    except: pass
+                
+                df_mov = pd.DataFrame(mov_list).sort_values("Chg", ascending=False)
+                if len(df_mov) >= 2:
+                    st.success(f"🚀 **Top Gainer:** {df_mov.iloc[0]['Ticker']} (+{df_mov.iloc[0]['Chg']:.2f}%)")
+                    st.error(f"⚠️ **Top Loser:** {df_mov.iloc[-1]['Ticker']} ({df_mov.iloc[-1]['Chg']:.2f}%)")
+            except: st.info("Data Movers belum tersedia.")
+        st.caption("🏆 **Top Movers:** Saham-saham papan atas yang memimpin persentase kenaikan dan penurunan hari ini.")
 
 
 # =========================================================================
-# 🔥 FITUR 2: AI CANDLESTICK PATTERN DETECTOR
+# 🔥 FITUR 2: NEW FITUR! AI CANDLESTICK MULTI-TIMEFRAME
 # =========================================================================
 elif menu == "🕯️ POLA CANDLE AI":
-    st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI</h2>", unsafe_allow_html=True)
-    st.caption("Mesin pendeteksi bentuk grafik terbaru untuk mencari tahu titik balik arah. Biarkan AI yang membacakan sentimen grafiknya untukmu.")
+    st.markdown(f"<h2 class='gradient-text'>Pola Candlestick AI (Multi-Timeframe)</h2>", unsafe_allow_html=True)
+    st.caption("Mesin pendeteksi bentuk grafik dari harian hingga bulanan untuk mencari tahu titik balik arah. Biarkan AI yang membacakan sentimen grafiknya untukmu.")
     with st.expander("📖 PANDUAN POLA GRAFIK", expanded=False):
         st.markdown("""
         * **Bullish Engulfing / Hammer:** Tanda perlawanan pembeli kuat di area bawah. Harga siap mantul naik! 🚀
@@ -816,14 +823,19 @@ elif menu == "🕯️ POLA CANDLE AI":
         """)
 
     with st.form("f_candle"):
-        tk_candle = st.text_input("Ketik Kode Saham", value="BBRI").upper().strip()
+        c1, c2 = st.columns(2)
+        tk_candle = c1.text_input("Ketik Kode Saham", value="BBRI").upper().strip()
+        tf_candle = c2.selectbox("Pilih Timeframe (Gambaran Besar)", ["Harian (Daily)", "Mingguan (Weekly)", "Bulanan (Monthly)"])
         btn_candle = st.form_submit_button("Deteksi Pola Sekarang", width="stretch")
         
     if btn_candle:
         with st.spinner("Mendeteksi anatomi grafik terakhir..."):
             try:
                 full_tk = f"{tk_candle}.JK" if not tk_candle.endswith(".JK") else tk_candle
-                df_c = yf.download(full_tk, period="1mo", interval="1d", progress=False).dropna()
+                tf_map = {"Harian (Daily)": "1d", "Mingguan (Weekly)": "1wk", "Bulanan (Monthly)": "1mo"}
+                p_map_c = {"Harian (Daily)": "2mo", "Mingguan (Weekly)": "6mo", "Bulanan (Monthly)": "2y"}
+                
+                df_c = yf.download(full_tk, period=p_map_c[tf_candle], interval=tf_map[tf_candle], progress=False).dropna()
                 
                 if not df_c.empty and len(df_c) >= 3:
                     if isinstance(df_c.columns, pd.MultiIndex): df_c.columns = df_c.columns.get_level_values(0)
@@ -1045,6 +1057,9 @@ elif menu == "📅 SIKLUS MUSIMAN":
                     st.plotly_chart(fig_season, use_container_width=True)
             except: st.error("Data rentang waktu belum mencukupi.")
 
+# =========================================================================
+# 🔥 FITUR 3: NEW FITUR! MULTI-GURU VALUASI (CEK FUNDAMENTAL)
+# =========================================================================
 elif menu == "📟 CEK FUNDAMENTAL":
     st.markdown("""<style>.stMetric {border-left: 4px solid #2563EB !important;}</style>""", unsafe_allow_html=True)
     st.markdown(f"<h2 class='gradient-text'>Cek Laporan Fundamental</h2>", unsafe_allow_html=True)
@@ -1062,17 +1077,43 @@ elif menu == "📟 CEK FUNDAMENTAL":
                 eps, bvps, per, pbv = info.get('trailingEps', 0) or 0, info.get('bookValue', 0) or 0, info.get('trailingPE', 0) or 0, info.get('priceToBook', 0) or 0
                 roe = (info.get('returnOnEquity', 0) or 0) * 100
                 der = info.get('debtToEquity', 0) or 0
-                cr = info.get('currentRatio', 0) or 0
+                peg = info.get('pegRatio', 0) or 0
                 
                 st.markdown(f"### 🏢 {info.get('longName', target_f)}")
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("P/E RATIO", f"{per:,.2f}x"); c2.metric("PBV RATIO", f"{pbv:,.2f}x")
                 c3.metric("ROE (Profit)", f"{roe:,.2f}%"); c4.metric("DER (Utang)", f"{der:,.1f}%")
 
+                st.markdown("---")
+                st.markdown("<h4 style='color:#2563EB;'>🧠 Analisis Valuasi Multi-Guru</h4>", unsafe_allow_html=True)
+                
+                # Benjamin Graham Valuation
                 graham = math.sqrt(22.5 * eps * bvps) if (eps > 0 and bvps > 0) else 0
-                if current_price < graham: st.success(f"💡 Valuasi Saham **UNDERVALUED (Murah)**. Harga Wajar Asli Graham: Rp {graham:,.0f}")
-                else: st.error(f"💡 Valuasi Saham **OVERVALUED (Mahal)**. Harga Wajar Asli Graham: Rp {graham:,.0f}")
-            except: st.error("Data rasio tidak ditemukan.")
+                c_grah, c_lyn = st.columns(2)
+                with c_grah:
+                    st.markdown("**1. Benjamin Graham (Value Investing)**")
+                    st.caption("Fokus pada aset dan laba inti perusahaan.")
+                    if current_price < graham: st.success(f"💡 Valuasi: **MURAH (Undervalued)**\n\nHarga Wajar: Rp {graham:,.0f}")
+                    else: st.error(f"💡 Valuasi: **MAHAL (Overvalued)**\n\nHarga Wajar: Rp {graham:,.0f}")
+                
+                # Peter Lynch Valuation
+                with c_lyn:
+                    st.markdown("**2. Peter Lynch (Growth Investing)**")
+                    st.caption("Fokus pada potensi pertumbuhan bisnis (PEG Ratio).")
+                    if peg > 0 and peg <= 1:
+                        lynch_stat, lynch_col = "SANGAT MURAH (Growth Tinggi) 🚀", "success"
+                    elif peg > 1 and peg <= 1.5:
+                        lynch_stat, lynch_col = "WAJAR (Fair Value) ⚖️", "info"
+                    elif peg > 1.5:
+                        lynch_stat, lynch_col = "MAHAL (Overvalued) ⚠️", "error"
+                    else:
+                        lynch_stat, lynch_col = "Data PEG Tidak Tersedia", "warning"
+                    
+                    if lynch_col == "success": st.success(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
+                    elif lynch_col == "info": st.info(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
+                    elif lynch_col == "error": st.error(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: {peg}x")
+                    else: st.warning(f"💡 Valuasi: **{lynch_stat}**\n\nPEG Ratio: N/A")
+            except: st.error("Data rasio fundamental tidak ditemukan di server.")
 
 elif menu == "⚔️ ADU SAHAM":
     st.markdown(f"<h2 class='gradient-text'>Adu Saham (Head-to-Head)</h2>", unsafe_allow_html=True)
@@ -1133,12 +1174,12 @@ elif menu == "🌐 PETA SEKTOR":
                 st.plotly_chart(fig_sec, use_container_width=True)
 
 # =========================================================================
-# 🔥 KALKULATOR TRADING (RISIKO & AVERAGING DOWN)
+# 🔥 FITUR 4: NEW FITUR! KALKULATOR COMPOUNDING 1 MILIAR
 # =========================================================================
 elif menu == "🧮 KALKULATOR TRADING":
     st.markdown(f"<h2 class='gradient-text'>Kalkulator Manajemen Risiko</h2>", unsafe_allow_html=True)
-    st.caption("Disiplin adalah kunci. Hitung dengan matematis berapa porsi lot yang aman agar seluruh modal tidak hangus saat pasar berbalik arah.")
-    tab_risk, tab_avg = st.tabs(["🛡️ KALKULATOR RISIKO", "🛟 AVERAGING DOWN"])
+    st.caption("Disiplin adalah kunci. Hitung dengan matematis porsi lot, average down, hingga proyeksi profit masa depan Anda.")
+    tab_risk, tab_avg, tab_comp = st.tabs(["🛡️ KALKULATOR RISIKO", "🛟 AVERAGING DOWN", "📈 JALUR MENUJU 1 MILIAR"])
     
     with tab_risk:
         st.info("Hitung lot maksimal agar modal tidak habis saat terpaksa Cut Loss.")
@@ -1188,6 +1229,34 @@ elif menu == "🧮 KALKULATOR TRADING":
                 a2.metric("TOTAL KESELURUHAN LOT", f"{total_lot_akhir:,} Lot")
                 a3.metric("DANA TAMBAHAN DIPERLUKAN", f"Rp {total_modal_baru:,.0f}")
                 st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**. Jual posisi segera ketika harga mencapai titik ini.")
+                
+    with tab_comp:
+        st.info("Kalkulator Bunga Berbunga (Compounding). Hitung secara presisi kapan portofoliomu akan menembus Rp 1 Miliar!")
+        with st.form("comp_form"):
+            c1, c2 = st.columns(2)
+            p_awal = c1.number_input("Modal Awal Saat Ini (Rp)", min_value=100000, value=10000000, step=1000000)
+            r_bulan = c2.number_input("Target Profit Konsisten per Bulan (%)", min_value=0.1, max_value=100.0, value=5.0, step=0.5)
+            btn_comp = st.form_submit_button("Hitung Peta Jalan 1 Miliar", width="stretch")
+        
+        if btn_comp:
+            target_fv = 1000000000
+            if p_awal >= target_fv:
+                st.success("🎉 Luar Biasa! Anda sudah memiliki lebih dari 1 Miliar di tangan Anda!")
+            else:
+                r_decimal = r_bulan / 100
+                months_needed = math.log(target_fv / p_awal) / math.log(1 + r_decimal)
+                years = int(months_needed // 12)
+                months = int(math.ceil(months_needed % 12))
+                
+                if months == 12:
+                    years += 1
+                    months = 0
+                
+                st.markdown("---")
+                st.markdown(f"<h3 style='text-align:center; color:#2563EB;'>Pencapaian 1 Miliar Anda:</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='text-align:center; color:#10B981; font-size:3.5rem; margin-bottom:0;'>{years} Tahun {months} Bulan</h1>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.info(f"💡 Dengan modal awal **Rp {p_awal:,.0f}** dan konsistensi profit **{r_bulan}% tiap bulan** tanpa ditarik, kekuatan bunga berbunga (*compounding interest*) akan melipatgandakan aset Anda menjadi Rp 1 Miliar dalam waktu **{years} tahun {months} bulan**. Tetap disiplin dan bersabar!")
 
 elif menu == "💰 PEMBURU DIVIDEN":
     st.markdown(f"<h2 class='gradient-text'>Pemburu Dividen</h2>", unsafe_allow_html=True)
