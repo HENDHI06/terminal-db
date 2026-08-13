@@ -28,7 +28,7 @@ st.set_page_config(
 
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# --- DATABASE & AUTH FUNGSI ---
+# --- DATABASE & LOGIC FUNGSI ---
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
     for url in providers:
@@ -173,9 +173,6 @@ def update_password_db(u, new_p):
         return True
     return False
 
-# =========================================================================
-# --- FUNGSI INTI ALGORITMA TRADING (YANG SEMPAT HILANG) ---
-# =========================================================================
 @st.cache_data(ttl=86400)
 def get_sector(ticker):
     try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
@@ -261,15 +258,18 @@ def run_scan(tickers, mode):
 
             if chg < min_chg or val_tr < min_val: continue
 
-            multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
-            cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
-            cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
-            
-            tr1 = df['High'] - df['Low']
-            tr2 = (df['High'] - df['Close'].shift()).abs()
-            tr3 = (df['Low'] - df['Close'].shift()).abs()
-            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-            atr_val = float(tr.rolling(14).mean().iloc[-1])
+            if len(df) >= 14:
+                multiplier = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / (df['High'] - df['Low'] + 1e-9)
+                cmf_series = (multiplier * df['Volume']).rolling(14).sum() / df['Volume'].rolling(14).sum()
+                cmf = float(cmf_series.dropna().iloc[-1]) if not cmf_series.dropna().empty else 0
+                tr1 = df['High'] - df['Low']
+                tr2 = (df['High'] - df['Close'].shift()).abs()
+                tr3 = (df['Low'] - df['Close'].shift()).abs()
+                tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+                atr_val = float(tr.rolling(14).mean().iloc[-1])
+            else:
+                cmf = 0
+                atr_val = c_now * 0.03
                 
             if math.isnan(atr_val): atr_val = c_now * 0.03
             ideal_entry = c_now - (0.4 * atr_val)
@@ -287,19 +287,14 @@ def run_scan(tickers, mode):
             score_vol = min(100, (atr_val / c_now) * 1000)
 
             results.append({
-                "TICKER": t.replace(".JK", ""), 
-                "LAST": c_now, 
-                "CHG%": chg, 
+                "TICKER": t.replace(".JK", ""), "LAST": c_now, "CHG%": chg, 
                 "VAL(M)": (val_tr / 1_000_000), 
                 "BANDAR": "AKUMULASI" if cmf > 0 else "DISTRIBUSI",
                 "VPA_STATUS": vpa_status, "KATALIS": katalis,
                 "AI_SCORE": ai_score,
                 "SCORE_MOM": score_mom, "SCORE_BNDR": score_bndr, "SCORE_TRND": score_trnd, "SCORE_VOL": score_vol,
-                "ENTRY": ideal_entry, 
-                "TP 1": ideal_entry + (1.5 * atr_val), 
-                "TP 2": ideal_entry + (2.5 * atr_val), 
-                "EXIT/CL": ideal_entry - (1.0 * atr_val), 
-                "FULL": t
+                "ENTRY": ideal_entry, "TP 1": ideal_entry + (1.5 * atr_val), 
+                "TP 2": ideal_entry + (2.5 * atr_val), "EXIT/CL": ideal_entry - (1.0 * atr_val), "FULL": t
             })
         except: continue
     progress.empty()
@@ -571,7 +566,7 @@ if menu == "🖥️ DASHBOARD UTAMA":
     try:
         ihsg_data = yf.download("^JKSE", period="10d", interval="1d", progress=False)['Close'].dropna()
         if not ihsg_data.empty and len(ihsg_data) >= 2:
-            ihsg_last, ihsg_prev = float(ihsg_data.iloc[-1]), float(ihsg_data.iloc[-2])
+            ihsg_last, ihsg_prev = float(ihsg_data.iloc[-1].item() if isinstance(ihsg_data.iloc[-1], pd.Series) else ihsg_data.iloc[-1]), float(ihsg_data.iloc[-2].item() if isinstance(ihsg_data.iloc[-2], pd.Series) else ihsg_data.iloc[-2])
             ihsg_pct = ((ihsg_last - ihsg_prev) / ihsg_prev) * 100
             ihsg_color = "#16A34A" if ihsg_pct > 0 else "#DC2626"
             ihsg_status = "BULLISH 🚀" if ihsg_pct > 0.5 else ("BEARISH ⚠️" if ihsg_pct < -0.5 else "SIDEWAYS 💤")
@@ -583,11 +578,14 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 <p style='margin:0; font-size:14px; color:#0F172A;'>Status Pasar Terakhir: <span class='{badge_ihsg}'>{ihsg_status}</span></p>
             </div>""", unsafe_allow_html=True)
             
-            if len(ihsg_data) >= 7:
-                fig_spark = px.line(ihsg_data.tail(7), x=ihsg_data.tail(7).index, y=ihsg_data.tail(7).values)
-                fig_spark.update_traces(line_color=ihsg_color, line_width=3)
-                fig_spark.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), xaxis=dict(visible=False), yaxis=dict(visible=False), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, hovermode=False)
-                st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
+            try:
+                if len(ihsg_data) >= 7:
+                    spark_y = ihsg_data.tail(7).values.flatten()
+                    spark_x = ihsg_data.tail(7).index
+                    fig_spark = go.Figure(go.Scatter(x=spark_x, y=spark_y, mode='lines', line=dict(color=ihsg_color, width=3)))
+                    fig_spark.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), xaxis=dict(visible=False), yaxis=dict(visible=False), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, hovermode=False)
+                    st.plotly_chart(fig_spark, use_container_width=True, config={'displayModeBar': False})
+            except: pass
     except: st.warning("Sedang memproses sambungan IHSG...")
 
     with st.spinner("Memindai Kesehatan Pasar..."):
@@ -685,13 +683,9 @@ if menu == "🖥️ DASHBOARD UTAMA":
     if not df_p.empty:
         tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique()]
         try:
-            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close']
-            live_prices = {}
-            for t in tickers_jk:
-                try: live_prices[t] = float(live_prices_df[t].dropna().iloc[-1])
-                except: pass
+            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].dropna()
+            live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(live_prices_df.iloc[-1])}
         except: live_prices = {}
-        
         def calc_active(row):
             tk, bp, lots = f"{row['ticker']}.JK", row['buy_price'], row['lots']
             curr = float(live_prices.get(tk, bp))
@@ -733,8 +727,8 @@ if menu == "🖥️ DASHBOARD UTAMA":
                 val_list = []
                 for tk in proxy_market:
                     try:
-                        tk_close = br_data[tk].dropna().iloc[-1]
-                        tk_vol = vol_data_today[tk].dropna().iloc[-1]
+                        tk_close = float(br_data[tk].dropna().iloc[-1])
+                        tk_vol = float(vol_data_today[tk].dropna().iloc[-1])
                         val_tr = tk_close * tk_vol
                         if val_tr > 0: val_list.append({"Ticker": tk.replace(".JK",""), "Value": val_tr})
                     except: pass
@@ -1820,15 +1814,6 @@ elif menu == "💼 DOMPET TRADING":
 
     with tab3: 
         if 'df_h' in locals() and not df_h.empty:
-            st.markdown("### 🤖 JURNAL EVALUASI MENTOR AI")
-            
-            with st.expander("📖 CARA BACA KURVA EKUITAS", expanded=False):
-                st.markdown("""
-                * Grafik di bawah menunjukkan perjalanan saldo keuntungan/kerugian Anda dari waktu ke waktu.
-                * Jika garis biru menanjak lurus ke atas dari kiri ke kanan, berarti gaya trading Anda sangat sehat dan konsisten untung.
-                * Jika grafik bergerigi tajam ke bawah (Rollercoaster), pertimbangkan untuk mengecilkan lot Anda (lihat fitur Kelly Criterion).
-                """)
-
             df_h_sorted = df_h.sort_values('date')
             df_h_sorted['Cumulative_PnL'] = df_h_sorted['pnl'].cumsum()
             
