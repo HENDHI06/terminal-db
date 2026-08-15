@@ -19,7 +19,7 @@ import random
 import feedparser
 
 # =========================================================================
-# --- 0. CONFIG & APP SETUP ---
+# --- 0. CONFIG & PENGATURAN TEMA APLIKASI ---
 # =========================================================================
 warnings.filterwarnings("ignore", category=FutureWarning)
 st.set_page_config(
@@ -29,10 +29,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
+# Koneksi Utama ke Database Google Sheets
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
 # =========================================================================
-# --- 1. DATABASE & LOGIC FUNGSI UMUM ---
+# --- 1. FUNGSI DATABASE, LOGIN & MANAJEMEN PENGGUNA ---
 # =========================================================================
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
@@ -191,8 +192,9 @@ def update_password_db(u, new_p):
         return True
     return False
 
+
 # =========================================================================
-# --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO ---
+# --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO (API ENGINES) ---
 # =========================================================================
 @st.cache_data(ttl=86400)
 def get_sector(ticker):
@@ -270,13 +272,15 @@ def load_tickers():
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
 
+
 # =========================================================================
-# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI PEMBANTU ---
+# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI VISUALISASI ---
 # =========================================================================
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
     
+    # Standar Sensitivitas AI
     if is_crypto:
         if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 0.5, 40, 100_000, 1.0 
         elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 500_000, 1.2
@@ -440,55 +444,94 @@ def style_dataframe(val):
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* --- CUSTOM SCROLLBAR --- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* --- ANIMASI FADE-IN (SMOOTH LOAD) --- */
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
+
+/* --- LATAR BELAKANG & TEKS DASAR --- */
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
+
+/* PAKSA SEMUA TEKS JADI GELAP */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
+
+/* --- HEADING & EFEK GRADASI --- */
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #2563EB, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
-.ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
+
+/* --- EFEK 1: RUNNING TICKER TAPE --- */
+.ticker-wrap {
+    position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; 
+    background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); 
+    color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #F8FAFC; }
 @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
-.pulsing-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite; }
+
+/* --- EFEK 2: PULSING DOT ONLINE --- */
+.pulsing-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite;
+}
 @keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+/* --- EFEK 3: PILL BADGES --- */
 .badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+
+/* --- EFEK 4: TAMPILAN TAB iOS --- */
 .stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
 .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
+
+/* --- EFEK 5: SIDEBAR MENU GLASSMORPHISM --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #E2E8F0 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; }
+
+/* --- EFEK 6: KOTAK GLOWING HOVER & NEUMORPHISM --- */
+div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
+    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
+    transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; 
+}
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
+
+/* --- EFEK 7: INPUT NEUMORPHISM (INNER SHADOW 3D) --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
 input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06), 0 0 0 3px rgba(56, 189, 248, 0.2) !important; }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
+
+/* --- EFEK 8: SHIMMER SWEEP PADA TOMBOL --- */
 .stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; position: relative; overflow: hidden; }
 .stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2; }
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 .stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
 @keyframes shimmer { 100% { left: 200%; } }
+
+/* Warna Custom Teks Utility */
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
@@ -538,6 +581,7 @@ st.sidebar.markdown("<p style='font-size:12px; font-weight:700; color:#64748B; m
 zona_market = st.sidebar.selectbox("ZONA", ["🏢 ZONA SAHAM (IDX)", "🪙 ZONA KRIPTO (INDODAX)"], label_visibility="collapsed")
 st.sidebar.write("---")
 
+# Mengatur Daftar Menu Berdasarkan Zona
 if zona_market == "🏢 ZONA SAHAM (IDX)":
     menu_list = [
         "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", "🕯️ POLA CANDLE AI",         
@@ -899,7 +943,7 @@ elif menu == "🔮 PREDIKSI KRIPTO":
                         
                         final_prices = [p[-1] for p in paths]
                         prob_up = sum([1 for p in final_prices if p > last_price]) / simulations * 100
-                        st.info(f"💡 **Kesimpulan AI Kripto:** Berdasarkan perhitungan matematika probabilitas acak, ada **{prob_up:.0f}%** peluang harga koin {tk_mc} 30 hari lagi akan lebih tinggi dari harga saat ini ($ {last_price:,.4f}).")
+                        st.info(f"💡 **Kesimpulan AI Kripto:** Berdasarkan perhitungan matematika probabilitas acak, ada **{prob_up:.0f}%** peluang harga koin {tk_mc} 30 Hari lagi akan lebih tinggi dari harga saat ini ($ {last_price:,.4f}).")
                     else: st.warning("Data koin terlalu sedikit untuk disimulasikan.")
                 except Exception as e: st.error("Gagal melakukan simulasi kuantitatif kripto.")
 
@@ -1112,6 +1156,54 @@ elif menu == "🖥️ DASHBOARD UTAMA":
             st.plotly_chart(fig_fg, use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
         except: pass
+
+    st.write("---")
+
+    c_title, c_toggle = st.columns([2.5, 1.5])
+    c_title.markdown("<h3 style='margin-top:5px;' class='gradient-text'>💼 Portofolio & AI Auditor</h3>", unsafe_allow_html=True)
+    show_saldo_dash = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False, key="privasi_dash")
+    fmt_dash = lambda v: f"Rp {v:,.0f}" if show_saldo_dash else "Rp *****"
+
+    df_p = get_user_portfolio(user_now, role)
+    t_inv, t_pl = 0, 0
+    if not df_p.empty:
+        tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique() if "-" not in t] 
+        try:
+            live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].ffill().dropna()
+            live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(live_prices_df.iloc[-1])}
+        except: live_prices = {}
+        def calc_active(row):
+            tk = f"{row['ticker']}.JK" if "-" not in row['ticker'] else row['ticker']
+            bp, lots = row['buy_price'], row['lots']
+            curr = float(live_prices.get(tk, bp))
+            pengali = 100 if "-" not in row['ticker'] else 1 
+            cost, val = float(bp * lots * pengali), float(curr * lots * pengali)
+            return pd.Series([curr, cost, val, (val-cost)])
+        df_p[['Live', 'Cost', 'Value', 'P/L']] = df_p.apply(calc_active, axis=1)
+        t_inv, t_pl = df_p['Cost'].sum(), df_p['P/L'].sum()
+        
+    c1, c2, c3 = st.columns(3)
+    c1.metric("MODAL", fmt_dash(t_inv))
+    c2.metric("P/L", fmt_dash(t_pl), f"{(t_pl/t_inv*100 if t_inv!=0 else 0):.2f}%" if show_saldo_dash else "*****")
+    c3.metric("SEKARANG", fmt_dash(t_inv + t_pl))
+
+    if not df_p.empty and t_inv > 0:
+        df_p_aud = df_p[df_p['lots'] > 0].copy()
+        if not df_p_aud.empty:
+            df_p_aud['Sector'] = df_p_aud['ticker'].apply(lambda x: get_sector(f"{x}.JK") if "-" not in x else "Cryptocurrency")
+            sec_weights = df_p_aud.groupby('Sector')['Cost'].sum() / t_inv * 100
+            max_sec = sec_weights.idxmax()
+            max_w = sec_weights.max()
+            
+            if max_w > 60:
+                st.markdown(f"<div class='dash-box' style='background-color:#FEF2F2; border-left:4px solid #DC2626;'><b class='text-red'>🛡️ Peringatan Risiko:</b> {max_w:.1f}% dana menumpuk di sektor <b>{max_sec}</b>. Segera diversifikasi agar lebih aman!</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='dash-box' style='background-color:#F0FDF4; border-left:4px solid #16A34A;'><b class='text-green'>🛡️ Status Aman:</b> Diversifikasi portofoliomu sehat (Maksimal: {max_sec} {max_w:.1f}%).</div>", unsafe_allow_html=True)
+            
+            fig_pie = px.pie(df_p_aud, values='Cost', names='Sector', hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
+            fig_pie.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=2)))
+            fig_pie.update_layout(template="plotly_white", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=0, l=0, r=0), showlegend=False)
+            st.plotly_chart(fig_pie, use_container_width=True)
 
     st.write("---")
     
@@ -2045,7 +2137,10 @@ elif menu == "💼 DOMPET TRADING":
                 
                 bp = float(row['buy_price'])
                 lots = float(row['lots'])
-                curr_price = float(live_prices.get(tk_yf, bp))
+                
+                curr_price = live_prices.get(tk_yf, bp)
+                if pd.isna(curr_price): curr_price = bp
+                curr_price = float(curr_price)
                 
                 if not is_crypto:
                     cost_rp = bp * lots * 100
