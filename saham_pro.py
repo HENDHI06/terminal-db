@@ -210,6 +210,7 @@ def update_password_db(u, new_p):
         return True
     return False
 
+
 # =========================================================================
 # --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO ---
 # =========================================================================
@@ -287,44 +288,16 @@ def load_tickers():
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
 
-def fetch_live_prices(ticker_list):
-    prices = {}
-    yf_map = {t: get_yf_ticker(t) for t in ticker_list}
-    yf_tickers = list(set(yf_map.values()))
-    
-    if yf_tickers:
-        try:
-            df_dl = yf.download(yf_tickers, period="10d", interval="1d", progress=False, threads=True)
-            if 'Close' in df_dl:
-                close_data = df_dl['Close']
-                for raw_t, yf_t in yf_map.items():
-                    try:
-                        if isinstance(close_data, pd.DataFrame) and yf_t in close_data.columns:
-                            s = close_data[yf_t].dropna()
-                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
-                        elif isinstance(close_data, pd.Series):
-                            s = close_data.dropna()
-                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
-                    except: pass
-        except: pass
-        
-    for raw_t, yf_t in yf_map.items():
-        if raw_t not in prices or pd.isna(prices[raw_t]) or prices[raw_t] == 0:
-            try:
-                tk_obj = yf.Ticker(yf_t)
-                p = tk_obj.fast_info.get('lastPrice')
-                if p and not math.isnan(p) and p > 0:
-                    prices[raw_t] = float(p)
-                else:
-                    hist = tk_obj.history(period="5d")
-                    if not hist.empty and 'Close' in hist:
-                        prices[raw_t] = float(hist['Close'].dropna().iloc[-1])
-            except: pass
-    return prices
 
 # =========================================================================
-# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI PEMBANTU ---
+# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI FORMATTING ---
 # =========================================================================
+def format_rupiah_bersih(val):
+    if pd.isna(val): return "Rp 0"
+    if val < 10: return f"Rp {val:,.4f}"
+    elif val < 1000: return f"Rp {val:,.2f}"
+    else: return f"Rp {val:,.0f}"
+
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
@@ -450,18 +423,15 @@ def get_trend_signals(ticker_list):
     return signals
 
 def draw_mobile_cards(df, is_crypto=False):
-    prefix = "$" if is_crypto else "Rp"
     for _, row in df.iterrows():
         chg, chg_color = row.get('CHG%', 0), "#16A34A" if row.get('CHG%', 0) > 0 else "#DC2626"
         val_last, val_entry = row.get('LAST', 0), row.get('ENTRY', row.get('Entry', row.get('LAST', 0)))
         val_tp1, val_cl, val_m = row.get('TP 1', 0), row.get('EXIT/CL', 0), row.get('VAL(M)', 0)
 
-        if is_crypto and val_last < 1: 
-            fmt_p = f"{prefix} {val_last:.4f}"
-            fmt_e, fmt_tp, fmt_cl = f"{prefix} {val_entry:.4f}", f"{prefix} {val_tp1:.4f}", f"{prefix} {val_cl:.4f}"
-        else:
-            fmt_p = f"{prefix} {val_last:,.2f}" if is_crypto else f"{prefix} {val_last:,.0f}"
-            fmt_e, fmt_tp, fmt_cl = f"{prefix} {val_entry:,.2f}", f"{prefix} {val_tp1:,.2f}", f"{prefix} {val_cl:,.2f}"
+        fmt_p = format_rupiah_bersih(val_last)
+        fmt_e = format_rupiah_bersih(val_entry)
+        fmt_tp = format_rupiah_bersih(val_tp1)
+        fmt_cl = format_rupiah_bersih(val_cl)
 
         st.markdown(f"""
         <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
@@ -471,7 +441,7 @@ def draw_mobile_cards(df, is_crypto=False):
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #64748B;">
                 <div>Harga Berjalan: <b style="color:#0F172A;">{fmt_p}</b></div>
-                <div>Transaksi Vol: <b style="color:#0F172A;">{val_m:,.1f} M</b></div>
+                <div>Transaksi Vol: <b style="color:#0F172A;">Rp {val_m:,.1f} M</b></div>
                 <div style="color: #2563EB; font-weight: 600;">Antre Beli: {fmt_e}</div>
                 <div style="color: #16A34A; font-weight: 600;">Jual Untung: {fmt_tp}</div>
                 <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): {fmt_cl}</div>
@@ -492,80 +462,55 @@ def style_dataframe(val):
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
-
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
-
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
-
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
-
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #2563EB, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
-
-.ticker-wrap {
-    position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; 
-    background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); 
-    color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-}
+.ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #F8FAFC; }
 @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
-
-.pulsing-dot {
-    display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite;
-}
+.pulsing-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite; }
 @keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-
 .badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
-
 .stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
 .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
-
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #E2E8F0 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
-
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
-    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
-}
-div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
-    transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; 
-}
+div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; }
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
-
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
 input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06), 0 0 0 3px rgba(56, 189, 248, 0.2) !important; }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
-
 .stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; position: relative; overflow: hidden; }
 .stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2; }
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 .stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
 @keyframes shimmer { 100% { left: 200%; } }
-
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
@@ -615,7 +560,6 @@ st.sidebar.markdown("<p style='font-size:12px; font-weight:700; color:#64748B; m
 zona_market = st.sidebar.selectbox("ZONA", ["🏢 ZONA SAHAM (IDX)", "🪙 ZONA KRIPTO (INDODAX)"], label_visibility="collapsed")
 st.sidebar.write("---")
 
-# Mengatur Daftar Menu Berdasarkan Zona
 if zona_market == "🏢 ZONA SAHAM (IDX)":
     menu_list = [
         "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", "🕯️ POLA CANDLE AI",         
@@ -629,7 +573,7 @@ else:
         "⚔️ ADU KRIPTO", "🌐 PETA KRIPTO"
     ]
 
-# MENU UNIVERSAL (Selalu Ada di Bawah Kedua Zona)
+# MENU UNIVERSAL
 menu_list.append("🧮 KALKULATOR TRADING")
 menu_list.append("💼 DOMPET TRADING")
 menu_list.append("🔒 KEAMANAN")
@@ -798,6 +742,11 @@ elif menu == "🚀 RADAR ALTCOIN":
                 val_last, val_entry = row.get('LAST', 0), row.get('ENTRY', 0)
                 val_tp1, val_cl, val_m = row.get('TP 1', 0), row.get('EXIT/CL', 0), row.get('VAL(M)', 0)
 
+                fmt_p = format_rupiah_bersih(val_last)
+                fmt_e = format_rupiah_bersih(val_entry)
+                fmt_tp = format_rupiah_bersih(val_tp1)
+                fmt_cl = format_rupiah_bersih(val_cl)
+
                 st.markdown(f"""
                 <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -805,11 +754,11 @@ elif menu == "🚀 RADAR ALTCOIN":
                         <span style="color: {chg_color}; font-weight: 700; font-family: 'JetBrains Mono';">{'+' if chg>0 else ''}{chg:.2f}%</span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 0.85rem; color: #64748B;">
-                        <div>Harga Berjalan: <b style="color:#0F172A;">Rp {val_last:,.0f}</b></div>
+                        <div>Harga Berjalan: <b style="color:#0F172A;">{fmt_p}</b></div>
                         <div>Transaksi Vol: <b style="color:#0F172A;">Rp {val_m:,.1f} M</b></div>
-                        <div style="color: #2563EB; font-weight: 600;">Antre Beli: Rp {float(val_entry):,.0f}</div>
-                        <div style="color: #16A34A; font-weight: 600;">Jual Untung: Rp {float(val_tp1):,.0f}</div>
-                        <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): Rp {float(val_cl):,.0f}</div>
+                        <div style="color: #2563EB; font-weight: 600;">Antre Beli: {fmt_e}</div>
+                        <div style="color: #16A34A; font-weight: 600;">Jual Untung: {fmt_tp}</div>
+                        <div style="color: #DC2626; font-weight: 600; grid-column: span 2; text-align: center; margin-top:5px;">Jual Rugi (Cut Loss): {fmt_cl}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1055,10 +1004,17 @@ elif menu == "⚔️ ADU KRIPTO":
                 
                 if data1 and data2:
                     st.markdown(f"<h2 style='text-align:center; color:#2563EB;'>{tk1} <span style='color:#DC2626;'>VS</span> {tk2}</h2>", unsafe_allow_html=True)
+                    
+                    last1, high1, low1 = float(data1.get('last',0)), float(data1.get('high',0)), float(data1.get('low',0))
+                    last2, high2, low2 = float(data2.get('last',0)), float(data2.get('high',0)), float(data2.get('low',0))
+                    
+                    chg1 = ((last1 - low1) / low1 * 100) if low1 > 0 else 0
+                    chg2 = ((last2 - low2) / low2 * 100) if low2 > 0 else 0
+                    
                     df_compare = pd.DataFrame({
-                        "METRIK ANALISIS": ["Harga Terakhir (IDR)", "Harga Tertinggi 24 Jam", "Harga Terendah 24 Jam", "Total Volume (Rp)"],
-                        tk1: [f"Rp {int(data1.get('last',0)):,.0f}", f"Rp {int(data1.get('high',0)):,.0f}", f"Rp {int(data1.get('low',0)):,.0f}", f"Rp {float(data1.get('vol_idr',0))/1e9:,.1f} M"],
-                        tk2: [f"Rp {int(data2.get('last',0)):,.0f}", f"Rp {int(data2.get('high',0)):,.0f}", f"Rp {int(data2.get('low',0)):,.0f}", f"Rp {float(data2.get('vol_idr',0))/1e9:,.1f} M"] 
+                        "METRIK ANALISIS": ["Harga Terakhir (Rp)", "Harga Tertinggi 24 Jam (Rp)", "Tingkat Kenaikan (24 Jam)", "Total Volume (Rp)"],
+                        tk1: [format_rupiah_bersih(last1), format_rupiah_bersih(high1), f"{chg1:+.2f}%", f"Rp {float(data1.get('vol_idr',0))/1e9:,.1f} M"],
+                        tk2: [format_rupiah_bersih(last2), format_rupiah_bersih(high2), f"{chg2:+.2f}%", f"Rp {float(data2.get('vol_idr',0))/1e9:,.1f} M"] 
                     })
                     st.table(df_compare.set_index("METRIK ANALISIS"))
                 else: st.error("Salah satu koin tidak ditemukan di pasar Indodax.")
@@ -1076,26 +1032,22 @@ elif menu == "🌐 PETA KRIPTO":
         """)
         
     if st.button("Pantau Pergerakan Kripto Terkini", use_container_width=True):
-        with st.spinner("Memetakan arus Dolar..."):
+        with st.spinner("Memetakan arus Rupiah di Indodax..."):
             coin_data = []
             coins = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "PEPE", "SHIB", "AVAX"]
-            all_tickers = [f"{c}-USD" for c in coins]
-            try:
-                data_full = yf.download(all_tickers, period="5d", interval="1d", progress=False)
-                if isinstance(data_full.columns, pd.MultiIndex):
-                    data_close = data_full['Close']
-                else:
-                    data_close = data_full
-                    
-                for c, t in zip(coins, all_tickers):
+            indo_tickers = get_indodax_tickers()
+            
+            for c in coins:
+                pair = f"{c.lower()}_idr"
+                if pair in indo_tickers:
                     try:
-                        tk_data = data_close[t].dropna()
-                        if len(tk_data) >= 2:
-                            c_now, c_prev = float(tk_data.iloc[-1]), float(tk_data.iloc[-2])
-                            sec_changes = ((c_now - c_prev) / c_prev) * 100
-                            coin_data.append({"Koin": c, "Perubahan (%)": round(sec_changes, 2)})
+                        data = indo_tickers[pair]
+                        last_p = float(data.get('last', 0))
+                        low_p = float(data.get('low', last_p)) # Proksi perubahan harian
+                        if low_p > 0:
+                            chg_pct = ((last_p - low_p) / low_p) * 100
+                            coin_data.append({"Koin": c, "Perubahan (%)": round(chg_pct, 2)})
                     except: pass
-            except Exception as e: pass
             
             if coin_data:
                 df_sec = pd.DataFrame(coin_data).sort_values(by="Perubahan (%)", ascending=False)
@@ -1103,7 +1055,7 @@ elif menu == "🌐 PETA KRIPTO":
                 fig_sec.update_layout(template="plotly_white", height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig_sec, use_container_width=True)
             else:
-                st.warning("Gagal menarik data. Server Yahoo Finance (Satelit Kripto) mungkin sedang sibuk atau menolak koneksi.")
+                st.warning("Gagal menarik data. Server Indodax mungkin sedang sibuk atau menolak koneksi.")
 
 
 # =========================================================================
@@ -1229,8 +1181,8 @@ elif menu == "🖥️ DASHBOARD UTAMA":
                     'bar': {'color': fg_color, 'thickness': 0.3}, 'bgcolor': "#FFFFFF",
                     'steps': [
                         {'range': [0, 30], 'color': "rgba(239, 68, 68, 0.15)"}, {'range': [30, 45], 'color': "rgba(245, 158, 11, 0.15)"},
-                        {'range': [45, 55], 'color': "rgba(56, 189, 248, 0.15)"}, {'range': [55, 75], 'color': "rgba(16, 185, 129, 0.15)"},
-                        {'range': [75, 100], 'color': "rgba(5, 150, 105, 0.15)"}],
+                        {'range': [45, 55], 'color': "rgba(56, 189, 248, 0.15)"}, {'range': [55, 70], 'color': "rgba(16, 185, 129, 0.15)"},
+                        {'range': [70, 100], 'color': "rgba(5, 150, 105, 0.15)"}],
                 }
             ))
             fig_fg.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)")
@@ -2010,11 +1962,11 @@ elif menu == "🧮 KALKULATOR TRADING":
         st.info("Hitung lot/unit maksimal agar modal tidak habis saat terpaksa Cut Loss.")
         with st.form("risk_calc_form"):
             c1, c2 = st.columns(2)
-            capital = c1.number_input("Modal Trading Disiapkan (Rp / $)", min_value=100.0, value=10000000.0, step=50000.0)
-            risk_pct = c2.number_input("Toleransi Rugi Maksimal (%)", min_value=0.1, max_value=10.0, value=2.0, step=0.1)
+            capital = c1.number_input("Modal Trading Disiapkan (Rp)", min_value=100.0, value=10000000.0, step=50000.0, format="%g")
+            risk_pct = c2.number_input("Toleransi Rugi Maksimal (%)", min_value=0.1, max_value=10.0, value=2.0, step=0.1, format="%g")
             c3, c4 = st.columns(2)
-            entry_p = c3.number_input("Rencana Harga Beli / Entry (Rp / $)", min_value=0.0001, value=5000.0)
-            stop_loss_p = c4.number_input("Batas Harga Cut Loss (Rp / $)", min_value=0.0001, value=4800.0)
+            entry_p = c3.number_input("Rencana Harga Beli / Entry (Rp)", min_value=1.0, value=5000.0, step=100.0, format="%g")
+            stop_loss_p = c4.number_input("Batas Harga Cut Loss (Rp)", min_value=1.0, value=4800.0, step=100.0, format="%g")
             calc_btn = st.form_submit_button("Kalkulasi Lot/Unit Aman", width="stretch")
             
         if calc_btn:
@@ -2027,23 +1979,23 @@ elif menu == "🧮 KALKULATOR TRADING":
                 st.markdown("---")
                 m1, m2, m3 = st.columns(3)
                 if zona_market == "🏢 ZONA SAHAM (IDX)":
-                    m1.metric("BELI MAKSIMAL", f"{total_lots:,} Lot")
+                    m1.metric("BELI MAKSIMAL", f"{total_lots:,.0f} Lot")
                     m2.metric("MODAL DIBUTUHKAN", f"Rp {actual_shares * entry_p:,.0f}")
                     m3.metric("UANG HILANG (JIKA CL)", f"Rp {actual_shares * risk_per_share:,.0f}", delta_color="inverse")
                 else:
                     m1.metric("BELI MAKSIMAL", f"{total_lots:,.4f} Unit")
-                    m2.metric("MODAL DIBUTUHKAN", f"$ {actual_shares * entry_p:,.2f}")
-                    m3.metric("UANG HILANG (JIKA CL)", f"$ {actual_shares * risk_per_share:,.2f}", delta_color="inverse")
+                    m2.metric("MODAL DIBUTUHKAN", f"Rp {actual_shares * entry_p:,.0f}")
+                    m3.metric("UANG HILANG (JIKA CL)", f"Rp {actual_shares * risk_per_share:,.0f}", delta_color="inverse")
                 
     with tab_avg:
         st.info("Penyelamat portofolio: Hitung lot/unit tambahan yang diperlukan untuk menurunkan beban harga rata-rata pada posisi yang menyangkut (Average Down).")
         with st.form("avg_calc_form"):
             c1, c2 = st.columns(2)
-            p1 = c1.number_input("Harga Tersangkut (Atas)", min_value=0.0001, value=1000.0)
-            l1 = c2.number_input("Jumlah Lot/Unit Nyangkut", min_value=0.0001, value=10.0)
+            p1 = c1.number_input("Harga Tersangkut (Atas)", min_value=1.0, value=1000.0, format="%g")
+            l1 = c2.number_input("Jumlah Lot/Unit Nyangkut", min_value=0.0001, value=10.0, format="%g")
             c3, c4 = st.columns(2)
-            p2 = c3.number_input("Harga Bawah Saat Ini", min_value=0.0001, value=800.0)
-            l2 = c4.number_input("Rencana Pembelian Baru", min_value=0.0001, value=20.0)
+            p2 = c3.number_input("Harga Bawah Saat Ini", min_value=1.0, value=800.0, format="%g")
+            l2 = c4.number_input("Rencana Pembelian Baru", min_value=0.0001, value=20.0, format="%g")
             calc_avg_btn = st.form_submit_button("Hitung Harga Penyelamatan", width="stretch")
             
         if calc_avg_btn:
@@ -2063,17 +2015,17 @@ elif menu == "🧮 KALKULATOR TRADING":
                     a3.metric("DANA TAMBAHAN DIPERLUKAN", f"Rp {total_modal_baru:,.0f}")
                     st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**. Jual posisi segera ketika harga mencapai titik ini.")
                 else:
-                    a1.metric("HARGA BEP BARU", f"$ {new_avg:,.4f}")
+                    a1.metric("HARGA BEP BARU", f"Rp {new_avg:,.0f}")
                     a2.metric("TOTAL KESELURUHAN UNIT", f"{total_lot_akhir:,.4f} Unit")
-                    a3.metric("DANA TAMBAHAN DIPERLUKAN", f"$ {total_modal_baru:,.2f}")
-                    st.success(f"Harga rata-ratamu berhasil turun ke level aman **$ {new_avg:,.4f}**.")
+                    a3.metric("DANA TAMBAHAN DIPERLUKAN", f"Rp {total_modal_baru:,.0f}")
+                    st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**.")
                 
     with tab_comp:
         st.info("Kalkulator Bunga Berbunga (Compounding). Hitung secara presisi kapan portofoliomu akan menembus Rp 1 Miliar!")
         with st.form("comp_form"):
             c1, c2 = st.columns(2)
-            p_awal = c1.number_input("Modal Awal Saat Ini (Rp)", min_value=100000, value=10000000, step=1000000)
-            r_bulan = c2.number_input("Target Profit Konsisten per Bulan (%)", min_value=0.1, max_value=100.0, value=5.0, step=0.5)
+            p_awal = c1.number_input("Modal Awal Saat Ini (Rp)", min_value=100000.0, value=10000000.0, step=1000000.0, format="%g")
+            r_bulan = c2.number_input("Target Profit Konsisten per Bulan (%)", min_value=0.1, max_value=100.0, value=5.0, step=0.5, format="%g")
             btn_comp = st.form_submit_button("Hitung Peta Jalan 1 Miliar", width="stretch")
         
         if btn_comp:
@@ -2099,8 +2051,8 @@ elif menu == "🧮 KALKULATOR TRADING":
     with tab_kelly:
         with st.form("kelly_form"):
             c1, c2 = st.columns(2)
-            w_rate = c1.number_input("Win Rate Trading Anda (%) (Lihat Jurnal AI)", min_value=1.0, max_value=100.0, value=55.0)
-            rr_ratio = c2.number_input("Risk/Reward Ratio (Misal 2 untuk target cuan 2x lipat dari risiko cut loss)", min_value=0.1, max_value=10.0, value=2.0)
+            w_rate = c1.number_input("Win Rate Trading Anda (%) (Lihat Jurnal AI)", min_value=1.0, max_value=100.0, value=55.0, format="%g")
+            rr_ratio = c2.number_input("Risk/Reward Ratio (Misal 2 untuk target cuan 2x lipat dari risiko cut loss)", min_value=0.1, max_value=10.0, value=2.0, format="%g")
             btn_kelly = st.form_submit_button("Hitung Batas Maksimal Pembelian", width="stretch")
             
         if btn_kelly:
@@ -2124,14 +2076,13 @@ elif menu == "💼 DOMPET TRADING":
     st.markdown(f"<h2 class='gradient-text'>Dompet Omni-Wallet & AI Jurnal</h2>", unsafe_allow_html=True)
     with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
         st.markdown("""
-        **Sistem Akumulasi Kekayaan Pintar (Saham + Kripto):**
-        * Jika membeli Saham, ketik kodenya (`BBCA`) dan Harga Dasar Beli dalam Rupiah (misal: 10000). Satuan otomatis dihitung Lot (x100 lembar).
-        * Jika membeli Kripto, WAJIB gunakan format Dolar seperti `BTC-USD` atau `PEPE-USD`. Masukkan harga beli dalam Dolar (misal: 60000.50) dan satuan Koin.
-        * **Kecerdasan AI:** Sistem akan menarik nilai tukar (Kurs) Dolar ke Rupiah hari ini secara live, mengubah profit Kripto Anda ke Rupiah, lalu menggabungkannya dengan aset saham Anda menjadi **Total Kekayaan Bersih**.
+        **Sistem Akumulasi Kekayaan Pintar (Saham + Kripto 100% Rupiah):**
+        * **Saham:** Ketik kodenya (`BBCA`), Beli & Live dalam **Rupiah**, Satuan **Lot**.
+        * **Kripto Indodax:** Ketik kodenya (`CEL`, `BTC`, `PEPE`), Beli & Live otomatis 100% **Rupiah**, Satuan **Unit**.
         """)
         
     c_title, c_toggle = st.columns([3, 1])
-    show_saldo = c_toggle.checkbox("👁️ Penampakan Saldo", value=False)
+    show_saldo = c_toggle.checkbox("👁️ Tampilkan Saldo", value=False)
     format_privacy = lambda v: f"Rp {v:,.0f}" if show_saldo else "Rp *****"
 
     tab1, tab2, tab3 = st.tabs(["📈 KEPEMILIKAN ASET", "📜 RIWAYAT", "📊 AUDIT AI JURNAL"])
@@ -2140,55 +2091,74 @@ elif menu == "💼 DOMPET TRADING":
         with st.expander("➕ DAFTARKAN PEMBELIAN ASET BARU", expanded=False):
             with st.form("form_add_portfolio", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                t_in = c1.text_input("Kode Saham/Kripto (Cth: BBCA atau BTC-USD)")
-                l_in = c2.number_input("Besaran Lot Saham / Unit Koin?", min_value=0.000001, value=1.0, format="%.6f")
+                t_in = c1.text_input("Kode Saham/Kripto (Cth: BBCA atau BTC)").upper().strip()
+                l_in = c2.number_input("Besaran Lot (Saham) / Unit (Kripto)", min_value=0.000001, value=1.0, step=1.0, format="%g")
+                
                 c3, c4 = st.columns(2)
-                p_in = c3.number_input("Harga Dasar Beli (Rp utk Saham / $ u/ Kripto)", min_value=0.000001, value=100.0, format="%.6f")
+                p_in = c3.number_input("Harga Dasar Beli (FULL RUPIAH)", min_value=0.000001, value=1000.0, step=100.0, format="%g")
                 strat_in = c4.selectbox("Faktor Justifikasi Beli?", ["Golden Cross MA", "Breakout Resistance", "Serok Bawah (Support)", "Ikut Berita", "Fundamental Bagus", "Feeling / FOMO"])
+                
                 if st.form_submit_button("MASUKKAN DALAM SISTEM", width="stretch"):
                     if t_in and p_in > 0: 
                         add_to_portfolio(user_now, t_in, p_in, l_in, 0, 0, strat_in)
-                        st.success("Berkas Berhasil Tersimpan di Cloud!"); st.rerun()
+                        st.success("Aset Berhasil Tersimpan di Cloud!"); st.rerun()
 
         df_p = get_user_portfolio(user_now, role)
         if not df_p.empty:
-            try:
-                kurs_idr = float(yf.download("IDR=X", period="1d", progress=False)['Close'].iloc[-1])
-            except:
-                kurs_idr = 15500.0 
-                
-            tickers_raw = df_p['ticker'].unique().tolist()
+            indo_tickers = get_indodax_tickers()
             
-            # --- PENARIKAN HARGA LIVE ANTI-GAGAL DAN SMART DETECTOR ---
-            live_prices = fetch_live_prices(tickers_raw)
+            saham_tickers = [f"{t}.JK" for t in df_p['ticker'].unique() if not is_crypto_ticker(t)]
+            live_prices_saham = {}
+            if saham_tickers:
+                try:
+                    df_dl = yf.download(saham_tickers, period="5d", progress=False, threads=True)['Close']
+                    for st_tk in saham_tickers:
+                        try:
+                            s = df_dl[st_tk].dropna() if isinstance(df_dl, pd.DataFrame) else df_dl.dropna()
+                            if not s.empty: live_prices_saham[st_tk] = float(s.iloc[-1])
+                        except: pass
+                except: pass
 
-            def calc_omni_active(row):
-                tk_asli = row['ticker']
-                is_cr = is_crypto_ticker(tk_asli)
+            def calc_omni_active_idr(row):
+                tk_asli = row['ticker'].strip().upper()
+                clean_t = tk_asli.lower() + "_idr"
+                is_crypto = is_crypto_ticker(tk_asli)
                 
-                bp = float(row['buy_price'])
+                bp_rp = float(row['buy_price'])
                 lots = float(row['lots'])
                 
-                curr_price = live_prices.get(tk_asli, bp)
-                if pd.isna(curr_price) or curr_price <= 0: curr_price = bp
-                curr_price = float(curr_price)
-                
-                if not is_cr:
-                    cost_rp = bp * lots * 100
-                    val_rp = curr_price * lots * 100
+                if is_crypto:
+                    curr_price_rp = float(indo_tickers.get(clean_t, {}).get('last', 0))
+                    
+                    if curr_price_rp == 0:
+                        try:
+                            yf_usd = float(yf.Ticker(f"{tk_asli}-USD").fast_info.get('lastPrice', 0))
+                            if yf_usd > 0: curr_price_rp = yf_usd * 15500
+                            else: curr_price_rp = bp_rp
+                        except: curr_price_rp = bp_rp
+                        
+                    cost_rp = bp_rp * lots
+                    val_rp = curr_price_rp * lots
                 else:
-                    cost_usd = bp * lots
-                    val_usd = curr_price * lots
-                    cost_rp = cost_usd * kurs_idr
-                    val_rp = val_usd * kurs_idr
+                    tk_yf = f"{tk_asli}.JK"
+                    curr_price_rp = float(live_prices_saham.get(tk_yf, 0))
+                    
+                    if curr_price_rp == 0:
+                        try:
+                            p_info = yf.Ticker(tk_yf).fast_info.get('lastPrice', 0)
+                            if p_info > 0: curr_price_rp = float(p_info)
+                            else: curr_price_rp = bp_rp
+                        except: curr_price_rp = bp_rp
+                        
+                    cost_rp = bp_rp * lots * 100
+                    val_rp = curr_price_rp * lots * 100
                     
                 pnl_rp = val_rp - cost_rp
-                return pd.Series([curr_price, cost_rp, val_rp, pnl_rp])
+                return pd.Series([curr_price_rp, cost_rp, val_rp, pnl_rp, is_crypto])
 
-            df_p[['Live', 'Cost_IDR', 'Value_IDR', 'PnL_IDR']] = df_p.apply(calc_omni_active, axis=1)
+            df_p[['Live_Rp', 'Cost_IDR', 'Value_IDR', 'PnL_IDR', 'Is_Crypto']] = df_p.apply(calc_omni_active_idr, axis=1)
             t_inv_rp, t_pl_rp = df_p['Cost_IDR'].sum(), df_p['PnL_IDR'].sum()
             
-            st.markdown(f"<div style='text-align:center;'><p style='margin:0; font-size:12px; color:#64748B;'>Estimasi Kurs USD: Rp {kurs_idr:,.0f}</p></div>", unsafe_allow_html=True)
             m1, m2, m3 = st.columns(3)
             m1.metric("TOTAL MODAL (Rp)", format_privacy(t_inv_rp))
             m2.metric("TOTAL CUAN/RUGI (Rp)", format_privacy(t_pl_rp), f"{(t_pl_rp/t_inv_rp*100 if t_inv_rp!=0 else 0):.2f}%" if show_saldo else "*****")
@@ -2197,17 +2167,16 @@ elif menu == "💼 DOMPET TRADING":
             st.markdown("---")
             for i, row in df_p.iterrows():
                 strat_label = row.get('strategy', 'Bebas')
-                is_cr = is_crypto_ticker(row['ticker'])
+                is_cr = row['Is_Crypto']
                 satuan = "Unit" if is_cr else "Lot"
-                simbol_uang = "$" if is_cr else "Rp"
+                
                 bp_val = float(row['buy_price'])
-                live_val = float(row['Live'])
+                live_val = float(row['Live_Rp'])
                 pnl_val = float(row['PnL_IDR'])
                 
                 pct_val = (pnl_val / row['Cost_IDR'] * 100) if row['Cost_IDR'] > 0 else 0
                 sign_str = "+" if pnl_val > 0 else ""
                 
-                # Format Judul Bersih Tanpa Desimal Panjang
                 fmt_qty = f"{row['lots']:.4f}" if is_cr else f"{row['lots']:.0f}"
                 icon = "🪙" if is_cr else "🏢"
                 title_text = f"{icon} {row['ticker']} | {fmt_qty} {satuan} | Beli: Rp {bp_val:,.0f} | Live: Rp {live_val:,.0f} | Profit: {sign_str}Rp {pnl_val:,.0f} ({sign_str}{pct_val:.2f}%)"
@@ -2217,9 +2186,8 @@ elif menu == "💼 DOMPET TRADING":
                     st.write("")
                     c_price, c_lots, c_btn = st.columns([2, 2, 1])
                     
-                    fmt_input = "%.4f" if is_cr else "%.0f"
-                    s_price = c_price.number_input(f"Eksekusi Jual di Harga ({simbol_uang})", value=live_val, format=fmt_input, key=f"s_prc_{row['id']}")
-                    s_lots = c_lots.number_input(f"Berapa {satuan} Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), format=fmt_input, key=f"s_lot_{row['id']}")
+                    s_price = c_price.number_input("Harga Jual (Rp)", value=float(live_val), step=100.0, format="%g", key=f"s_prc_{row['id']}")
+                    s_lots = c_lots.number_input(f"Jumlah Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), step=1.0, format="%g", key=f"s_lot_{row['id']}")
                     
                     if c_btn.button("LIKUIDASI", key=f"btn_s_{row['id']}", use_container_width=True):
                         st.toast(sell_position(user_now, row['id'], row['ticker'], row['buy_price'], s_price, row['lots'], s_lots)); time.sleep(1); st.rerun()
@@ -2235,8 +2203,7 @@ elif menu == "💼 DOMPET TRADING":
                     c_t, c_b = st.columns([4,1])
                     c_t.write(f"Dasar Strategi: **{h_row.get('strategy', 'Tidak Terekam')}**")
                     satuan_h = "Unit" if is_crypto_ticker(h_row['ticker']) else "Lot"
-                    uang_h = "$" if is_crypto_ticker(h_row['ticker']) else "Rp"
-                    c_t.write(f"Avg Beli: {uang_h} {h_row['buy_price']:,.4f} | Avg Jual: {uang_h} {h_row['sell_price']:,.4f} | Pelepasan: {h_row['lots']} {satuan_h} | Profit: {format_privacy(h_row['pnl'])}")
+                    c_t.write(f"Avg Beli: Rp {h_row['buy_price']:,.0f} | Avg Jual: Rp {h_row['sell_price']:,.0f} | Pelepasan: {h_row['lots']} {satuan_h} | Profit: {format_privacy(h_row['pnl'])}")
                     if c_b.button("🗑️ Hapus Bukti", key=f"del_h_{h_row['id']}"):
                         df_h_all = conn_gs.read(worksheet="history", ttl=0)
                         idx_del_h = df_h_all.index[df_h_all['id'] == h_row['id']].tolist()
