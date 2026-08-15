@@ -29,7 +29,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
+# Koneksi Database Google Sheets
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
+
+# Daftar Koin Kripto Populer untuk Deteksi Otomatis
+CRYPTO_SET = {
+    "BTC", "ETH", "USDT", "BNB", "SOL", "XRP", "DOGE", "ADA", "SHIB", "AVAX", 
+    "LINK", "DOT", "MATIC", "UNI", "LTC", "NEAR", "ATOM", "APT", "INJ", "OP", 
+    "RNDR", "ARB", "GALA", "FET", "PEPE", "WIF", "FLOKI", "BONK", "CEL", "SUI", 
+    "TON", "NOT", "RENDER", "TRX", "XLM", "ETC", "BCH", "FIL", "LDO", "TIA", "SEI"
+}
+
+def is_crypto_ticker(t):
+    clean_t = str(t).strip().upper().replace(".JK", "").replace("-USD", "")
+    return ("-" in str(t)) or (clean_t in CRYPTO_SET) or (str(t).upper().endswith("USD"))
+
+def get_yf_ticker(t):
+    clean_t = str(t).strip().upper().replace(".JK", "").replace("-USD", "")
+    if is_crypto_ticker(t):
+        return f"{clean_t}-USD"
+    else:
+        return f"{clean_t}.JK"
 
 # =========================================================================
 # --- 1. DATABASE & LOGIC FUNGSI UMUM ---
@@ -91,9 +111,8 @@ def add_to_portfolio(u, t, p, l, tp, cl, strategy="Bebas"):
     conn_gs.update(worksheet="portfolio", data=df)
 
 def sell_position(u, row_id, ticker, buy_p, sell_p, total_lots, sold_lots):
-    pnl = (sell_p - buy_p) * sold_lots * 100 
-    if "-" in ticker or "IDR" in ticker: 
-        pnl = (sell_p - buy_p) * sold_lots 
+    is_cr = is_crypto_ticker(ticker)
+    pnl = (sell_p - buy_p) * sold_lots if is_cr else (sell_p - buy_p) * sold_lots * 100
     
     df_port = conn_gs.read(worksheet="portfolio", ttl=0)
     idx = df_port.index[df_port['id'] == row_id].tolist()
@@ -191,12 +210,15 @@ def update_password_db(u, new_p):
         return True
     return False
 
+
 # =========================================================================
 # --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO ---
 # =========================================================================
 @st.cache_data(ttl=86400)
 def get_sector(ticker):
-    try: return yf.Ticker(ticker).info.get('sector', 'Lainnya')
+    try: 
+        if is_crypto_ticker(ticker): return "Cryptocurrency"
+        return yf.Ticker(get_yf_ticker(ticker)).info.get('sector', 'Lainnya')
     except: return "Lainnya"
 
 @st.cache_data(ttl=60) 
@@ -269,6 +291,43 @@ def load_tickers():
         col = 'Kode' if 'Kode' in df.columns else df.columns[0]
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
+
+# FUNGSI PENARIKAN HARGA LIVE ANTI-GAGAL (MULTI-TIER)
+def fetch_live_prices(ticker_list):
+    prices = {}
+    yf_map = {t: get_yf_ticker(t) for t in ticker_list}
+    yf_tickers = list(set(yf_map.values()))
+    
+    if yf_tickers:
+        try:
+            df_dl = yf.download(yf_tickers, period="10d", interval="1d", progress=False, threads=True)
+            if 'Close' in df_dl:
+                close_data = df_dl['Close']
+                for raw_t, yf_t in yf_map.items():
+                    try:
+                        if isinstance(close_data, pd.DataFrame) and yf_t in close_data.columns:
+                            s = close_data[yf_t].dropna()
+                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
+                        elif isinstance(close_data, pd.Series):
+                            s = close_data.dropna()
+                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
+                    except: pass
+        except: pass
+        
+    for raw_t, yf_t in yf_map.items():
+        if raw_t not in prices or pd.isna(prices[raw_t]) or prices[raw_t] == 0:
+            try:
+                tk_obj = yf.Ticker(yf_t)
+                p = tk_obj.fast_info.get('lastPrice')
+                if p and not math.isnan(p) and p > 0:
+                    prices[raw_t] = float(p)
+                else:
+                    hist = tk_obj.history(period="5d")
+                    if not hist.empty and 'Close' in hist:
+                        prices[raw_t] = float(hist['Close'].dropna().iloc[-1])
+            except: pass
+    return prices
+
 
 # =========================================================================
 # --- 3. MESIN SCANNER UNIVERSAL & FUNGSI PEMBANTU ---
@@ -441,30 +500,24 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* --- CUSTOM SCROLLBAR --- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
-/* --- ANIMASI FADE-IN (SMOOTH LOAD) --- */
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
 
-/* --- LATAR BELAKANG & TEKS DASAR --- */
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-/* PAKSA SEMUA TEKS JADI GELAP */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
 
-/* --- HEADING & EFEK GRADASI --- */
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #2563EB, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
 
-/* --- EFEK 1: RUNNING TICKER TAPE --- */
 .ticker-wrap {
     position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; 
     background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); 
@@ -475,20 +528,17 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #F8FAFC; }
 @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
 
-/* --- EFEK 2: PULSING DOT ONLINE --- */
 .pulsing-dot {
     display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px;
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite;
 }
 @keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
 
-/* --- EFEK 3: PILL BADGES --- */
 .badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 
-/* --- EFEK 4: TAMPILAN TAB iOS --- */
 .stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
@@ -496,14 +546,12 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* --- EFEK 5: SIDEBAR MENU GLASSMORPHISM --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #E2E8F0 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
 
-/* --- EFEK 6: KOTAK GLOWING HOVER & NEUMORPHISM --- */
 div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
     background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
 }
@@ -512,7 +560,6 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
 }
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
 
-/* --- EFEK 7: INPUT NEUMORPHISM (INNER SHADOW 3D) --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
 input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06), 0 0 0 3px rgba(56, 189, 248, 0.2) !important; }
@@ -520,14 +567,12 @@ input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
 
-/* --- EFEK 8: SHIMMER SWEEP PADA TOMBOL --- */
 .stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; position: relative; overflow: hidden; }
 .stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2; }
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 .stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
 @keyframes shimmer { 100% { left: 200%; } }
 
-/* Warna Custom Teks Utility */
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
@@ -1161,16 +1206,16 @@ elif menu == "🖥️ DASHBOARD UTAMA":
     df_p = get_user_portfolio(user_now, role)
     t_inv, t_pl = 0, 0
     if not df_p.empty:
-        tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique() if "-" not in t] 
+        tickers_jk = [f"{t}.JK" for t in df_p['ticker'].unique() if not is_crypto_ticker(t)] 
         try:
             live_prices_df = yf.download(tickers_jk, period="10d", progress=False, threads=True)['Close'].ffill().dropna()
             live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_jk) > 1 else {tickers_jk[0]: float(live_prices_df.iloc[-1])}
         except: live_prices = {}
         def calc_active(row):
-            tk = f"{row['ticker']}.JK" if "-" not in row['ticker'] else row['ticker']
+            tk = get_yf_ticker(row['ticker'])
             bp, lots = row['buy_price'], row['lots']
             curr = float(live_prices.get(tk, bp))
-            pengali = 100 if "-" not in row['ticker'] else 1 
+            pengali = 1 if is_crypto_ticker(row['ticker']) else 100 
             cost, val = float(bp * lots * pengali), float(curr * lots * pengali)
             return pd.Series([curr, cost, val, (val-cost)])
         df_p[['Live', 'Cost', 'Value', 'P/L']] = df_p.apply(calc_active, axis=1)
@@ -1184,7 +1229,7 @@ elif menu == "🖥️ DASHBOARD UTAMA":
     if not df_p.empty and t_inv > 0:
         df_p_aud = df_p[df_p['lots'] > 0].copy()
         if not df_p_aud.empty:
-            df_p_aud['Sector'] = df_p_aud['ticker'].apply(lambda x: get_sector(f"{x}.JK") if "-" not in x else "Cryptocurrency")
+            df_p_aud['Sector'] = df_p_aud['ticker'].apply(lambda x: get_sector(x))
             sec_weights = df_p_aud.groupby('Sector')['Cost'].sum() / t_inv * 100
             max_sec = sec_weights.idxmax()
             max_w = sec_weights.max()
@@ -2116,40 +2161,23 @@ elif menu == "💼 DOMPET TRADING":
             except:
                 kurs_idr = 15500.0 
                 
-            tickers_raw = df_p['ticker'].unique()
-            tickers_yf = [f"{t}.JK" if "-" not in t else t for t in tickers_raw]
+            tickers_raw = df_p['ticker'].unique().tolist()
             
-            # --- PENARIKAN HARGA LIVE ANTI-DROPNA ---
-            live_prices = {}
-            if len(tickers_yf) > 0:
-                try:
-                    df_dl = yf.download(tickers_yf, period="10d", progress=False, threads=True)
-                    if 'Close' in df_dl:
-                        close_data = df_dl['Close']
-                        for t in tickers_yf:
-                            try:
-                                if isinstance(close_data, pd.DataFrame) and t in close_data.columns:
-                                    s = close_data[t].dropna()
-                                    if not s.empty: live_prices[t] = float(s.iloc[-1])
-                                elif isinstance(close_data, pd.Series):
-                                    s = close_data.dropna()
-                                    if not s.empty: live_prices[tickers_yf[0]] = float(s.iloc[-1])
-                            except: pass
-                except: pass
+            # --- PENARIKAN HARGA LIVE ANTI-GAGAL DAN SMART DETECTOR ---
+            live_prices = fetch_live_prices(tickers_raw)
 
             def calc_omni_active(row):
                 tk_asli = row['ticker']
-                tk_yf = f"{tk_asli}.JK" if "-" not in tk_asli else tk_asli
-                is_crypto = "-" in tk_asli
+                is_cr = is_crypto_ticker(tk_asli)
                 
                 bp = float(row['buy_price'])
                 lots = float(row['lots'])
                 
-                curr_price = live_prices.get(tk_yf, bp)
-                if pd.isna(curr_price): curr_price = bp
+                curr_price = live_prices.get(tk_asli, bp)
+                if pd.isna(curr_price) or curr_price <= 0: curr_price = bp
                 curr_price = float(curr_price)
                 
-                if not is_crypto:
+                if not is_cr:
                     cost_rp = bp * lots * 100
                     val_rp = curr_price * lots * 100
                 else:
@@ -2173,7 +2201,7 @@ elif menu == "💼 DOMPET TRADING":
             st.markdown("---")
             for i, row in df_p.iterrows():
                 strat_label = row.get('strategy', 'Bebas')
-                is_cr = "-" in row['ticker']
+                is_cr = is_crypto_ticker(row['ticker'])
                 satuan = "Unit" if is_cr else "Lot"
                 simbol_uang = "$" if is_cr else "Rp"
                 bp_val = float(row['buy_price'])
@@ -2210,8 +2238,8 @@ elif menu == "💼 DOMPET TRADING":
                 with st.expander(f"{h_row['date']} | {h_row['ticker']}"):
                     c_t, c_b = st.columns([4,1])
                     c_t.write(f"Dasar Strategi: **{h_row.get('strategy', 'Tidak Terekam')}**")
-                    satuan_h = "Unit" if "-" in h_row['ticker'] else "Lot"
-                    uang_h = "$" if "-" in h_row['ticker'] else "Rp"
+                    satuan_h = "Unit" if is_crypto_ticker(h_row['ticker']) else "Lot"
+                    uang_h = "$" if is_crypto_ticker(h_row['ticker']) else "Rp"
                     c_t.write(f"Avg Beli: {uang_h} {h_row['buy_price']} | Avg Jual: {uang_h} {h_row['sell_price']} | Pelepasan: {h_row['lots']} {satuan_h} | Profit: {format_privacy(h_row['pnl'])}")
                     if c_b.button("🗑️ Hapus Bukti", key=f"del_h_{h_row['id']}"):
                         df_h_all = conn_gs.read(worksheet="history", ttl=0)
