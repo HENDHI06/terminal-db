@@ -872,7 +872,7 @@ elif menu == "⚔️ ADU KRIPTO":
                 "METRIK ANALISIS": ["Harga Terakhir (IDR)", "Harga Tertinggi 24 Jam", "Harga Terendah 24 Jam", "Total Volume (Rp)"],
                 tk1: [f"Rp {int(data1.get('last',0)):,.0f}", f"Rp {int(data1.get('high',0)):,.0f}", f"Rp {int(data1.get('low',0)):,.0f}", f"Rp {float(data1.get('vol_idr',0))/1e9:,.1f} M"],
                 tk2: [f"Rp {int(data2.get('last',0)):,.0f}", f"Rp {int(data2.get('high',0)):,.0f}", f"Rp {int(data2.get('low',0)):,.0f}", f"Rp {float(data2.get('vol_idr',0))/1e9:,.1f} M}"]
-            })
+            }
             st.table(df_compare.set_index("METRIK ANALISIS"))
         else: st.error("Salah satu koin tidak ditemukan di pasar Indodax.")
 
