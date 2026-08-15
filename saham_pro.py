@@ -19,7 +19,7 @@ import random
 import feedparser
 
 # =========================================================================
-# --- 0. CONFIG & PENGATURAN TEMA APLIKASI ---
+# --- 0. CONFIG & APP SETUP ---
 # =========================================================================
 warnings.filterwarnings("ignore", category=FutureWarning)
 st.set_page_config(
@@ -29,11 +29,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# Koneksi Utama ke Database Google Sheets
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
 # =========================================================================
-# --- 1. FUNGSI DATABASE, LOGIN & MANAJEMEN PENGGUNA ---
+# --- 1. DATABASE & LOGIC FUNGSI UMUM ---
 # =========================================================================
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json', 'https://ifconfig.co/json']
@@ -192,9 +191,8 @@ def update_password_db(u, new_p):
         return True
     return False
 
-
 # =========================================================================
-# --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO (API ENGINES) ---
+# --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO ---
 # =========================================================================
 @st.cache_data(ttl=86400)
 def get_sector(ticker):
@@ -272,15 +270,13 @@ def load_tickers():
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
 
-
 # =========================================================================
-# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI VISUALISASI ---
+# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI PEMBANTU ---
 # =========================================================================
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
     
-    # Standar Sensitivitas AI
     if is_crypto:
         if mode == "Santai": min_chg, min_rsi, min_val, vol_m = 0.5, 40, 100_000, 1.0 
         elif mode == "Profesional": min_chg, min_rsi, min_val, vol_m = 1.5, 45, 500_000, 1.2
@@ -581,7 +577,6 @@ st.sidebar.markdown("<p style='font-size:12px; font-weight:700; color:#64748B; m
 zona_market = st.sidebar.selectbox("ZONA", ["🏢 ZONA SAHAM (IDX)", "🪙 ZONA KRIPTO (INDODAX)"], label_visibility="collapsed")
 st.sidebar.write("---")
 
-# Mengatur Daftar Menu Berdasarkan Zona
 if zona_market == "🏢 ZONA SAHAM (IDX)":
     menu_list = [
         "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", "🕯️ POLA CANDLE AI",         
@@ -595,7 +590,6 @@ else:
         "⚔️ ADU KRIPTO", "🌐 PETA KRIPTO"
     ]
 
-# MENU UNIVERSAL (Selalu Ada di Bawah Kedua Zona)
 menu_list.append("🧮 KALKULATOR TRADING")
 menu_list.append("💼 DOMPET TRADING")
 menu_list.append("🔒 KEAMANAN")
@@ -2083,7 +2077,7 @@ elif menu == "🧮 KALKULATOR TRADING":
                 st.success(f"💡 Pemenang Nobel Matematika menyarankan Anda untuk TIDAK menggunakan lebih dari **{kelly_pct*100:.1f}% total modal Anda** untuk 1 posisi transaksi (berdasarkan statistik pribadi Anda). Ini adalah batas pertahanan agar portofolio Anda tidak akan pernah hancur (margin call).")
 
 # =========================================================================
-# 💼 MENU UNIVERSAL 2: DOMPET TRADING (OMNI-WALLET SAHAM + KRIPTO)
+# 💼 MENU UNIVERSAL 2: DOMPET TRADING (OMNI-WALLET SAHAM + KRIPTO FIX)
 # =========================================================================
 elif menu == "💼 DOMPET TRADING":
     st.markdown(f"<h2 class='gradient-text'>Dompet Omni-Wallet & AI Jurnal</h2>", unsafe_allow_html=True)
@@ -2125,10 +2119,23 @@ elif menu == "💼 DOMPET TRADING":
             tickers_raw = df_p['ticker'].unique()
             tickers_yf = [f"{t}.JK" if "-" not in t else t for t in tickers_raw]
             
-            try:
-                live_prices_df = yf.download(tickers_yf, period="5d", progress=False, threads=True)['Close'].dropna()
-                live_prices = live_prices_df.iloc[-1].to_dict() if len(tickers_yf) > 1 else {tickers_yf[0]: float(live_prices_df.iloc[-1])}
-            except: live_prices = {}
+            # --- PENARIKAN HARGA LIVE ANTI-DROPNA ---
+            live_prices = {}
+            if len(tickers_yf) > 0:
+                try:
+                    df_dl = yf.download(tickers_yf, period="10d", progress=False, threads=True)
+                    if 'Close' in df_dl:
+                        close_data = df_dl['Close']
+                        for t in tickers_yf:
+                            try:
+                                if isinstance(close_data, pd.DataFrame) and t in close_data.columns:
+                                    s = close_data[t].dropna()
+                                    if not s.empty: live_prices[t] = float(s.iloc[-1])
+                                elif isinstance(close_data, pd.Series):
+                                    s = close_data.dropna()
+                                    if not s.empty: live_prices[tickers_yf[0]] = float(s.iloc[-1])
+                            except: pass
+                except: pass
 
             def calc_omni_active(row):
                 tk_asli = row['ticker']
@@ -2169,13 +2176,27 @@ elif menu == "💼 DOMPET TRADING":
                 is_cr = "-" in row['ticker']
                 satuan = "Unit" if is_cr else "Lot"
                 simbol_uang = "$" if is_cr else "Rp"
+                bp_val = float(row['buy_price'])
+                live_val = float(row['Live'])
+                pnl_val = float(row['PnL_IDR'])
                 
-                with st.expander(f"{'🪙' if is_cr else '🏢'} {row['ticker']} | {row['lots']} {satuan} | Profit: Rp {row['PnL_IDR']:,.0f}"):
+                pct_val = (pnl_val / row['Cost_IDR'] * 100) if row['Cost_IDR'] > 0 else 0
+                sign_str = "+" if pnl_val > 0 else ""
+                
+                # Format Tampilan Judul Expander
+                if not is_cr:
+                    title_text = f"🏢 {row['ticker']} | {row['lots']:.0f} Lot | Beli: Rp {bp_val:,.0f} | Live: Rp {live_val:,.0f} | Profit: {sign_str}Rp {pnl_val:,.0f} ({sign_str}{pct_val:.2f}%)"
+                else:
+                    title_text = f"🪙 {row['ticker']} | {row['lots']:.4f} Unit | Beli: $ {bp_val:,.4f} | Live: $ {live_val:,.4f} | Profit: {sign_str}Rp {pnl_val:,.0f} ({sign_str}{pct_val:.2f}%)"
+
+                with st.expander(title_text):
                     st.markdown(f"<span class='badge-blue'>Kategori: {strat_label}</span>", unsafe_allow_html=True)
                     st.write("")
                     c_price, c_lots, c_btn = st.columns([2, 2, 1])
-                    s_price = c_price.number_input(f"Eksekusi Jual di Harga ({simbol_uang})", value=float(row['Live']), format="%.6f", key=f"s_prc_{row['id']}")
-                    s_lots = c_lots.number_input(f"Berapa {satuan} Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), format="%.6f", key=f"s_lot_{row['id']}")
+                    
+                    fmt_input = "%.4f" if is_cr else "%.0f"
+                    s_price = c_price.number_input(f"Eksekusi Jual di Harga ({simbol_uang})", value=live_val, format=fmt_input, key=f"s_prc_{row['id']}")
+                    s_lots = c_lots.number_input(f"Berapa {satuan} Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), format=fmt_input, key=f"s_lot_{row['id']}")
                     if c_btn.button("LIKUIDASI", key=f"btn_s_{row['id']}", use_container_width=True):
                         st.toast(sell_position(user_now, row['id'], row['ticker'], row['buy_price'], s_price, row['lots'], s_lots)); time.sleep(1); st.rerun()
         else: st.info("Sistem perbendaharaan belum mencatatkan transaksi apapun.")
