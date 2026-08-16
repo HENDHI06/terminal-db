@@ -32,7 +32,7 @@ st.set_page_config(
 # Koneksi Database Google Sheets
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
 
-# Daftar Koin Kripto Populer untuk Deteksi Otomatis
+# Daftar Koin Kripto Populer untuk Deteksi Otomatis (Cadangan)
 CRYPTO_SET = {
     "BTC", "ETH", "USDT", "BNB", "SOL", "XRP", "DOGE", "ADA", "SHIB", "AVAX", 
     "LINK", "DOT", "MATIC", "UNI", "LTC", "NEAR", "ATOM", "APT", "INJ", "OP", 
@@ -210,7 +210,6 @@ def update_password_db(u, new_p):
         return True
     return False
 
-
 # =========================================================================
 # --- 2. FUNGSI PENARIKAN DATA SAHAM & KRIPTO ---
 # =========================================================================
@@ -288,16 +287,44 @@ def load_tickers():
         return [f"{str(t).strip().upper()}.JK" for t in df[col].tolist() if len(str(t)) <= 5]
     except: return []
 
+def fetch_live_prices(ticker_list):
+    prices = {}
+    yf_map = {t: get_yf_ticker(t) for t in ticker_list}
+    yf_tickers = list(set(yf_map.values()))
+    
+    if yf_tickers:
+        try:
+            df_dl = yf.download(yf_tickers, period="10d", interval="1d", progress=False, threads=True)
+            if 'Close' in df_dl:
+                close_data = df_dl['Close']
+                for raw_t, yf_t in yf_map.items():
+                    try:
+                        if isinstance(close_data, pd.DataFrame) and yf_t in close_data.columns:
+                            s = close_data[yf_t].dropna()
+                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
+                        elif isinstance(close_data, pd.Series):
+                            s = close_data.dropna()
+                            if not s.empty: prices[raw_t] = float(s.iloc[-1])
+                    except: pass
+        except: pass
+        
+    for raw_t, yf_t in yf_map.items():
+        if raw_t not in prices or pd.isna(prices[raw_t]) or prices[raw_t] == 0:
+            try:
+                tk_obj = yf.Ticker(yf_t)
+                p = tk_obj.fast_info.get('lastPrice')
+                if p and not math.isnan(p) and p > 0:
+                    prices[raw_t] = float(p)
+                else:
+                    hist = tk_obj.history(period="5d")
+                    if not hist.empty and 'Close' in hist:
+                        prices[raw_t] = float(hist['Close'].dropna().iloc[-1])
+            except: pass
+    return prices
 
 # =========================================================================
-# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI FORMATTING ---
+# --- 3. MESIN SCANNER UNIVERSAL & FUNGSI PEMBANTU ---
 # =========================================================================
-def format_rupiah_bersih(val):
-    if pd.isna(val): return "Rp 0"
-    if val < 10: return f"Rp {val:,.4f}"
-    elif val < 1000: return f"Rp {val:,.2f}"
-    else: return f"Rp {val:,.0f}"
-
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
@@ -423,15 +450,16 @@ def get_trend_signals(ticker_list):
     return signals
 
 def draw_mobile_cards(df, is_crypto=False):
+    prefix = "Rp"
     for _, row in df.iterrows():
         chg, chg_color = row.get('CHG%', 0), "#16A34A" if row.get('CHG%', 0) > 0 else "#DC2626"
         val_last, val_entry = row.get('LAST', 0), row.get('ENTRY', row.get('Entry', row.get('LAST', 0)))
         val_tp1, val_cl, val_m = row.get('TP 1', 0), row.get('EXIT/CL', 0), row.get('VAL(M)', 0)
 
-        fmt_p = format_rupiah_bersih(val_last)
-        fmt_e = format_rupiah_bersih(val_entry)
-        fmt_tp = format_rupiah_bersih(val_tp1)
-        fmt_cl = format_rupiah_bersih(val_cl)
+        fmt_p = f"{prefix} {val_last:,.0f}"
+        fmt_e = f"{prefix} {val_entry:,.0f}"
+        fmt_tp = f"{prefix} {val_tp1:,.0f}"
+        fmt_cl = f"{prefix} {val_cl:,.0f}"
 
         st.markdown(f"""
         <div class="dash-box" style="border-left: 4px solid {chg_color}; padding: 16px; border-top: 1px solid #E2E8F0 !important;">
@@ -462,55 +490,94 @@ def style_dataframe(val):
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* --- CUSTOM SCROLLBAR --- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* --- ANIMASI FADE-IN (SMOOTH LOAD) --- */
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
+
+/* --- LATAR BELAKANG & TEKS DASAR --- */
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
+
+/* PAKSA SEMUA TEKS JADI GELAP */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
+
+/* --- HEADING & EFEK GRADASI --- */
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #0F172A !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #2563EB, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #64748B !important; }
-.ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
+
+/* --- EFEK 1: RUNNING TICKER TAPE --- */
+.ticker-wrap {
+    position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; 
+    background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); 
+    color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #F8FAFC; }
 @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
-.pulsing-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite; }
+
+/* --- EFEK 2: PULSING DOT ONLINE --- */
+.pulsing-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite;
+}
 @keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+/* --- EFEK 3: PILL BADGES --- */
 .badge-green { background-color: #D1FAE5; color: #065F46; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-red { background-color: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-blue { background-color: #DBEAFE; color: #1E40AF; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
 .badge-gray { background-color: #F1F5F9; color: #475569; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; display: inline-block;}
+
+/* --- EFEK 4: TAMPILAN TAB iOS --- */
 .stTabs [data-baseweb="tab-list"] { background-color: #E2E8F0 !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #64748B !important; transition: all 0.3s ease; font-weight: 600 !important; }
 .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .stTabs [aria-selected="true"] p { color: #2563EB !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
+
+/* --- EFEK 5: SIDEBAR MENU GLASSMORPHISM --- */
 section[data-testid="stSidebar"], [data-testid="stSidebarContent"] { background-color: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #E2E8F0 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; color: #334155 !important; font-weight: 600 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: #F8FAFC !important; border: 1px solid #E2E8F0 !important; border-left: 4px solid #2563EB !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #2563EB !important; font-weight: 800 !important; }
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; }
+
+/* --- EFEK 6: KOTAK GLOWING HOVER & NEUMORPHISM --- */
+div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box {
+    background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover {
+    transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1) !important; border-color: #BFDBFE !important; 
+}
 .dash-box { border-top: 1px solid #E2E8F0 !important; }
+
+/* --- EFEK 7: INPUT NEUMORPHISM (INNER SHADOW 3D) --- */
 div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #2563EB !important; font-size: 0.85rem !important; font-weight: 600 !important; }
 input, select, textarea { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06) !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.06), 0 0 0 3px rgba(56, 189, 248, 0.2) !important; }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #0F172A !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
+
+/* --- EFEK 8: SHIMMER SWEEP PADA TOMBOL --- */
 .stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; position: relative; overflow: hidden; }
 .stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2; }
 .stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
 .stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
 @keyframes shimmer { 100% { left: 200%; } }
+
+/* Warna Custom Teks Utility */
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
@@ -560,6 +627,7 @@ st.sidebar.markdown("<p style='font-size:12px; font-weight:700; color:#64748B; m
 zona_market = st.sidebar.selectbox("ZONA", ["🏢 ZONA SAHAM (IDX)", "🪙 ZONA KRIPTO (INDODAX)"], label_visibility="collapsed")
 st.sidebar.write("---")
 
+# Mengatur Daftar Menu Berdasarkan Zona
 if zona_market == "🏢 ZONA SAHAM (IDX)":
     menu_list = [
         "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", "🕯️ POLA CANDLE AI",         
@@ -573,7 +641,7 @@ else:
         "⚔️ ADU KRIPTO", "🌐 PETA KRIPTO"
     ]
 
-# MENU UNIVERSAL
+# MENU UNIVERSAL (Selalu Ada di Bawah Kedua Zona)
 menu_list.append("🧮 KALKULATOR TRADING")
 menu_list.append("💼 DOMPET TRADING")
 menu_list.append("🔒 KEAMANAN")
@@ -1181,8 +1249,8 @@ elif menu == "🖥️ DASHBOARD UTAMA":
                     'bar': {'color': fg_color, 'thickness': 0.3}, 'bgcolor': "#FFFFFF",
                     'steps': [
                         {'range': [0, 30], 'color': "rgba(239, 68, 68, 0.15)"}, {'range': [30, 45], 'color': "rgba(245, 158, 11, 0.15)"},
-                        {'range': [45, 55], 'color': "rgba(56, 189, 248, 0.15)"}, {'range': [55, 70], 'color': "rgba(16, 185, 129, 0.15)"},
-                        {'range': [70, 100], 'color': "rgba(5, 150, 105, 0.15)"}],
+                        {'range': [45, 55], 'color': "rgba(56, 189, 248, 0.15)"}, {'range': [55, 75], 'color': "rgba(16, 185, 129, 0.15)"},
+                        {'range': [75, 100], 'color': "rgba(5, 150, 105, 0.15)"}],
                 }
             ))
             fig_fg.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)")
@@ -2089,19 +2157,25 @@ elif menu == "💼 DOMPET TRADING":
     
     with tab1:
         with st.expander("➕ DAFTARKAN PEMBELIAN ASET BARU", expanded=False):
+            tipe_aset_input = st.radio("PILIH JENIS ASET:", ["🏢 Saham Indonesia (IDX)", "🪙 Kripto (Indodax)"], horizontal=True)
             with st.form("form_add_portfolio", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                t_in = c1.text_input("Kode Saham/Kripto (Cth: BBCA atau BTC)").upper().strip()
-                l_in = c2.number_input("Besaran Lot (Saham) / Unit (Kripto)", min_value=0.000001, value=1.0, step=1.0, format="%g")
                 
-                c3, c4 = st.columns(2)
-                p_in = c3.number_input("Harga Dasar Beli (FULL RUPIAH)", min_value=0.000001, value=1000.0, step=100.0, format="%g")
-                strat_in = c4.selectbox("Faktor Justifikasi Beli?", ["Golden Cross MA", "Breakout Resistance", "Serok Bawah (Support)", "Ikut Berita", "Fundamental Bagus", "Feeling / FOMO"])
+                if "Saham" in tipe_aset_input:
+                    t_in = c1.text_input("Kode Saham (Cth: BBCA)").upper().strip()
+                    l_in = c2.number_input("Jumlah Lot (1 Lot = 100 Lembar)", min_value=1.0, value=1.0, step=1.0, format="%g")
+                    p_in = st.number_input("Harga Beli (Rp per Lembar)", min_value=1.0, value=1000.0, step=50.0, format="%g")
+                else:
+                    t_in = c1.text_input("Kode Koin (Cth: BTC, PEPE)").upper().strip()
+                    l_in = c2.number_input("Jumlah Koin (Unit)", min_value=0.000001, value=1.0, step=0.1, format="%g")
+                    p_in = st.number_input("Harga Beli (Rp per Unit Koin)", min_value=1.0, value=1000.0, step=100.0, format="%g")
+                    
+                strat_in = st.selectbox("Faktor Justifikasi Beli?", ["Golden Cross MA", "Breakout Resistance", "Serok Bawah (Support)", "Ikut Berita", "Fundamental Bagus", "Feeling / FOMO"])
                 
                 if st.form_submit_button("MASUKKAN DALAM SISTEM", width="stretch"):
                     if t_in and p_in > 0: 
                         add_to_portfolio(user_now, t_in, p_in, l_in, 0, 0, strat_in)
-                        st.success("Aset Berhasil Tersimpan di Cloud!"); st.rerun()
+                        st.success("Aset Berhasil Tersimpan di Cloud!"); time.sleep(1); st.rerun()
 
         df_p = get_user_portfolio(user_now, role)
         if not df_p.empty:
@@ -2187,7 +2261,7 @@ elif menu == "💼 DOMPET TRADING":
                     c_price, c_lots, c_btn = st.columns([2, 2, 1])
                     
                     s_price = c_price.number_input("Harga Jual (Rp)", value=float(live_val), step=100.0, format="%g", key=f"s_prc_{row['id']}")
-                    s_lots = c_lots.number_input(f"Jumlah Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), step=1.0, format="%g", key=f"s_lot_{row['id']}")
+                    s_lots = c_lots.number_input(f"Jumlah Dilepas?", min_value=0.000001, max_value=float(row['lots']), value=float(row['lots']), step=(0.01 if is_cr else 1.0), format="%g", key=f"s_lot_{row['id']}")
                     
                     if c_btn.button("LIKUIDASI", key=f"btn_s_{row['id']}", use_container_width=True):
                         st.toast(sell_position(user_now, row['id'], row['ticker'], row['buy_price'], s_price, row['lots'], s_lots)); time.sleep(1); st.rerun()
