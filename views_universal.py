@@ -381,7 +381,7 @@ def render_asisten_ai(user_now, role):
             st.error("⚠️ Sistem tidak mendeteksi kunci API. Pastikan Anda sudah menambahkan `GEMINI_API_KEY = '...'` di menu Settings > Secrets pada dashboard Streamlit Cloud Anda.")
         else:
             genai.configure(api_key=api_key_rahasia)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
             
             # Memori chat sementara
             if "messages" not in st.session_state:
