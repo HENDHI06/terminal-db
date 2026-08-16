@@ -130,7 +130,6 @@ def render_kalkulator(zona_market):
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success(f"💡 Pemenang Nobel Matematika menyarankan Anda untuk TIDAK menggunakan lebih dari **{kelly_pct*100:.1f}% total modal Anda** untuk 1 posisi transaksi (berdasarkan statistik pribadi Anda). Ini adalah batas pertahanan agar portofolio Anda tidak akan pernah hancur (margin call).")
 
-
 def render_dompet(user_now, role):
     st.markdown(f"<h2 class='gradient-text'>Dompet Omni-Wallet & AI Jurnal</h2>", unsafe_allow_html=True)
     with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
@@ -165,7 +164,9 @@ def render_dompet(user_now, role):
                 
                 if st.form_submit_button("MASUKKAN DALAM SISTEM", width="stretch"):
                     if t_in and p_in > 0: 
-                        add_to_portfolio(user_now, t_in, p_in, l_in, 0, 0, strat_in)
+                        # PERBAIKAN: Jika user memilih Kripto, pastikan kita memberi penanda -IDR otomatis ke database
+                        final_ticker = t_in if "Saham" in tipe_aset_input else (t_in if "-" in t_in else f"{t_in}-IDR")
+                        add_to_portfolio(user_now, final_ticker, p_in, l_in, 0, 0, strat_in)
                         st.success("Aset Berhasil Tersimpan di Cloud!"); time.sleep(1); st.rerun()
 
         df_p = get_user_portfolio(user_now, role)
@@ -186,7 +187,11 @@ def render_dompet(user_now, role):
 
             def calc_omni_active_idr(row):
                 tk_asli = row['ticker'].strip().upper()
-                clean_t = tk_asli.lower() + "_idr"
+                
+                # PERBAIKAN: Bersihkan penanda Kripto (-IDR) untuk mencari harga ke API Indodax/Yahoo
+                base_ticker = tk_asli.replace("-IDR", "").replace("-USD", "")
+                clean_t = base_ticker.lower() + "_idr"
+                
                 is_crypto = is_crypto_ticker(tk_asli)
                 
                 bp_rp = float(row['buy_price'])
@@ -197,7 +202,7 @@ def render_dompet(user_now, role):
                     
                     if curr_price_rp == 0:
                         try:
-                            yf_usd = float(yf.Ticker(f"{tk_asli}-USD").fast_info.get('lastPrice', 0))
+                            yf_usd = float(yf.Ticker(f"{base_ticker}-USD").fast_info.get('lastPrice', 0))
                             if yf_usd > 0: curr_price_rp = yf_usd * 15500
                             else: curr_price_rp = bp_rp
                         except: curr_price_rp = bp_rp
@@ -244,7 +249,10 @@ def render_dompet(user_now, role):
                 
                 fmt_qty = f"{row['lots']:.4f}" if is_cr else f"{row['lots']:.0f}"
                 icon = "🪙" if is_cr else "🏢"
-                title_text = f"{icon} {row['ticker']} | {fmt_qty} {satuan} | Beli: Rp {bp_val:,.0f} | Live: Rp {live_val:,.0f} | Profit: {sign_str}Rp {pnl_val:,.0f} ({sign_str}{pct_val:.2f}%)"
+                
+                # PERBAIKAN: Hapus penanda -IDR untuk tampilan agar tetap rapi di mata Anda
+                display_ticker = row['ticker'].replace("-IDR", "")
+                title_text = f"{icon} {display_ticker} | {fmt_qty} {satuan} | Beli: Rp {bp_val:,.0f} | Live: Rp {live_val:,.0f} | Profit: {sign_str}Rp {pnl_val:,.0f} ({sign_str}{pct_val:.2f}%)"
 
                 with st.expander(title_text):
                     st.markdown(f"<span class='badge-blue'>Kategori: {strat_label}</span>", unsafe_allow_html=True)
@@ -264,7 +272,9 @@ def render_dompet(user_now, role):
             df_h['pnl'] = pd.to_numeric(df_h['pnl'], errors='coerce')
             if role != 'admin': df_h = df_h[df_h['username'] == user_now]
             for idx, h_row in df_h.sort_values(by='date', ascending=False).iterrows():
-                with st.expander(f"{h_row['date']} | {h_row['ticker']}"):
+                # PERBAIKAN: Bersihkan juga di tab riwayat (History)
+                display_tick_h = h_row['ticker'].replace("-IDR", "")
+                with st.expander(f"{h_row['date']} | {display_tick_h}"):
                     c_t, c_b = st.columns([4,1])
                     c_t.write(f"Dasar Strategi: **{h_row.get('strategy', 'Tidak Terekam')}**")
                     satuan_h = "Unit" if is_crypto_ticker(h_row['ticker']) else "Lot"
