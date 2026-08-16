@@ -357,34 +357,10 @@ def render_dokter_portofolio(user_now, role):
                 else:
                     st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
 
-
 def render_ai_chat_panel(user_now, role):
-    # Gunakan CSS khusus untuk panel AI agar lebih profesional (Hapus paksa warna biru primary Streamlit)
+    # Menyuntikkan CSS khusus (menjaga agar tombol aksi tetap bersih)
     st.markdown("""
     <style>
-    .ai-header-container {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        padding: 15px 20px;
-        border-radius: 12px 12px 0 0;
-        border-bottom: 3px solid #3b82f6;
-        display: flex;
-        align-items: center;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .ai-title {
-        color: #f8fafc !important;
-        font-size: 1.25rem !important;
-        font-weight: 700 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-    }
-    .ai-icon {
-        font-size: 1.4rem;
-        margin-right: 10px;
-    }
-    
-    /* Tombol Aksi Kustom untuk Chat (Bersih & Elegan) */
     div[data-testid="column"] button {
         background-color: #ffffff !important;
         color: #475569 !important;
@@ -402,8 +378,6 @@ def render_ai_chat_panel(user_now, role):
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
     }
-    
-    /* Styling khusus bubble chat agar tidak kaku */
     .stChatMessage {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -424,18 +398,16 @@ def render_ai_chat_panel(user_now, role):
     </style>
     """, unsafe_allow_html=True)
 
-    # Header Profesional (Tanpa kotak biru kaku bawaan Streamlit)
+    # Header Panel AI - MEMAKSA WARNA PUTIH menggunakan <span> khusus untuk menghindari error warna
     st.markdown("""
-    <div class="ai-header-container">
-        <span class="ai-icon">🤖</span>
-        <h3 class="ai-title">AI Quant Advisor</h3>
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px 20px; border-radius: 12px 12px 0 0; border-bottom: 3px solid #3b82f6; display: flex; align-items: center; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <span style="font-size: 1.4rem; margin-right: 10px;">🤖</span>
+        <span style="color: #ffffff !important; font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: 0.5px; font-family: 'Inter', sans-serif;">AI Quant Advisor</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # Merapikan nama user (misal "hen_dhi" jadi "Hen_dhi", atau "HENDHI" jadi "Hendhi")
     nama_tampil = user_now.title() if user_now else "Trader"
     
-    # Tombol Aksi disejajarkan dengan rapi
     c1, c2 = st.columns(2)
     if c1.button("🗑️ Bersihkan Chat", use_container_width=True, key="clear_chat_btn"):
         st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
@@ -458,7 +430,6 @@ def render_ai_chat_panel(user_now, role):
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
 
-    # Kontainer Chatbox
     chat_container = st.container(height=500, border=False)
     
     with chat_container:
@@ -466,7 +437,6 @@ def render_ai_chat_panel(user_now, role):
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-    # Input Chat
     if prompt := st.chat_input("Tanya AI (Cth: Analisis fundamental ASII)..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
@@ -482,9 +452,7 @@ def render_ai_chat_panel(user_now, role):
                     log_error = ""
                     
                     try:
-                        # Trik Sapu Jagat: Auto-Fallback Model (Anti Error 404)
                         daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        # Urutkan: prioritas yang ada 'flash', lalu 'pro', sisanya di belakang
                         daftar_model.sort(key=lambda x: (not ('flash' in x.lower()), not ('pro' in x.lower()), x))
                         
                         for nama_model in daftar_model:
