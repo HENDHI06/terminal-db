@@ -1,11 +1,17 @@
 # views_crypto.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import yfinance as yf
 import math
 import random
+import requests
+import feedparser
+import time
+from time import mktime
+from datetime import datetime
 from core import *
 
 def render_dasbor_indodax():
@@ -164,7 +170,7 @@ def render_whale_tracker():
     with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
         st.markdown("""
         **Cara Melacak Pergerakan Paus (Whales) di Indodax:**
-        * Sistem ini akan membaca antrean jual-beli (Bid/Offer) secara langsung dari server. Fitur ini menyajikan kedalaman data yang setara atau bahkan lebih brutal dari antrean order yang biasa Anda gunakan di Stockbit, karena di sini Anda melihat pergerakan paus kripto.
+        * Sistem ini akan membaca antrean jual-beli (Bid/Offer) secara langsung dari server.
         * **Buku Order (Tembok Bandar):** Lihat Total Antrean. Jika kolom BID jauh lebih besar dari kolom ASK, artinya banyak yang antre beli di bawah (Harga akan susah turun/mantul).
         * **Transaksi Terkini (Tape Reading):** Jika muncul deretan transaksi dengan kolom Tipe "Beli" (Hijau) dalam jumlah Rupiah yang masif beruntun, bersiaplah harga akan meroket (Pump).
         """)
@@ -230,6 +236,131 @@ def render_whale_tracker():
                         st.dataframe(df_show.style.format({"Harga Eksekusi (Rp)": "{:,.0f}", "Jumlah Koin": "{:,.4f}", "Total Nilai (Rp)": "{:,.0f}"}).apply(highlight_type), use_container_width=True, hide_index=True)
             else:
                 st.error("Gagal menarik data langsung dari Indodax. Coba beberapa saat lagi.")
+
+# --- FITUR BARU 1: RADAR ARBITRASE ---
+def render_arbitrase():
+    st.markdown(f"<h2 class='gradient-text'>Radar Arbitrase Global vs Lokal</h2>", unsafe_allow_html=True)
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Mengambil Keuntungan dari Celah Harga:**
+        * Fitur ini membandingkan Harga Wajar Koin di pasar Internasional (Yahoo/Binance) dengan Harga di Indodax.
+        * Jika muncul status **PREMIUM (Lokal Lebih Mahal)**: Ini adalah kesempatan Emas untuk **JUAL** koin Anda di Indodax, karena harganya sedang tidak wajar mahalnya dibanding harga dunia.
+        * Jika muncul status **DISCOUNT (Lokal Lebih Murah)**: Waktunya **BELI** di Indodax karena sedang ada cuci gudang di bawah harga global.
+        """)
+        
+    koin_arb = st.text_input("Ketik Kode Koin (Contoh: BTC, ETH, DOGE)", value="BTC").upper().strip()
+    
+    if st.button("Pindai Celah Harga", width="stretch"):
+        with st.spinner(f"Menganalisis selisih harga {koin_arb} antar benua..."):
+            try:
+                # Ambil Kurs USD ke IDR hari ini dari Yahoo
+                df_kurs = yf.download("IDR=X", period="1d", progress=False)['Close']
+                kurs_idr = float(df_kurs.iloc[-1])
+                
+                # Ambil Harga Koin Global (USD) dari Yahoo
+                df_coin_global = yf.download(f"{koin_arb}-USD", period="1d", progress=False)['Close']
+                harga_global_usd = float(df_coin_global.iloc[-1])
+                harga_global_idr = harga_global_usd * kurs_idr
+                
+                # Ambil Harga Koin Lokal (IDR) dari Indodax
+                indo_tickers = get_indodax_tickers()
+                harga_lokal_idr = float(indo_tickers.get(f"{koin_arb.lower()}_idr", {}).get('last', 0))
+                
+                if harga_lokal_idr == 0:
+                    st.error("Koin ini tidak ditemukan di pasar Indodax (Rupiah).")
+                else:
+                    selisih_persen = ((harga_lokal_idr - harga_global_idr) / harga_global_idr) * 100
+                    
+                    st.markdown("---")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("🌍 HARGA DUNIA (Konversi)", f"Rp {harga_global_idr:,.0f}", f"$ {harga_global_usd:,.2f}")
+                    c2.metric("🇮🇩 HARGA INDODAX", f"Rp {harga_lokal_idr:,.0f}")
+                    
+                    if selisih_persen > 1.5:
+                        status_arb, warna_arb = f"PREMIUM LOKAL (+{selisih_persen:.2f}%)", "#DC2626"
+                        saran = "⚠️ Harga Indodax SANGAT MAHAL dibanding harga dunia. Waktunya Jual Cepat (Take Profit)!"
+                    elif selisih_persen < -1.5:
+                        status_arb, warna_arb = f"DISCOUNT LOKAL ({selisih_persen:.2f}%)", "#16A34A"
+                        saran = "✅ Harga Indodax SEDANG DISKON dibanding harga dunia. Waktunya Borong (Serok Bawah)!"
+                    else:
+                        status_arb, warna_arb = f"HARGA WAJAR ({selisih_persen:+.2f}%)", "#2563EB"
+                        saran = "⚖️ Harga Indodax sejalan dengan pasar global. Tidak ada celah arbitrase yang signifikan."
+                    
+                    c3.metric("CELAH HARGA", f"{selisih_persen:+.2f}%", delta_color="inverse" if selisih_persen > 0 else "normal")
+                    
+                    st.markdown(f"<div class='dash-box' style='border-left: 5px solid {warna_arb}; text-align:center;'><h3 style='color:{warna_arb}; margin:0;'>{status_arb}</h3><p style='margin-top:10px; font-weight:600;'>{saran}</p></div>", unsafe_allow_html=True)
+            except:
+                st.error("Koneksi ke data satelit global/lokal gagal. Pastikan simbol koin benar.")
+
+# --- FITUR BARU 2: MESIN WAKTU DCA ---
+def render_dca():
+    st.markdown(f"<h2 class='gradient-text'>Mesin Waktu DCA Kripto</h2>", unsafe_allow_html=True)
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Dollar Cost Averaging (Nabung Rutin):**
+        * Kripto sangat bergejolak. Cara teraman untuk kaya dari kripto adalah menabung nominal yang sama setiap bulan, berapapun harganya.
+        * Mesin ini akan melakukan *backtest* (melihat ke masa lalu). Jika Anda rutin menabung 1 juta Rupiah tiap bulan ke Bitcoin sejak 2 tahun lalu, berapa total kekayaan Anda sekarang?
+        """)
+        
+    with st.form("dca_form"):
+        c1, c2, c3 = st.columns(3)
+        koin_dca = c1.text_input("Koin Tabungan", value="BTC").upper().strip()
+        nominal_dca = c2.number_input("Nabung Per Bulan (Rp)", min_value=10000.0, value=1000000.0, step=100000.0)
+        tahun_mulai = c3.selectbox("Sejak Kapan?", ["1 Tahun Lalu", "2 Tahun Lalu", "3 Tahun Lalu", "4 Tahun Lalu"])
+        btn_dca = st.form_submit_button("Jalankan Mesin Waktu", width="stretch")
+        
+    if btn_dca:
+        with st.spinner("Memutar kembali waktu untuk perhitungan aset..."):
+            try:
+                periode = {"1 Tahun Lalu": "1y", "2 Tahun Lalu": "2y", "3 Tahun Lalu": "3y", "4 Tahun Lalu": "4y"}
+                
+                # Ambil data koin bulanan
+                df_hist = yf.download(f"{koin_dca}-USD", period=periode[tahun_mulai], interval="1mo", progress=False)['Close'].dropna()
+                
+                if len(df_hist) < 12:
+                    st.warning("Data koin tidak cukup panjang untuk simulasi ini.")
+                else:
+                    # Asumsi Kurs Fix agar cepat (bisa diganti dinamis jika perlu)
+                    kurs_estimasi = 15500
+                    
+                    df_dca = pd.DataFrame(df_hist)
+                    if isinstance(df_dca.columns, pd.MultiIndex): df_dca.columns = df_dca.columns.get_level_values(0)
+                    df_dca.columns = ['Harga_USD']
+                    df_dca['Harga_IDR'] = df_dca['Harga_USD'] * kurs_estimasi
+                    
+                    # Logika DCA
+                    total_investasi_rp = 0
+                    total_koin_terkumpul = 0
+                    nilai_portfolio = []
+                    modal_kumulatif = []
+                    
+                    for harga in df_dca['Harga_IDR']:
+                        koin_didapat = nominal_dca / harga
+                        total_koin_terkumpul += koin_didapat
+                        total_investasi_rp += nominal_dca
+                        
+                        nilai_portfolio.append(total_koin_terkumpul * harga)
+                        modal_kumulatif.append(total_investasi_rp)
+                        
+                    df_dca['Nilai_Aset_Rp'] = nilai_portfolio
+                    df_dca['Modal_Ditanam_Rp'] = modal_kumulatif
+                    
+                    nilai_akhir = df_dca['Nilai_Aset_Rp'].iloc[-1]
+                    persen_cuan = ((nilai_akhir - total_investasi_rp) / total_investasi_rp) * 100
+                    
+                    st.markdown("---")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("TOTAL UANG DITABUNG", f"Rp {total_investasi_rp:,.0f}")
+                    col2.metric(f"TOTAL KOIN ({koin_dca})", f"{total_koin_terkumpul:,.4f} Unit")
+                    col3.metric("NILAI ASET SEKARANG", f"Rp {nilai_akhir:,.0f}", f"{persen_cuan:+.2f}%")
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=df_dca.index, y=df_dca['Modal_Ditanam_Rp'], mode='lines', line=dict(color='#64748B', width=2, dash='dash'), name='Modal Ditanam'))
+                    fig.add_trace(go.Scatter(x=df_dca.index, y=df_dca['Nilai_Aset_Rp'], mode='lines', line=dict(color='#10B981', width=3), fill='tonexty', fillcolor='rgba(16, 185, 129, 0.2)', name='Nilai Aset Kripto'))
+                    fig.update_layout(title="Grafik Pertumbuhan Nabung Rutin", template="plotly_white", height=400, margin=dict(l=0,r=0,t=40,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig, use_container_width=True)
+            except:
+                st.error("Gagal menarik data masa lalu untuk koin ini.")
 
 def render_prediksi_kripto():
     st.markdown(f"<h2 class='gradient-text'>Pola AI & Proyeksi Kripto</h2>", unsafe_allow_html=True)
@@ -401,13 +532,95 @@ def render_adu_kripto():
                 else: st.error("Salah satu koin tidak ditemukan di pasar Indodax.")
             except: st.error("Simbol koin tidak valid atau gagal terhubung ke satelit data.")
 
-def render_peta_kripto():
-    st.markdown(f"<h2 class='gradient-text'>Peta Dominasi Altcoin</h2>", unsafe_allow_html=True)
+# --- FITUR BARU 3: KORELASI ALCOIN ---
+def render_korelasi_kripto():
+    st.markdown(f"<h2 class='gradient-text'>Matriks Korelasi Kripto</h2>", unsafe_allow_html=True)
     with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
         st.markdown("""
-        **Cara Membaca Radar Uang Global:**
-        * Menunjukkan performa koin kripto utama selama 5 hari terakhir.
-        * Koin dengan batang tertinggi (hijau pekat) berarti sedang menerima aliran suntikan dana Paus (Whales) dari seluruh dunia.
+        **Cara Mengatur Diversifikasi:**
+        * Sama seperti saham, jangan membeli koin yang pergerakannya 100% sama.
+        * Jika angka **mendekati +1** (merah pekat), koin-koin tersebut akan jatuh bersamaan jika terjadi crash.
+        * Cari koin dengan angka korelasi rendah (mendekati 0 atau negatif/biru) untuk mengamankan portofolio Anda saat Bitcoin sedang turun.
+        """)
+    input_tkrs = st.text_input("MASUKKAN KODE KOIN (DIPISAH KOMA)", value="BTC, ETH, SOL, DOGE, PEPE")
+    if st.button("Kalkulasi Matriks Korelasi Kripto", width="stretch"):
+        with st.spinner("Mengukur ikatan pergerakan antar koin..."):
+            try:
+                raw_list = [t.strip().upper() + "-USD" for t in input_tkrs.split(",")]
+                data_corr = yf.download(raw_list, period="3mo", interval="1d", progress=False)['Close'].dropna()
+                
+                if not data_corr.empty:
+                    if isinstance(data_corr.columns, pd.MultiIndex): data_corr.columns = data_corr.columns.get_level_values(0)
+                    data_corr.columns = [c.replace("-USD", "") for c in data_corr.columns]
+                    
+                    fig_corr = px.imshow(data_corr.corr(), text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1)
+                    fig_corr.update_layout(template="plotly_white", height=400, margin=dict(l=0,r=0,t=20,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_corr, use_container_width=True)
+            except: st.error("Kalkulasi terhambat. Pastikan kode koin valid (Contoh: BTC, ETH).")
+
+# --- FITUR BARU 4: ROTASI NARASI KRIPTO ---
+def render_rotasi_narasi():
+    st.markdown(f"<h2 class='gradient-text'>Peta Rotasi Narasi Kripto</h2>", unsafe_allow_html=True)
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Mendeteksi Musim Kripto (Crypto Seasons):**
+        * Kripto bergerak berdasarkan Tren/Narasi (contoh: Musim Koin Meme, Musim Koin AI, Musim Koin Layer-1).
+        * Grafik ini merangkum rata-rata kenaikan/penurunan koin berdasarkan sektornya dalam seminggu terakhir.
+        * Belilah koin di sektor yang barnya sedang panjang ke atas (Hijau), karena uang Paus (Whales) dunia sedang mengalir ke sektor tersebut!
+        """)
+        
+    kategori_koin = {
+        "Layer-1 (Fondasi)": ["BTC", "ETH", "SOL", "ADA", "AVAX"],
+        "Meme Coins": ["DOGE", "SHIB", "PEPE", "FLOKI", "BONK"],
+        "Kecerdasan Buatan (AI)": ["FET", "RNDR", "INJ", "NEAR", "GRT"],
+        "DeFi & Pertukaran": ["UNI", "LINK", "LDO", "CRV", "MKR"]
+    }
+    
+    if st.button("Pantau Tren Sektor Dunia", use_container_width=True):
+        with st.spinner("Memetakan aliran dana institusi ke sektor narasi..."):
+            hasil_narasi = []
+            semua_ticker = []
+            
+            for koin_list in kategori_koin.values():
+                semua_ticker.extend([f"{k}-USD" for k in koin_list])
+                
+            try:
+                # Mengambil data performa 7 hari terakhir
+                df_narasi = yf.download(semua_ticker, period="7d", interval="1d", progress=False)['Close']
+                
+                for nama_sektor, daftar_koin in kategori_koin.items():
+                    total_chg = []
+                    for k in daftar_koin:
+                        tk = f"{k}-USD"
+                        try:
+                            s_data = df_narasi[tk].dropna() if isinstance(df_narasi, pd.DataFrame) else df_narasi.dropna()
+                            if len(s_data) >= 2:
+                                chg = ((float(s_data.iloc[-1]) - float(s_data.iloc[0])) / float(s_data.iloc[0])) * 100
+                                total_chg.append(chg)
+                        except: pass
+                    
+                    if total_chg:
+                        rata_rata = sum(total_chg) / len(total_chg)
+                        hasil_narasi.append({"Narasi": nama_sektor, "Performa 7 Hari (%)": round(rata_rata, 2)})
+                        
+                if hasil_narasi:
+                    df_hasil = pd.DataFrame(hasil_narasi).sort_values(by="Performa 7 Hari (%)", ascending=False)
+                    fig_narasi = px.bar(df_hasil, x="Narasi", y="Performa 7 Hari (%)", color="Performa 7 Hari (%)", color_continuous_scale=["#EF4444", "#1E293B", "#10B981"], text="Performa 7 Hari (%)")
+                    fig_narasi.update_traces(texttemplate='%{text}%', textposition='outside')
+                    fig_narasi.update_layout(template="plotly_white", height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_narasi, use_container_width=True)
+                else:
+                    st.warning("Gagal menyusun peta rotasi narasi saat ini.")
+            except:
+                st.error("Koneksi ke data pusat terputus.")
+
+def render_peta_kripto():
+    st.markdown(f"<h2 class='gradient-text'>Peta Dominasi Altcoin (Lokal)</h2>", unsafe_allow_html=True)
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Cara Membaca Radar Uang Lokal:**
+        * Menunjukkan performa koin kripto utama di bursa lokal (Indodax).
+        * Koin dengan batang tertinggi (hijau pekat) berarti sedang menerima aliran suntikan dana Paus (Whales) Indonesia.
         * Anda bisa menumpang (*riding the wave*) pada koin-koin yang baru mulai merangkak naik.
         """)
         
@@ -436,3 +649,45 @@ def render_peta_kripto():
                 st.plotly_chart(fig_sec, use_container_width=True)
             else:
                 st.warning("Gagal menarik data. Server Indodax mungkin sedang sibuk atau menolak koneksi.")
+
+# --- FITUR BARU 5: BERITA KRIPTO ---
+def render_kripto_news():
+    st.markdown(f"<h2 class='gradient-text'>Crypto Intelligence Center</h2>", unsafe_allow_html=True)
+    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
+        st.markdown("""
+        **Sistem Pelacak Sentimen FUD & FOMO:**
+        * Mesin AI ini menyaring berita global khusus Kripto.
+        * Perhatikan label di sebelah kiri. Jika banyak berita berlabel **NEGATIF** (FUD), jangan buru-buru membeli. Bandar mungkin sedang menyebar ketakutan.
+        * Jika pasar penuh dengan berita **POSITIF** (FOMO) dan berlabel **🔥 HOT NEWS**, ikuti arusnya tapi tetap pasang batas Cut Loss!
+        """)
+        
+    def analyze_sentiment(text):
+        pos_words = ['naik', 'bullish', 'untung', 'lonjak', 'etf', 'investasi', 'meroket', 'cuan', 'diborong', 'rekor', 'adopsi', 'beli']
+        neg_words = ['turun', 'bearish', 'anjlok', 'hack', 'kasus', 'gagal', 'merosot', 'jeblok', 'dijual', 'sec', 'denda', 'larang', 'scam']
+        score = sum(1 for w in pos_words if w in text.lower()) - sum(1 for w in neg_words if w in text.lower())
+        if score > 0: return "POSITIF", "badge-green"
+        elif score < 0: return "NEGATIF", "badge-red"
+        else: return "NETRAL", "badge-gray"
+
+    def check_if_new(p_parsed):
+        if p_parsed and (time.time() - mktime(p_parsed)) < (12 * 3600): return "🔥 HOT NEWS"
+        return ""
+
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    with st.spinner("Memindai radar sentimen kripto global..."):
+        try:
+            # Query difokuskan pada Kripto
+            url_rss = "https://news.google.com/rss/search?q=kripto+OR+bitcoin+OR+altcoin+OR+crypto&hl=id&gl=ID&ceid=ID:id"
+            feed = feedparser.parse(requests.get(url_rss, headers=headers, timeout=5).content)
+            
+            if not feed.entries:
+                st.warning("Data berita kripto sedang tidak tersedia.")
+                
+            for entry in feed.entries[:12]: 
+                sent_text, badge_c = analyze_sentiment(entry.title)
+                fire_badge = check_if_new(entry.published_parsed if hasattr(entry, 'published_parsed') else None)
+                pub_date = entry.published if hasattr(entry, 'published') else ""
+                st.markdown(f"<div class='dash-box'><div style='display:flex; justify-content:space-between; margin-bottom:8px;'><span class='{badge_c}'>{sent_text}</span><span style='font-size:11px; color:#EF4444; font-weight:700;'>{fire_badge}</span></div><a href='{entry.link}' target='_blank' style='color:#0F172A; text-decoration:none; font-size:1rem; font-weight:600;'>{entry.title}</a><p class='text-muted' style='margin-top:8px; margin-bottom:0;'>⏰ {pub_date}</p></div>", unsafe_allow_html=True)
+        except: 
+            st.error("Malfungsi sambungan internet saat penarikan RSS Berita Kripto.")
