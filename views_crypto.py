@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 
 @st.cache_data(ttl=60)
 def fetch_indodax_live():
-    """Mesin penarik data 100% ASLI & LANGSUNG dari Server Indodax"""
     try:
         url = "https://indodax.com/api/tickers"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -43,7 +42,6 @@ def fetch_indodax_live():
 
 @st.cache_data(ttl=30)
 def fetch_order_book(coin_id):
-    """Menarik data kedalaman pasar (Order Book) dari Indodax"""
     try:
         url = f"https://indodax.com/api/depth/{coin_id.lower()}idr"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -57,22 +55,26 @@ def fetch_order_book(coin_id):
 
 @st.cache_data(ttl=3600)
 def fetch_fear_greed_index():
-    """Menarik data Psikologi Massa Kripto Global"""
     try:
         req = urllib.request.Request("https://api.alternative.me/fng/?limit=1", headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
             return int(data['data'][0]['value']), data['data'][0]['value_classification']
     except:
         return 50, "Neutral"
 
+# KODE PERBAIKAN: Penyamaran yang lebih kuat dan timeout yang lebih lama
 @st.cache_data(ttl=300)
 def fetch_funding_rates():
-    """Menarik data Funding Rate dari Binance (Deteksi Potensi Likuidasi)"""
     try:
         url = "https://fapi.binance.com/fapi/v1/premiumIndex"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json'
+        }
+        req = urllib.request.Request(url, headers=headers)
+        # Timeout dinaikkan jadi 10 detik agar server punya waktu menarik data
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
         
         targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'DOGEUSDT', 'XRPUSDT', 'PEPEUSDT']
@@ -86,7 +88,6 @@ def fetch_funding_rates():
         return pd.DataFrame()
 
 def calculate_rsi(data, window=14):
-    """Kalkulator Relative Strength Index (RSI)"""
     delta = data.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
@@ -169,25 +170,20 @@ def render_radar_altcoin():
     df = fetch_indodax_live()
     if df.empty: return
 
-    # --- 1. FILTER STABLECOIN (BLACKLIST) ---
     stablecoins = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'FDUSD', 'PYUSD']
     df = df[~df['ID'].isin(stablecoins)]
 
-    # --- 2. FILTER LIKUIDITAS KETAT (ANTI KOIN MICIN) ---
-    # Syarat mutlak: Volume 24 Jam harus di atas Rp 1 Miliar agar terhindar dari koin gorengan ilikuid
     df_valid = df[df['Vol_IDR'] >= 1_000_000_000].copy()
     
     def hitung_skor(row):
         vol = row['Vol_IDR']
         bounce = row['Bounce_Pct']
         
-        # Poin Volume
         if vol >= 10_000_000_000: vol_pts = 50
         elif vol >= 5_000_000_000: vol_pts = 40
         elif vol >= 2_000_000_000: vol_pts = 30
         else: vol_pts = 20
             
-        # Poin Pantulan (Jarak dari dasar)
         if bounce <= 1.5: bounce_pts = 50
         elif bounce <= 3.0: bounce_pts = 40
         elif bounce <= 5.0: bounce_pts = 30
@@ -220,7 +216,6 @@ def render_radar_altcoin():
     df_sorted['Vol_Uang_IDR'] = df_sorted['Vol_IDR'].apply(lambda x: f"Rp {x/1e9:,.2f} M")
     df_sorted['Pantulan'] = df_sorted['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
     
-    # Pilih kolom yang relevan dan tajam
     display_df = df_sorted[['ID', 'Rekomendasi', 'Skor_Akumulasi', 'Harga_Live', 'Pantulan', 'Vol_Uang_IDR']]
     
     def warnai_skor_manual(val):
@@ -231,13 +226,6 @@ def render_radar_altcoin():
         return f'background-color: {warna}; color: white; font-weight: bold;'
     
     st.dataframe(display_df.style.applymap(warnai_skor_manual, subset=['Skor_Akumulasi']), hide_index=True, use_container_width=True, height=600)
-
-    with st.expander("📖 Panduan Cara Membaca Scanner Sniper (WAJIB BACA)"):
-        st.markdown("""
-        **Cara Mencari Koin Bagger / PUMP:**
-        * **💎 SANGAT BAGUS (Skor 90-100):** Koin ini beromzet **Miliaran Rupiah** tapi anehnya harganya **tidak naik (>1.5%)**. Ini anomali sempurna. Cukong sedang diam-diam menyerap barang ritel. Buka *chart*-nya, jika benar sedang mendatar (*sideways*), mulailah mencicil beli (*DCA*).
-        * **Kenapa Koin Micin Hilang?** Sistem telah secara otomatis menendang koin-koin berisiko tinggi (*volume* di bawah Rp 1 Miliar) dan *Stablecoin* (USDT/USDC) agar portofolio Anda aman dari jeratan nyangkut.
-        """)
 
 def render_whale_tracker():
     st.markdown("<h2 class='gradient-text'>🐋 Whale Tracker & Likuidasi</h2>", unsafe_allow_html=True)
@@ -271,23 +259,32 @@ def render_whale_tracker():
                     c1, c2 = st.columns(2)
                     c1.metric("Kekuatan Beli (Support)", f"Rp {total_beli_miliar:.2f} Miliar")
                     c2.metric("Tekanan Jual (Resistance)", f"Rp {total_jual_miliar:.2f} Miliar")
-    
+
+    # KODE PERBAIKAN: Penambahan peringatan error jika gagal ditarik
     with tab_liq:
         st.info("Mendeteksi *Funding Rate* global. Jika nilai sangat positif (merah), Ritel sedang rakus berutang (Long) dan Cukong bersiap menjatuhkan harga untuk melikuidasi mereka!")
-        df_funding = fetch_funding_rates()
-        if not df_funding.empty:
-            def format_funding(val):
-                if val > 0.05: return f"🔴 RAWAN BANTINGAN ({val:.4f}%)"
-                elif val < -0.05: return f"🟢 RAWAN PUMP NAIK ({val:.4f}%)"
-                else: return f"⚪ AMAN / NETRAL ({val:.4f}%)"
-                
-            def color_funding(val):
-                if 'BANTINGAN' in val: return 'color: #EF4444; font-weight: bold;'
-                elif 'PUMP' in val: return 'color: #10B981; font-weight: bold;'
-                return 'color: #64748B;'
-                
-            df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
-            st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.applymap(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True)
+        
+        if st.button("🔄 Coba Tarik Ulang Data Binance", use_container_width=True):
+            st.cache_data.clear() # Membersihkan memori cache agar ditarik ulang secara paksa
+            
+        with st.spinner("Menghubungkan ke API Binance Global..."):
+            df_funding = fetch_funding_rates()
+            
+            if not df_funding.empty:
+                def format_funding(val):
+                    if val > 0.05: return f"🔴 RAWAN BANTINGAN ({val:.4f}%)"
+                    elif val < -0.05: return f"🟢 RAWAN PUMP NAIK ({val:.4f}%)"
+                    else: return f"⚪ AMAN / NETRAL ({val:.4f}%)"
+                    
+                def color_funding(val):
+                    if 'BANTINGAN' in val: return 'color: #EF4444; font-weight: bold;'
+                    elif 'PUMP' in val: return 'color: #10B981; font-weight: bold;'
+                    return 'color: #64748B;'
+                    
+                df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
+                st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.applymap(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True)
+            else:
+                st.error("⚠️ **Gagal memuat data likuidasi.** Firewall Binance memblokir permintaan dari server Anda atau terjadi Timeout. Silakan klik tombol 'Coba Tarik Ulang' di atas.")
 
 def render_arbitrase():
     st.markdown("<h2 class='gradient-text'>⚖️ Radar Arbitrase (Lokal vs Global)</h2>", unsafe_allow_html=True)
