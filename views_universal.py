@@ -359,67 +359,17 @@ def render_dokter_portofolio(user_now, role):
 
 
 def render_ai_chat_panel(user_now, role):
+    # Desain Terang yang sangat aman dari bentrokan warna CSS
     st.markdown("""
-    <style>
-    /* Styling khusus tombol aksi panel agar putih dan rapi */
-    div[data-testid="column"] button {
-        background-color: #ffffff !important;
-        color: #475569 !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s !important;
-        padding: 6px 12px !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-    }
-    div[data-testid="column"] button:hover {
-        background-color: #f1f5f9 !important;
-        color: #0f172a !important;
-        border-color: #cbd5e1 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-    }
-    .stChatMessage {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 10px 15px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) {
-        background-color: #f8fafc;
-        border-color: #e2e8f0;
-    }
-    .stChatInputContainer {
-        border-radius: 20px !important;
-        border: 1px solid #cbd5e1 !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-    }
-    
-    /* BYPASS CSS SUPER KUAT UNTUK HEADER AI */
-    .ai-title-force {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        font-size: 1.25rem !important;
-        font-weight: 700 !important;
-        font-family: 'Inter', sans-serif !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Header Panel AI - Memaksa menggunakan <div> agar lolos dari jeratan CSS Streamlit
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px 20px; border-radius: 12px 12px 0 0; border-bottom: 3px solid #3b82f6; display: flex; align-items: center; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        <div style="font-size: 1.4rem; margin-right: 10px;">🤖</div>
-        <div class="ai-title-force">AI Quant Advisor</div>
+    <div style='background: linear-gradient(90deg, #2563EB, #10B981); padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+        <b style='font-size: 1.25rem; color: white;'>🤖 AI Quant Advisor</b>
     </div>
     """, unsafe_allow_html=True)
     
-    nama_tampil = user_now.title() if user_now else "Trader"
+    # Format nama user menjadi rapi (Huruf Besar di Awal)
+    nama_tampil = user_now.capitalize() if user_now else "Trader"
     
+    # Tombol Aksi Hapus & Tutup dibuat sejajar
     c1, c2 = st.columns(2)
     if c1.button("🗑️ Bersihkan Chat", use_container_width=True, key="clear_chat_btn"):
         st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
@@ -442,7 +392,7 @@ def render_ai_chat_panel(user_now, role):
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
 
-    chat_container = st.container(height=500, border=False)
+    chat_container = st.container(height=500, border=True)
     
     with chat_container:
         for message in st.session_state.messages:
