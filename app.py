@@ -159,7 +159,6 @@ if zona_market == "🏢 ZONA SAHAM (IDX)":
         "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR"
     ]
 else:
-    # 5 MENU BARU KRIPTO DITAMBAHKAN DI SINI
     menu_list = [
         "🪙 DASBOR INDODAX", "🚀 RADAR ALTCOIN", "🐋 WHALE TRACKER INDODAX", 
         "⚖️ RADAR ARBITRASE", "⏳ MESIN WAKTU DCA", "🔮 PREDIKSI KRIPTO", 
@@ -167,9 +166,10 @@ else:
         "🌐 PETA KRIPTO", "📰 BERITA KRIPTO"
     ]
 
-# MENU UNIVERSAL (Selalu Ada di Bawah Kedua Zona)
+# MENU UNIVERSAL
 menu_list.append("🧮 KALKULATOR TRADING")
 menu_list.append("💼 DOMPET TRADING")
+menu_list.append("🤖 ASISTEN AI PRO") # <--- MENU BARU DITAMBAHKAN DI SINI
 menu_list.append("🔒 KEAMANAN")
 if role == "admin": menu_list.append("⚙️ USER MANAGEMENT")
 
@@ -218,5 +218,6 @@ elif menu == "📰 BERITA PASAR": views_idx.render_berita_pasar()
 # ================= ZONA UNIVERSAL =================
 elif menu == "🧮 KALKULATOR TRADING": views_universal.render_kalkulator(zona_market)
 elif menu == "💼 DOMPET TRADING": views_universal.render_dompet(user_now, role)
+elif menu == "🤖 ASISTEN AI PRO": views_universal.render_asisten_ai(user_now, role) # <--- ROUTING MENU BARU
 elif menu == "⚙️ USER MANAGEMENT": views_universal.render_user_management()
 elif menu == "🔒 KEAMANAN": views_universal.render_keamanan(user_now)
