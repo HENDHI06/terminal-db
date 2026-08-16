@@ -366,38 +366,31 @@ def render_asisten_ai(user_now, role):
                         st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
 
     # ---------------------------------------------------------
-    # TAB 2: CHATBOT AI GEMINI
+    # TAB 2: CHATBOT AI GEMINI PERMANEN
     # ---------------------------------------------------------
     with tab_chat:
         st.markdown("### Ngobrol dengan AI Quant Advisor")
         st.caption("Ketik pertanyaan seputar saham, kripto, atau kondisi makro ekonomi saat ini.")
         
-        if "gemini_api_key" not in st.session_state:
-            st.session_state.gemini_api_key = ""
+        # Mengekstrak kunci dari Brankas Streamlit Secrets
+        api_key_rahasia = None
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key_rahasia = st.secrets["GEMINI_API_KEY"]
             
-        if not st.session_state.gemini_api_key:
-            st.info("🔐 Untuk mengaktifkan otak AI, Anda memerlukan API Key Google Gemini (Gratis).")
-            with st.form("api_form"):
-                kunci_api = st.text_input("Masukkan Google Gemini API Key Anda:", type="password")
-                st.markdown("[Klik di sini untuk membuat API Key gratis di Google AI Studio](https://aistudio.google.com/app/apikey)")
-                if st.form_submit_button("Aktifkan AI", width="stretch"):
-                    if kunci_api:
-                        st.session_state.gemini_api_key = kunci_api
-                        st.success("Otak AI Berhasil Terhubung!"); st.rerun()
-                    else:
-                        st.error("API Key tidak boleh kosong.")
-        
+        if not api_key_rahasia:
+            st.error("⚠️ Sistem tidak mendeteksi kunci API. Pastikan Anda sudah menambahkan `GEMINI_API_KEY = '...'` di menu Settings > Secrets pada dashboard Streamlit Cloud Anda.")
         else:
-            if st.button("Ubah API Key / Hapus Sesi", key="reset_api"):
-                st.session_state.gemini_api_key = ""
-                st.session_state.messages = []
-                st.rerun()
-                
-            genai.configure(api_key=st.session_state.gemini_api_key)
+            genai.configure(api_key=api_key_rahasia)
             model = genai.GenerativeModel('gemini-1.5-flash')
             
+            # Memori chat sementara
             if "messages" not in st.session_state:
-                st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya adalah Asisten Keuangan Pribadi Anda. Ada yang bisa saya bantu analisis hari ini?"}]
+                st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
+
+            # Tombol untuk menghapus riwayat obrolan jika sudah kepanjangan
+            if st.button("🗑️ Bersihkan Riwayat Obrolan"):
+                st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
+                st.rerun()
 
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
@@ -418,4 +411,4 @@ def render_asisten_ai(user_now, role):
                             st.markdown(teks_balasan)
                             st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
                         except Exception as e:
-                            st.error(f"Maaf, terjadi kesalahan koneksi ke otak AI. Pastikan API Key Anda valid. Error: {e}")
+                            st.error(f"Maaf, terjadi kesalahan koneksi ke otak AI. Error: {e}")
