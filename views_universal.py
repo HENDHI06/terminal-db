@@ -359,7 +359,6 @@ def render_dokter_portofolio(user_now, role):
 
 
 def render_ai_chat_panel(user_now, role):
-    # Desain Header Khusus Panel
     st.markdown("""
     <div style='background: linear-gradient(90deg, #2563EB, #10B981); padding: 12px; border-radius: 8px 8px 0 0; color: white; margin-bottom: 10px;'>
         <b style='font-size: 1.1rem;'>🤖 AI Quant Advisor</b>
@@ -387,7 +386,6 @@ def render_ai_chat_panel(user_now, role):
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya Asisten Pribadi Anda. Ada yang bisa saya bantu hari ini?"}]
 
-    # Kotak Chat yang bisa di-scroll
     chat_container = st.container(height=550, border=True)
     with chat_container:
         for message in st.session_state.messages:
@@ -409,9 +407,7 @@ def render_ai_chat_panel(user_now, role):
                     log_error = ""
                     
                     try:
-                        # Trik Sapu Jagat: Auto-Fallback Model (Anti Error)
                         daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        # Urutkan model tercepat dulu
                         daftar_model.sort(key=lambda x: (not ('flash' in x.lower() or 'pro' in x.lower()), x))
                         
                         for nama_model in daftar_model:
@@ -428,7 +424,7 @@ def render_ai_chat_panel(user_now, role):
                                     st.markdown(teks_balasan)
                                     st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
                                     sukses = True
-                                    break # Langsung berhenti jika 1 model berhasil
+                                    break 
                             except Exception as e:
                                 log_error += f"[{nama_model} gagal] "
                                 continue 
@@ -437,4 +433,4 @@ def render_ai_chat_panel(user_now, role):
                             st.error(f"⚠️ Semua server AI Google penuh/ditolak. Log: {log_error}")
                     except Exception as e:
                         st.error(f"Error sistem: {e}")
-        st.rerun() # Refresh agar chatbox selalu rapi di bawah
+        st.rerun() 
