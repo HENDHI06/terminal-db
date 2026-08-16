@@ -381,21 +381,6 @@ def render_asisten_ai(user_now, role):
         else:
             genai.configure(api_key=api_key_rahasia)
             
-            # --- KODE PINTAR: MENCARI OTOMATIS MODEL AI YANG TERSEDIA ---
-            nama_model_valid = "gemini-1.5-flash" # Cadangan
-            try:
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        nama_model_valid = m.name
-                        # Prioritaskan model "flash" karena responnya paling cepat untuk chat
-                        if "flash" in nama_model_valid.lower():
-                            break
-            except Exception:
-                pass
-                
-            model = genai.GenerativeModel(nama_model_valid)
-            # ------------------------------------------------------------
-            
             # Memori chat sementara
             if "messages" not in st.session_state:
                 st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
@@ -419,9 +404,32 @@ def render_asisten_ai(user_now, role):
                 with st.chat_message("assistant"):
                     with st.spinner("AI sedang berpikir..."):
                         try:
-                            response = model.generate_content(system_prompt)
-                            teks_balasan = response.text
-                            st.markdown(teks_balasan)
-                            st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
+                            # --- SISTEM AUTO-FALLBACK MODEL AI ---
+                            # Kita coba panggil dari versi terbaru yang stabil hingga versi lama
+                            daftar_model = [
+                                "gemini-2.0-flash", 
+                                "gemini-1.5-flash", 
+                                "gemini-1.5-pro", 
+                                "gemini-pro"
+                            ]
+                            
+                            response = None
+                            error_msg = ""
+                            
+                            for nama_model in daftar_model:
+                                try:
+                                    model = genai.GenerativeModel(nama_model)
+                                    response = model.generate_content(system_prompt)
+                                    break # Jika berhasil menjawab, langsung keluar dari loop!
+                                except Exception as e:
+                                    error_msg = str(e)
+                                    continue # Jika model ini diblokir/tidak ada, lanjut ke model berikutnya
+                            
+                            if response:
+                                teks_balasan = response.text
+                                st.markdown(teks_balasan)
+                                st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
+                            else:
+                                st.error(f"Semua versi model AI gagal diakses. Error terakhir: {error_msg}")
                         except Exception as e:
-                            st.error(f"Maaf, terjadi kesalahan koneksi ke otak AI. Error: {e}")
+                            st.error(f"Terjadi kesalahan sistem: {e}")
