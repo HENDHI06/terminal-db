@@ -317,121 +317,124 @@ def render_keamanan(user_now):
         if st.form_submit_button("ENKRIPSI DAN SIMPAN", width="stretch"):
             if update_password_db(user_now, new_p): st.success("Sandikunci berhasil diubah dan diamankan oleh sistem!")
 
-def render_asisten_ai(user_now, role):
-    st.markdown(f"<h2 class='gradient-text'>Asisten Keuangan Cerdas (AI)</h2>", unsafe_allow_html=True)
+def render_dokter_portofolio(user_now, role):
+    st.markdown(f"<h2 class='gradient-text'>Dokter Kesehatan Portofolio</h2>", unsafe_allow_html=True)
+    st.caption("Sistem akan memindai dompet Anda untuk mendeteksi risiko konsentrasi yang berbahaya.")
     
-    tab_doc, tab_chat = st.tabs(["🩺 DOKTER PORTOFOLIO", "💬 CHATBOT PENASIHAT"])
-    
-    # ---------------------------------------------------------
-    # TAB 1: DOKTER PORTOFOLIO (AUTO-REBALANCING)
-    # ---------------------------------------------------------
-    with tab_doc:
-        st.markdown("### Audit Kesehatan Portofolio Anda")
-        st.caption("AI akan memindai dompet Anda untuk mendeteksi risiko konsentrasi yang berbahaya.")
-        
-        if st.button("Mulai Audit Kesehatan Keuangan", use_container_width=True):
-            with st.spinner("Memindai sektor aset di dompet Anda..."):
-                df_p = get_user_portfolio(user_now, role)
+    if st.button("Mulai Audit Kesehatan Keuangan", use_container_width=True):
+        with st.spinner("Memindai sektor aset di dompet Anda..."):
+            df_p = get_user_portfolio(user_now, role)
+            
+            if df_p.empty:
+                st.warning("Dompet Anda masih kosong. Silakan beli beberapa aset di menu Dompet Trading terlebih dahulu.")
+            else:
+                def hitung_modal_idr(row):
+                    is_cr = is_crypto_ticker(row['ticker'])
+                    pengali = 1 if is_cr else 100
+                    return float(row['buy_price']) * float(row['lots']) * pengali
                 
-                if df_p.empty:
-                    st.warning("Dompet Anda masih kosong. Silakan beli beberapa aset di menu Dompet Trading terlebih dahulu.")
+                df_p['Modal_IDR'] = df_p.apply(hitung_modal_idr, axis=1)
+                df_p['Sektor'] = df_p['ticker'].apply(get_sector)
+                
+                distribusi = df_p.groupby('Sektor')['Modal_IDR'].sum().reset_index()
+                total_semua_modal = distribusi['Modal_IDR'].sum()
+                distribusi['Persentase'] = (distribusi['Modal_IDR'] / total_semua_modal) * 100
+                
+                fig_pie = px.pie(distribusi, values='Modal_IDR', names='Sektor', title='Distribusi Sektor Portofolio Anda',
+                                 color_discrete_sequence=px.colors.sequential.Teal)
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                fig_pie.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_pie, use_container_width=True)
+                
+                sektor_terbesar = distribusi.loc[distribusi['Persentase'].idxmax()]
+                
+                st.markdown("---")
+                if sektor_terbesar['Persentase'] >= 70:
+                    st.error(f"⚠️ **STATUS: BAHAYA (RISIKO TINGGI)**\n\nPortofolio Anda terlalu berat di satu keranjang! **{sektor_terbesar['Persentase']:.1f}%** uang Anda tertumpuk di sektor **{sektor_terbesar['Sektor']}**. Jika sektor ini jatuh, seluruh uang Anda akan ikut amblas.")
+                    st.info("💡 **Resep Dokter:** Disarankan untuk memindahkan sebagian (Re-balancing) dana dari sektor ini ke sektor lain seperti Consumer, Energi, atau Kripto agar portofolio Anda lebih tahan banting terhadap krisis.")
+                elif sektor_terbesar['Persentase'] >= 40:
+                    st.warning(f"⚖️ **STATUS: PERLU PERHATIAN**\n\nSekitar **{sektor_terbesar['Persentase']:.1f}%** dana Anda ada di sektor **{sektor_terbesar['Sektor']}**. Ini masih wajar, tapi pertimbangkan untuk menambah aset di sektor lain agar diversifikasi lebih seimbang.")
                 else:
-                    def hitung_modal_idr(row):
-                        is_cr = is_crypto_ticker(row['ticker'])
-                        pengali = 1 if is_cr else 100
-                        return float(row['buy_price']) * float(row['lots']) * pengali
-                    
-                    df_p['Modal_IDR'] = df_p.apply(hitung_modal_idr, axis=1)
-                    df_p['Sektor'] = df_p['ticker'].apply(get_sector)
-                    
-                    distribusi = df_p.groupby('Sektor')['Modal_IDR'].sum().reset_index()
-                    total_semua_modal = distribusi['Modal_IDR'].sum()
-                    distribusi['Persentase'] = (distribusi['Modal_IDR'] / total_semua_modal) * 100
-                    
-                    fig_pie = px.pie(distribusi, values='Modal_IDR', names='Sektor', title='Distribusi Sektor Portofolio Anda',
-                                     color_discrete_sequence=px.colors.sequential.Teal)
-                    fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-                    fig_pie.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig_pie, use_container_width=True)
-                    
-                    sektor_terbesar = distribusi.loc[distribusi['Persentase'].idxmax()]
-                    
-                    st.markdown("---")
-                    if sektor_terbesar['Persentase'] >= 70:
-                        st.error(f"⚠️ **STATUS: BAHAYA (RISIKO TINGGI)**\n\nPortofolio Anda terlalu berat di satu keranjang! **{sektor_terbesar['Persentase']:.1f}%** uang Anda tertumpuk di sektor **{sektor_terbesar['Sektor']}**. Jika sektor ini jatuh, seluruh uang Anda akan ikut amblas.")
-                        st.info("💡 **Resep Dokter:** Disarankan untuk memindahkan sebagian (Re-balancing) dana dari sektor ini ke sektor lain seperti Consumer, Energi, atau Kripto agar portofolio Anda lebih tahan banting terhadap krisis.")
-                    elif sektor_terbesar['Persentase'] >= 40:
-                        st.warning(f"⚖️ **STATUS: PERLU PERHATIAN**\n\nSekitar **{sektor_terbesar['Persentase']:.1f}%** dana Anda ada di sektor **{sektor_terbesar['Sektor']}**. Ini masih wajar, tapi pertimbangkan untuk menambah aset di sektor lain agar diversifikasi lebih seimbang.")
-                    else:
-                        st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
+                    st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
 
-    # ---------------------------------------------------------
-    # TAB 2: CHATBOT AI GEMINI PERMANEN (AUTO-FALLBACK SYSTEM)
-    # ---------------------------------------------------------
-    with tab_chat:
-        st.markdown("### Ngobrol dengan AI Quant Advisor")
-        st.caption("Ketik pertanyaan seputar saham, kripto, atau kondisi makro ekonomi saat ini.")
+
+def render_ai_chat_panel(user_now, role):
+    # Desain Header Khusus Panel
+    st.markdown("""
+    <div style='background: linear-gradient(90deg, #2563EB, #10B981); padding: 12px; border-radius: 8px 8px 0 0; color: white; margin-bottom: 10px;'>
+        <b style='font-size: 1.1rem;'>🤖 AI Quant Advisor</b>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    c1, c2 = st.columns(2)
+    if c1.button("🗑️ Hapus Chat", use_container_width=True):
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya Asisten Pribadi Anda. Ada yang bisa saya bantu hari ini?"}]
+        st.rerun()
+    if c2.button("❌ Tutup Panel", use_container_width=True):
+        st.session_state.show_ai_panel = False
+        st.rerun()
+
+    api_key_rahasia = None
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key_rahasia = st.secrets["GEMINI_API_KEY"]
         
-        api_key_rahasia = None
-        if "GEMINI_API_KEY" in st.secrets:
-            api_key_rahasia = st.secrets["GEMINI_API_KEY"]
+    if not api_key_rahasia:
+        st.error("⚠️ API Key belum diset di menu Secrets.")
+        return
+        
+    genai.configure(api_key=api_key_rahasia)
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya Asisten Pribadi Anda. Ada yang bisa saya bantu hari ini?"}]
+
+    # Kotak Chat yang bisa di-scroll
+    chat_container = st.container(height=550, border=True)
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+    if prompt := st.chat_input("Tanya AI (Contoh: Analisis BBCA)..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            system_prompt = "Anda adalah penasihat keuangan profesional, ahli saham IDX dan kripto. Jawab ringkas, tegas, dan tidak berbunga-bunga dalam bahasa Indonesia. Pertanyaan User: " + prompt
             
-        if not api_key_rahasia:
-            st.error("⚠️ Sistem tidak mendeteksi kunci API. Pastikan Anda sudah menambahkan `GEMINI_API_KEY = '...'` di menu Settings > Secrets pada dashboard Streamlit Cloud Anda.")
-        else:
-            genai.configure(api_key=api_key_rahasia)
-            
-            if "messages" not in st.session_state:
-                st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
-
-            if st.button("🗑️ Bersihkan Riwayat Obrolan"):
-                st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
-                st.rerun()
-
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
-
-            if prompt := st.chat_input("Contoh: Tolong analisis apakah bagus beli BBCA saat ini?"):
-                st.session_state.messages.append({"role": "user", "content": prompt})
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-
-                system_prompt = "Anda adalah seorang penasihat keuangan profesional, ahli kuantitatif pasar modal (IDX), dan pakar kripto (Indodax). Jawablah pertanyaan user dengan bahasa Indonesia yang profesional, ringkas, berikan poin-poin tegas, dan hindari kata-kata yang terlalu berbunga-bunga. Pertanyaan User: " + prompt
-                
-                with st.chat_message("assistant"):
-                    with st.spinner("AI sedang memproses (mencari model yang paling stabil)..."):
-                        sukses = False
-                        log_error = ""
+            with st.chat_message("assistant"):
+                with st.spinner("AI berpikir..."):
+                    sukses = False
+                    log_error = ""
+                    
+                    try:
+                        # Trik Sapu Jagat: Auto-Fallback Model (Anti Error)
+                        daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        # Urutkan model tercepat dulu
+                        daftar_model.sort(key=lambda x: (not ('flash' in x.lower() or 'pro' in x.lower()), x))
                         
-                        try:
-                            # 1. Ambil semua daftar model yang benar-benar tersedia untuk API Key Anda
-                            daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                            
-                            # 2. Urutkan agar memprioritaskan yang ada kata 'flash' (lebih pintar/cepat) tapi taruh yang lain di belakangnya
-                            daftar_model.sort(key=lambda x: (not ('flash' in x.lower() or 'pro' in x.lower()), x))
-                            
-                            # 3. Tembak satu per satu sampai ada yang berhasil membalas
-                            for nama_model in daftar_model:
-                                try:
-                                    model = genai.GenerativeModel(nama_model)
-                                    response = model.generate_content(system_prompt)
-                                    
-                                    if response:
-                                        try:
-                                            teks_balasan = response.text
-                                        except ValueError:
-                                            teks_balasan = "Maaf, pertanyaan Anda diblokir oleh filter keamanan Google."
-                                            
-                                        st.markdown(teks_balasan)
-                                        st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
-                                        sukses = True
-                                        break # Berhasil! Keluar dari loop pencarian
-                                except Exception as e:
-                                    log_error += f"[{nama_model} gagal] "
-                                    continue # Coba model berikutnya di daftar
-                                    
-                            if not sukses:
-                                st.error(f"⚠️ Semua akses ke model AI ditolak oleh server Google. Silakan buat API Key baru menggunakan akun Google yang berbeda. Log: {log_error}")
-                        except Exception as e:
-                            st.error(f"Terjadi kesalahan sistem saat menghubungi Google: {e}")
+                        for nama_model in daftar_model:
+                            try:
+                                model = genai.GenerativeModel(nama_model)
+                                response = model.generate_content(system_prompt)
+                                
+                                if response:
+                                    try:
+                                        teks_balasan = response.text
+                                    except ValueError:
+                                        teks_balasan = "Maaf, filter keamanan Google memblokir jawaban ini."
+                                        
+                                    st.markdown(teks_balasan)
+                                    st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
+                                    sukses = True
+                                    break # Langsung berhenti jika 1 model berhasil
+                            except Exception as e:
+                                log_error += f"[{nama_model} gagal] "
+                                continue 
+                                
+                        if not sukses:
+                            st.error(f"⚠️ Semua server AI Google penuh/ditolak. Log: {log_error}")
+                    except Exception as e:
+                        st.error(f"Error sistem: {e}")
+        st.rerun() # Refresh agar chatbox selalu rapi di bawah
