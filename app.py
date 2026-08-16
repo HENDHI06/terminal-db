@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# Impor dari modul lokal yang sudah kita pisah
+# Impor dari modul lokal
 from core import authenticate_user, get_sidebar_log, get_ticker_data
 import views_crypto
 import views_idx
@@ -36,8 +36,6 @@ st.markdown("""
 .stApp { background-color: #F8FAFC !important; color: #0F172A !important; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
-
-/* PAKSA SEMUA TEKS JADI GELAP */
 p, span, label, li, div.stMarkdown, .stText { color: #1E293B; }
 
 /* --- HEADING & EFEK GRADASI --- */
@@ -108,7 +106,6 @@ input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 
 .stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
 @keyframes shimmer { 100% { left: 200%; } }
 
-/* Warna Custom Teks Utility */
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
@@ -162,9 +159,12 @@ if zona_market == "🏢 ZONA SAHAM (IDX)":
         "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR"
     ]
 else:
+    # 5 MENU BARU KRIPTO DITAMBAHKAN DI SINI
     menu_list = [
-        "🪙 DASBOR INDODAX", "🚀 RADAR ALTCOIN", "🐋 WHALE TRACKER INDODAX", "🔮 PREDIKSI KRIPTO", 
-        "⚔️ ADU KRIPTO", "🌐 PETA KRIPTO"
+        "🪙 DASBOR INDODAX", "🚀 RADAR ALTCOIN", "🐋 WHALE TRACKER INDODAX", 
+        "⚖️ RADAR ARBITRASE", "⏳ MESIN WAKTU DCA", "🔮 PREDIKSI KRIPTO", 
+        "⚔️ ADU KRIPTO", "🧬 KORELASI KRIPTO", "🎡 ROTASI NARASI", 
+        "🌐 PETA KRIPTO", "📰 BERITA KRIPTO"
     ]
 
 # MENU UNIVERSAL (Selalu Ada di Bawah Kedua Zona)
@@ -191,9 +191,14 @@ if ticker_html and zona_market == "🏢 ZONA SAHAM (IDX)":
 if menu == "🪙 DASBOR INDODAX": views_crypto.render_dasbor_indodax()
 elif menu == "🚀 RADAR ALTCOIN": views_crypto.render_radar_altcoin()
 elif menu == "🐋 WHALE TRACKER INDODAX": views_crypto.render_whale_tracker()
+elif menu == "⚖️ RADAR ARBITRASE": views_crypto.render_arbitrase()
+elif menu == "⏳ MESIN WAKTU DCA": views_crypto.render_dca()
 elif menu == "🔮 PREDIKSI KRIPTO": views_crypto.render_prediksi_kripto()
 elif menu == "⚔️ ADU KRIPTO": views_crypto.render_adu_kripto()
+elif menu == "🧬 KORELASI KRIPTO": views_crypto.render_korelasi_kripto()
+elif menu == "🎡 ROTASI NARASI": views_crypto.render_rotasi_narasi()
 elif menu == "🌐 PETA KRIPTO": views_crypto.render_peta_kripto()
+elif menu == "📰 BERITA KRIPTO": views_crypto.render_kripto_news()
 
 # ================= ZONA SAHAM =================
 elif menu == "🖥️ DASHBOARD UTAMA": views_idx.render_dashboard_utama()
