@@ -357,10 +357,11 @@ def render_dokter_portofolio(user_now, role):
                 else:
                     st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
 
+
 def render_ai_chat_panel(user_now, role):
-    # Menyuntikkan CSS khusus (menjaga agar tombol aksi tetap bersih)
     st.markdown("""
     <style>
+    /* Styling khusus tombol aksi panel agar putih dan rapi */
     div[data-testid="column"] button {
         background-color: #ffffff !important;
         color: #475569 !important;
@@ -395,14 +396,25 @@ def render_ai_chat_panel(user_now, role):
         border: 1px solid #cbd5e1 !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
     }
+    
+    /* BYPASS CSS SUPER KUAT UNTUK HEADER AI */
+    .ai-title-force {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        font-family: 'Inter', sans-serif !important;
+        margin: 0 !important;
+        letter-spacing: 0.5px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    # Header Panel AI - MEMAKSA WARNA PUTIH menggunakan <span> khusus untuk menghindari error warna
+    # Header Panel AI - Memaksa menggunakan <div> agar lolos dari jeratan CSS Streamlit
     st.markdown("""
     <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px 20px; border-radius: 12px 12px 0 0; border-bottom: 3px solid #3b82f6; display: flex; align-items: center; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        <span style="font-size: 1.4rem; margin-right: 10px;">🤖</span>
-        <span style="color: #ffffff !important; font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: 0.5px; font-family: 'Inter', sans-serif;">AI Quant Advisor</span>
+        <div style="font-size: 1.4rem; margin-right: 10px;">🤖</div>
+        <div class="ai-title-force">AI Quant Advisor</div>
     </div>
     """, unsafe_allow_html=True)
     
