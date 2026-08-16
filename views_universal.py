@@ -366,7 +366,7 @@ def render_asisten_ai(user_now, role):
                         st.success(f"✅ **STATUS: SANGAT SEHAT**\n\nDiversifikasi Anda luar biasa! Tidak ada satu pun sektor yang memonopoli lebih dari 40% portofolio Anda. Teruskan strategi ini!")
 
     # ---------------------------------------------------------
-    # TAB 2: CHATBOT AI GEMINI PERMANEN
+    # TAB 2: CHATBOT AI GEMINI PERMANEN (AUTO-FALLBACK SYSTEM)
     # ---------------------------------------------------------
     with tab_chat:
         st.markdown("### Ngobrol dengan AI Quant Advisor")
@@ -381,11 +381,9 @@ def render_asisten_ai(user_now, role):
         else:
             genai.configure(api_key=api_key_rahasia)
             
-            # Memori chat sementara
             if "messages" not in st.session_state:
                 st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
 
-            # Tombol untuk menghapus riwayat obrolan jika sudah kepanjangan
             if st.button("🗑️ Bersihkan Riwayat Obrolan"):
                 st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Otak AI Anda sudah tertanam secara permanen. Ada yang bisa saya bantu analisis hari ini?"}]
                 st.rerun()
@@ -402,22 +400,38 @@ def render_asisten_ai(user_now, role):
                 system_prompt = "Anda adalah seorang penasihat keuangan profesional, ahli kuantitatif pasar modal (IDX), dan pakar kripto (Indodax). Jawablah pertanyaan user dengan bahasa Indonesia yang profesional, ringkas, berikan poin-poin tegas, dan hindari kata-kata yang terlalu berbunga-bunga. Pertanyaan User: " + prompt
                 
                 with st.chat_message("assistant"):
-                    with st.spinner("AI sedang berpikir..."):
+                    with st.spinner("AI sedang memproses (mencari model yang paling stabil)..."):
+                        sukses = False
+                        log_error = ""
+                        
                         try:
-                            # --- SISTEM AUTO-DETECT: BERTANYA LANGSUNG KE GOOGLE ---
-                            model_yang_tersedia = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                            # 1. Ambil semua daftar model yang benar-benar tersedia untuk API Key Anda
+                            daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                             
-                            if not model_yang_tersedia:
-                                st.error("Google tidak memberikan akses model apa pun untuk API Key ini.")
-                            else:
-                                # Prioritaskan mengambil varian 'flash' agar responnya cepat
-                                nama_model_pilihan = next((m for m in model_yang_tersedia if 'flash' in m), model_yang_tersedia[0])
-                                
-                                model = genai.GenerativeModel(nama_model_pilihan)
-                                response = model.generate_content(system_prompt)
-                                teks_balasan = response.text
-                                
-                                st.markdown(teks_balasan)
-                                st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
+                            # 2. Urutkan agar memprioritaskan yang ada kata 'flash' (lebih pintar/cepat) tapi taruh yang lain di belakangnya
+                            daftar_model.sort(key=lambda x: (not ('flash' in x.lower() or 'pro' in x.lower()), x))
+                            
+                            # 3. Tembak satu per satu sampai ada yang berhasil membalas
+                            for nama_model in daftar_model:
+                                try:
+                                    model = genai.GenerativeModel(nama_model)
+                                    response = model.generate_content(system_prompt)
+                                    
+                                    if response:
+                                        try:
+                                            teks_balasan = response.text
+                                        except ValueError:
+                                            teks_balasan = "Maaf, pertanyaan Anda diblokir oleh filter keamanan Google."
+                                            
+                                        st.markdown(teks_balasan)
+                                        st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
+                                        sukses = True
+                                        break # Berhasil! Keluar dari loop pencarian
+                                except Exception as e:
+                                    log_error += f"[{nama_model} gagal] "
+                                    continue # Coba model berikutnya di daftar
+                                    
+                            if not sukses:
+                                st.error(f"⚠️ Semua akses ke model AI ditolak oleh server Google. Silakan buat API Key baru menggunakan akun Google yang berbeda. Log: {log_error}")
                         except Exception as e:
-                            st.error(f"Terjadi kesalahan sistem: {e}")
+                            st.error(f"Terjadi kesalahan sistem saat menghubungi Google: {e}")
