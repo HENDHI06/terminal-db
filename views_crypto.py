@@ -9,19 +9,21 @@ import yfinance as yf
 import numpy as np
 from datetime import datetime, timedelta
 
+# ==========================================
+# ⚙️ MESIN DATA (DATA FETCHERS)
+# ==========================================
+
 @st.cache_data(ttl=60)
 def fetch_indodax_live():
     """Mesin penarik data 100% ASLI & LANGSUNG dari Server Indodax"""
     try:
         url = "https://indodax.com/api/tickers"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
             
         tickers = data.get("tickers", {})
         results = []
-        
         for pair, info in tickers.items():
             if pair.endswith('_idr'): 
                 coin = pair.replace('_idr', '').upper()
@@ -32,70 +34,134 @@ def fetch_indodax_live():
                 bounce_pct = ((last_price - low_price) / low_price) * 100 if low_price > 0 else 0
                 
                 results.append({
-                    'ID': coin,
-                    'Last_Price': last_price,
-                    'Low_Price': low_price,
-                    'Bounce_Pct': bounce_pct,
-                    'Vol_IDR': vol_idr
+                    'ID': coin, 'Last_Price': last_price, 'Low_Price': low_price,
+                    'Bounce_Pct': bounce_pct, 'Vol_IDR': vol_idr
                 })
-                
         return pd.DataFrame(results)
-    except Exception as e:
+    except:
         return pd.DataFrame()
 
 @st.cache_data(ttl=30)
 def fetch_order_book(coin_id):
-    """Menarik data kedalaman pasar (Order Book Level 2) dari Indodax"""
+    """Menarik data kedalaman pasar (Order Book) dari Indodax"""
     try:
         url = f"https://indodax.com/api/depth/{coin_id.lower()}idr"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
-        
         df_buy = pd.DataFrame(data.get('buy', []), columns=['Price', 'Amount']).astype(float)
         df_sell = pd.DataFrame(data.get('sell', []), columns=['Price', 'Amount']).astype(float)
         return df_buy, df_sell
     except:
         return pd.DataFrame(), pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def fetch_fear_greed_index():
+    """Menarik data Psikologi Massa Kripto Global"""
+    try:
+        req = urllib.request.Request("https://api.alternative.me/fng/?limit=1", headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            return int(data['data'][0]['value']), data['data'][0]['value_classification']
+    except:
+        return 50, "Neutral"
+
+@st.cache_data(ttl=300)
+def fetch_funding_rates():
+    """Menarik data Funding Rate dari Binance (Deteksi Potensi Likuidasi)"""
+    try:
+        url = "https://fapi.binance.com/fapi/v1/premiumIndex"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+        
+        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'DOGEUSDT', 'XRPUSDT', 'PEPEUSDT']
+        results = []
+        for item in data:
+            if item['symbol'] in targets:
+                fr = float(item['lastFundingRate']) * 100 
+                results.append({'Koin': item['symbol'].replace('USDT', ''), 'Funding Rate (%)': fr})
+        return pd.DataFrame(results)
+    except:
+        return pd.DataFrame()
+
+def calculate_rsi(data, window=14):
+    """Kalkulator Relative Strength Index (RSI)"""
+    delta = data.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+# ==========================================
+# 🖥️ ROUTING MENU TAMPILAN UTAMA
+# ==========================================
+
 def render_dasbor_indodax():
     st.markdown("<h2 class='gradient-text'>🪙 Dasbor Indodax Utama</h2>", unsafe_allow_html=True)
-    st.write("Pantauan langsung denyut nadi market kripto lokal Indonesia.")
+    st.write("Pantauan langsung denyut nadi market kripto lokal Indonesia & Sentimen Global.")
+    
+    # --- FITUR 4: SPEEDOMETER FEAR & GREED ---
+    fgi_val, fgi_class = fetch_fear_greed_index()
+    fig_gauge = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = fgi_val,
+        title = {'text': f"Psikologi Massa: <b>{fgi_class.upper()}</b>", 'font': {'size': 18}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': "#0F172A", 'thickness': 0.25},
+            'steps': [
+                {'range': [0, 25], 'color': "#EF4444"},   # Merah (Extreme Fear) - Waktu Beli
+                {'range': [25, 45], 'color': "#F97316"},  # Oranye
+                {'range': [45, 55], 'color': "#EAB308"},  # Kuning (Netral)
+                {'range': [55, 75], 'color': "#84CC16"},  # Hijau Muda
+                {'range': [75, 100], 'color': "#10B981"}  # Hijau Tua (Extreme Greed) - Waktu Jual
+            ]
+        }
+    ))
+    fig_gauge.update_layout(height=250, margin=dict(l=10, r=10, t=40, b=10))
+    
+    col_g, col_m = st.columns([1, 1.5])
+    with col_g:
+        st.plotly_chart(fig_gauge, use_container_width=True)
     
     df = fetch_indodax_live()
-    if df.empty:
-        st.warning("Menghubungkan ke server Indodax... Silakan klik '🔄 Refresh Data Server'.")
-        return
+    with col_m:
+        if df.empty:
+            st.warning("Menghubungkan ke server Indodax...")
+        else:
+            koin_aktif = len(df[df['Vol_IDR'] > 5_000_000_000])
+            c1, c2 = st.columns(2)
+            c1.metric("Total Pasangan IDR", f"{len(df)} Koin")
+            c2.metric("Koin Bervolume Tinggi", f"{koin_aktif} Koin", "Vol > Rp 5 Miliar")
+            
+            df_vol = df.sort_values(by='Vol_IDR', ascending=False).head(1)
+            if not df_vol.empty:
+                st.metric("👑 Raja Volume (24h)", df_vol.iloc[0]['ID'], f"Rp {df_vol.iloc[0]['Vol_IDR']/1e9:.2f} Miliar")
+                
+            if fgi_val <= 25:
+                st.success("💡 **Sinyal Institusi:** Market sedang *Extreme Fear* (Kepanikan Maksimal). Ini adalah momentum paling aman untuk serok koin fundamental!")
+            elif fgi_val >= 75:
+                st.error("⚠️ **Sinyal Institusi:** Market sedang *Extreme Greed* (Sangat Rakus). Waspada bantingan keras (Koreksi) oleh Cukong. Siap-siap Take Profit.")
 
-    total_market = len(df)
-    koin_aktif = len(df[df['Vol_IDR'] > 5_000_000_000])
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Pasangan IDR", f"{total_market} Koin")
-    c2.metric("Koin Sangat Aktif", f"{koin_aktif} Koin", "Vol > Rp 5 Miliar")
-    
-    df_vol = df.sort_values(by='Vol_IDR', ascending=False).head(1)
-    if not df_vol.empty:
-        top_vol_coin = df_vol.iloc[0]
-        c3.metric("Raja Volume (24h)", top_vol_coin['ID'], f"Rp {top_vol_coin['Vol_IDR']/1e9:.2f} Miliar")
-
-    st.markdown("---")
-    st.markdown("### 🏆 Peta Momentum Indodax (24 Jam)")
-    col_gain, col_lose = st.columns(2)
-    
-    with col_gain:
-        st.success("🚀 Terjauh dari Dasar (Terbang)")
-        top_bounce = df.sort_values(by='Bounce_Pct', ascending=False).head(5)
-        top_bounce['Last_Price'] = top_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
-        top_bounce['Jauh_Dari_Dasar'] = top_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
-        st.dataframe(top_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
+    if not df.empty:
+        st.markdown("---")
+        st.markdown("### 🏆 Peta Momentum Indodax (24 Jam)")
+        col_gain, col_lose = st.columns(2)
         
-    with col_lose:
-        st.error("🧊 Masih di Dasar (Tertahan)")
-        bot_bounce = df.sort_values(by='Bounce_Pct', ascending=True).head(5)
-        bot_bounce['Last_Price'] = bot_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
-        bot_bounce['Jauh_Dari_Dasar'] = bot_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
-        st.dataframe(bot_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
+        with col_gain:
+            st.success("🚀 Terjauh dari Dasar (Terbang)")
+            top_bounce = df.sort_values(by='Bounce_Pct', ascending=False).head(5)
+            top_bounce['Last_Price'] = top_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+            top_bounce['Jauh_Dari_Dasar'] = top_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
+            st.dataframe(top_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
+            
+        with col_lose:
+            st.error("🧊 Masih di Dasar (Tertahan)")
+            bot_bounce = df.sort_values(by='Bounce_Pct', ascending=True).head(5)
+            bot_bounce['Last_Price'] = bot_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+            bot_bounce['Jauh_Dari_Dasar'] = bot_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
+            st.dataframe(bot_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
 
 def render_radar_altcoin():
     st.markdown("<h2 class='gradient-text'>🚀 Peringkat Akumulasi Cukong</h2>", unsafe_allow_html=True)
@@ -141,80 +207,71 @@ def render_radar_altcoin():
     
     display_df = df_sorted[['ID', 'Status_Koin', 'Skor_Akumulasi', 'Harga_Live', 'Pantulan_Dari_Dasar', 'Volume_Uang_IDR']]
     
-    # KODE PERBAIKAN: Pewarnaan manual (Tanpa library Matplotlib yang bikin error)
     def warnai_skor_manual(val):
-        if val >= 90:
-            warna = '#10B981' # Hijau Kuat
-        elif val >= 70:
-            warna = '#34D399' # Hijau Terang
-        elif val >= 50:
-            warna = '#FBBF24' # Kuning
-        else:
-            warna = '#EF4444' # Merah
+        if val >= 90: warna = '#10B981'
+        elif val >= 70: warna = '#34D399'
+        elif val >= 50: warna = '#FBBF24'
+        else: warna = '#EF4444'
         return f'background-color: {warna}; color: white; font-weight: bold;'
     
-    # Terapkan gaya warna khusus ke kolom skor
-    styled_table = display_df.style.applymap(warnai_skor_manual, subset=['Skor_Akumulasi'])
-    
-    st.dataframe(
-        styled_table,
-        hide_index=True, 
-        use_container_width=True,
-        height=600 
-    )
-
-    with st.expander("📖 Panduan Cara Membaca Skor (WAJIB BACA)"):
-        st.markdown("""
-        **Cara Mencari Koin Bagger / PUMP:**
-        * **💎 SANGAT BAGUS (Skor 90-100):** Koin ini sedang mengalami anomali. Uang yang masuk miliaran rupiah, tetapi harganya anehnya tidak naik sama sekali (ditahan). Ini adalah prioritas utama untuk dianalisis lebih lanjut karena cukong sedang akumulasi keras.
-        * **⭐ BAGUS (Skor 70-80):** Koin bervolume cukup besar dan baru naik sedikit dari harga bawahnya. Masih sangat wajar untuk masuk (Entry).
-        * **⚠️ LUMAYAN (Skor 50-60):** Uangnya kecil atau harganya sudah mulai melesat sedikit. Harus hati-hati dan melihat grafik.
-        * **❌ BURUK (Skor di bawah 50):** Jangan beli! Koin ini harganya sudah terbang terlalu tinggi menjauhi dasarnya, jika Anda masuk sekarang Anda akan menjadi pihak yang membeli jualan para cukong.
-        """)
+    st.dataframe(display_df.style.applymap(warnai_skor_manual, subset=['Skor_Akumulasi']), hide_index=True, use_container_width=True, height=600)
 
 def render_whale_tracker():
-    st.markdown("<h2 class='gradient-text'>🐋 Detektor Tembok Cukong (Order Book)</h2>", unsafe_allow_html=True)
-    st.info("Memindai uang nyata (Rupiah) yang sedang mengantre di pasar. Cari 'Tembok Hijau' yang tinggi menjulang, itu adalah *Support* buatan Cukong yang sangat kuat!")
+    st.markdown("<h2 class='gradient-text'>🐋 Whale Tracker & Likuidasi</h2>", unsafe_allow_html=True)
     
-    koin_pilihan = st.selectbox("Pilih Koin untuk di-X-Ray Temboknya:", ["BTC", "ETH", "SOL", "PEPE", "DOGE", "XRP", "ADA", "AVAX"])
+    tab_order, tab_liq = st.tabs(["🧱 TEMBOK CUKONG (SPOT)", "🩸 DETEKTOR LIKUIDASI (FUTURES)"])
     
-    if st.button(f"🔍 Pindai Tembok {koin_pilihan} Sekarang", use_container_width=True):
-        with st.spinner(f"Menyadap data antrean {koin_pilihan} di Indodax..."):
-            df_buy, df_sell = fetch_order_book(koin_pilihan)
-            if df_buy.empty or df_sell.empty:
-                st.error("Gagal menarik data antrean. Server Indodax mungkin sedang sibuk.")
-            else:
-                df_buy = df_buy.sort_values('Price', ascending=False).head(50)
-                df_buy['Total_IDR'] = df_buy['Price'] * df_buy['Amount']
-                df_buy['Cumulative_IDR'] = df_buy['Total_IDR'].cumsum()
+    with tab_order:
+        st.info("Memindai uang nyata (Rupiah) yang sedang mengantre di pasar. Cari 'Tembok Hijau' yang tinggi menjulang, itu adalah *Support* buatan Cukong yang sangat kuat!")
+        koin_pilihan = st.selectbox("Pilih Koin untuk di-X-Ray Temboknya:", ["BTC", "ETH", "SOL", "PEPE", "DOGE", "XRP", "ADA", "AVAX"])
+        
+        if st.button(f"🔍 Pindai Tembok {koin_pilihan} Sekarang", use_container_width=True):
+            with st.spinner(f"Menyadap data antrean {koin_pilihan} di Indodax..."):
+                df_buy, df_sell = fetch_order_book(koin_pilihan)
+                if not df_buy.empty and not df_sell.empty:
+                    df_buy = df_buy.sort_values('Price', ascending=False).head(50)
+                    df_buy['Total_IDR'] = df_buy['Price'] * df_buy['Amount']
+                    df_buy['Cumulative_IDR'] = df_buy['Total_IDR'].cumsum()
+                    
+                    df_sell = df_sell.sort_values('Price', ascending=True).head(50)
+                    df_sell['Total_IDR'] = df_sell['Price'] * df_sell['Amount']
+                    df_sell['Cumulative_IDR'] = df_sell['Total_IDR'].cumsum()
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=df_buy['Price'], y=df_buy['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#10B981', name='Antrean Beli (Tembok Support)'))
+                    fig.add_trace(go.Scatter(x=df_sell['Price'], y=df_sell['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#EF4444', name='Antrean Jual (Tembok Resistance)'))
+                    fig.update_layout(title=f"Peta Kekuatan Antrean Uang - {koin_pilihan}/IDR", xaxis_title="Tingkat Harga (Rp)", yaxis_title="Akumulasi Uang (Rp)", template="plotly_white")
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    total_beli_miliar = df_buy['Total_IDR'].sum() / 1e9
+                    total_jual_miliar = df_sell['Total_IDR'].sum() / 1e9
+                    st.markdown("---")
+                    c1, c2 = st.columns(2)
+                    c1.metric("Kekuatan Beli (Support)", f"Rp {total_beli_miliar:.2f} Miliar")
+                    c2.metric("Tekanan Jual (Resistance)", f"Rp {total_jual_miliar:.2f} Miliar")
+    
+    with tab_liq:
+        st.info("Mendeteksi *Funding Rate* global. Jika nilai sangat positif (merah), Ritel sedang rakus berutang (Long) dan Cukong bersiap menjatuhkan harga untuk melikuidasi mereka!")
+        df_funding = fetch_funding_rates()
+        if not df_funding.empty:
+            def format_funding(val):
+                if val > 0.05: return f"🔴 RAWAN BANTINGAN ({val:.4f}%)"
+                elif val < -0.05: return f"🟢 RAWAN PUMP NAIK ({val:.4f}%)"
+                else: return f"⚪ AMAN / NETRAL ({val:.4f}%)"
                 
-                df_sell = df_sell.sort_values('Price', ascending=True).head(50)
-                df_sell['Total_IDR'] = df_sell['Price'] * df_sell['Amount']
-                df_sell['Cumulative_IDR'] = df_sell['Total_IDR'].cumsum()
+            def color_funding(val):
+                if 'BANTINGAN' in val: return 'color: #EF4444; font-weight: bold;'
+                elif 'PUMP' in val: return 'color: #10B981; font-weight: bold;'
+                return 'color: #64748B;'
                 
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df_buy['Price'], y=df_buy['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#10B981', name='Antrean Beli (Tembok Support)'))
-                fig.add_trace(go.Scatter(x=df_sell['Price'], y=df_sell['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#EF4444', name='Antrean Jual (Tembok Resistance)'))
-                
-                fig.update_layout(title=f"Peta Kekuatan Antrean Uang - {koin_pilihan}/IDR", xaxis_title="Tingkat Harga (Rp)", yaxis_title="Total Akumulasi Antrean Uang (Rp)", template="plotly_white", hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                st.plotly_chart(fig, use_container_width=True)
-                
-                total_beli_miliar = df_buy['Total_IDR'].sum() / 1e9
-                total_jual_miliar = df_sell['Total_IDR'].sum() / 1e9
-                
-                st.markdown("---")
-                c1, c2 = st.columns(2)
-                c1.metric("Kekuatan Beli (Support)", f"Rp {total_beli_miliar:.2f} Miliar")
-                c2.metric("Tekanan Jual (Resistance)", f"Rp {total_jual_miliar:.2f} Miliar")
-                
-                if total_beli_miliar > total_jual_miliar * 1.5: st.success(f"💡 **Kesimpulan Sistem:** Tembok BELI dominan! Cukong menjaga harga {koin_pilihan}.")
-                elif total_jual_miliar > total_beli_miliar * 1.5: st.error(f"⚠️ **Kesimpulan Sistem:** Tembok JUAL raksasa. {koin_pilihan} akan berat untuk naik.")
-                else: st.info(f"⚖️ **Kesimpulan Sistem:** Kekuatan Beli dan Jual saat ini seimbang.")
+            df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
+            st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.applymap(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True)
+            
+            st.markdown("💡 **Trik Pro:** Jika koin tertulis 'RAWAN BANTINGAN', jangan beli koin tersebut di Indodax hari ini karena harga globalnya akan di-*dump* untuk membakar uang ritel.")
 
 def render_arbitrase():
-    st.markdown("<h2 class='gradient-text'>⚖️ Radar Arbitrase (Lokal vs Global)</h2>", unsafe_allow_html=True)
-    st.info("Mendeteksi koin yang 'Salah Harga'. Membandingkan harga di Indodax dengan harga standar Global (Wall Street/Binance).")
-    
+    st.markdown("<h2 class='gradient-text'>⚖️ Radar Arbitrase Kripto</h2>", unsafe_allow_html=True)
+    st.info("Mencari selisih harga antara Indodax dan market global (Binance/KuCoin).")
     if st.button("⚖️ Mulai Pindai Perbedaan Harga", use_container_width=True):
         with st.spinner("Menyelaraskan data kurs USD dan harga kripto global..."):
             try:
@@ -223,8 +280,8 @@ def render_arbitrase():
                     kurs_usd_idr = float(kurs_df.iloc[-1])
                 except:
                     kurs_usd_idr = 16000
-                
                 st.write(f"💵 *Nilai Tukar Referensi: 1 USD = Rp {kurs_usd_idr:,.0f}*")
+                
                 df_indo = fetch_indodax_live()
                 koin_target = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA', 'LINK']
                 tickers_yf = [f"{k}-USD" for k in koin_target]
@@ -253,89 +310,134 @@ def render_arbitrase():
                     
                 df_hasil['Status Harga'] = df_hasil['Status Harga'].apply(format_status)
                 st.dataframe(df_hasil.style.applymap(warna_status, subset=['Status Harga']), hide_index=True, use_container_width=True)
-            except Exception as e:
-                st.error("Terjadi kendala saat menyinkronkan data global. Coba lagi dalam beberapa detik.")
+            except:
+                st.error("Terjadi kendala saat menyinkronkan data global.")
 
 def render_dca():
-    st.markdown("<h2 class='gradient-text'>⏳ Mesin Waktu DCA Kripto</h2>", unsafe_allow_html=True)
-    st.info("Mengkalkulasi secara nyata keuntungan Anda jika rutin membeli kripto tertentu setiap bulan menggunakan data historis riil.")
+    st.markdown("<h2 class='gradient-text'>⏳ Mesin DCA Institusi (Smart DCA)</h2>", unsafe_allow_html=True)
+    st.info("Bandingkan menabung buta (DCA Klasik) vs Menabung menggunakan kecerdasan buatan (Smart DCA). Smart DCA akan mengerem pembelian saat harga sedang tinggi (RSI > 70) dan memborong 2x lipat saat harga jatuh murah (RSI < 40).")
     
     with st.form("dca_form"):
         c1, c2, c3 = st.columns(3)
-        coin_pilihan = c1.selectbox("Pilih Aset", ["BTC", "ETH", "SOL", "DOGE", "XRP"])
-        nabung_rutin = c2.number_input("Tabungan Rutin per Bulan (Rp)", min_value=100000, value=1000000, step=100000)
-        durasi_bulan = c3.slider("Sejak Berapa Bulan Lalu?", 1, 48, 12)
-        btn = st.form_submit_button("Hitung Profit DCA Saya", width="stretch")
+        coin_pilihan = c1.selectbox("Pilih Aset Historis", ["BTC", "ETH", "SOL", "DOGE", "LINK"])
+        nabung_rutin = c2.number_input("Alokasi Mingguan (Rp)", min_value=100000, value=1000000, step=100000)
+        durasi_bulan = c3.slider("Backtest Berapa Bulan Lalu?", 6, 48, 12)
+        btn = st.form_submit_button("Simulasi Perang Algoritma", width="stretch")
         
     if btn:
-        with st.spinner("Memutar waktu ke masa lalu..."):
+        with st.spinner("Memutar waktu ke masa lalu dan mengeksekusi ratusan transaksi..."):
             try:
-                df_hist = yf.download(f"{coin_pilihan}-USD", period=f"{durasi_bulan}mo", interval="1mo", progress=False)['Close']
-                if not df_hist.empty:
-                    df_hist = df_hist.dropna()
-                    total_koin = 0
-                    total_modal = 0
+                # Unduh data mingguan untuk backtest
+                df_hist = yf.download(f"{coin_pilihan}-USD", period=f"{durasi_bulan}mo", interval="1d", progress=False)['Close'].dropna()
+                df_hist = df_hist.to_frame(name='Price')
+                df_hist['RSI'] = calculate_rsi(df_hist['Price'], 14)
+                
+                # Resample ke mingguan untuk simulasi nabung per minggu
+                df_weekly = df_hist.resample('W').last().dropna()
+                
+                total_koin_dumb, total_modal_dumb = 0, 0
+                total_koin_smart, total_modal_smart = 0, 0
+                
+                for index, row in df_weekly.iterrows():
+                    price_idr = float(row['Price']) * 16000
+                    rsi = float(row['RSI'])
                     
-                    for price_usd in df_hist.values:
-                        price_idr = float(price_usd) * 16000
-                        koin_didapat = nabung_rutin / price_idr
-                        total_koin += koin_didapat
-                        total_modal += nabung_rutin
-                        
-                    harga_sekarang_idr = float(df_hist.iloc[-1]) * 16000
-                    nilai_sekarang = total_koin * harga_sekarang_idr
-                    profit_loss = nilai_sekarang - total_modal
-                    profit_pct = (profit_loss / total_modal) * 100
+                    # 1. DCA Biasa (Buta)
+                    total_koin_dumb += nabung_rutin / price_idr
+                    total_modal_dumb += nabung_rutin
                     
-                    st.markdown("---")
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Total Modal Dikeluarkan", f"Rp {total_modal:,.0f}")
-                    m2.metric("Nilai Portofolio Sekarang", f"Rp {nilai_sekarang:,.0f}", f"{profit_pct:.2f}%")
-                    m3.metric("Koin Terkumpul", f"{total_koin:.4f} {coin_pilihan}")
-                    
-                    if profit_loss > 0:
-                        st.success(f"🎉 Strategi disiplin berhasil! Anda menghasilkan **keuntungan bersih Rp {profit_loss:,.0f}** dibandingkan menabung biasa di bank.")
+                    # 2. Smart DCA
+                    if rsi < 40:
+                        # Market Crash -> Beli 2x Lipat
+                        total_koin_smart += (nabung_rutin * 2) / price_idr
+                        total_modal_smart += (nabung_rutin * 2)
+                    elif rsi > 70:
+                        # Market Pucuk -> Tahan uang (Nabung 0)
+                        pass
                     else:
-                        st.error(f"📉 Portofolio DCA Anda sedang merah Rp {profit_loss:,.0f}. Teruslah konsisten untuk menurunkan harga rata-rata (Average Down)!")
+                        # Market Normal -> Beli standar
+                        total_koin_smart += nabung_rutin / price_idr
+                        total_modal_smart += nabung_rutin
+                        
+                harga_sekarang_idr = float(df_weekly['Price'].iloc[-1]) * 16000
+                
+                nilai_dumb = total_koin_dumb * harga_sekarang_idr
+                profit_dumb_pct = ((nilai_dumb - total_modal_dumb) / total_modal_dumb) * 100
+                
+                nilai_smart = total_koin_smart * harga_sekarang_idr
+                profit_smart_pct = ((nilai_smart - total_modal_smart) / total_modal_smart) * 100 if total_modal_smart > 0 else 0
+                
+                st.markdown("### Hasil Tarung Strategi")
+                col_d, col_s = st.columns(2)
+                with col_d:
+                    st.error("🤖 Klasik DCA (Nabung Buta)")
+                    st.metric("Modal Keluar", f"Rp {total_modal_dumb:,.0f}")
+                    st.metric("Nilai Portofolio", f"Rp {nilai_dumb:,.0f}", f"{profit_dumb_pct:.2f}%")
+                with col_s:
+                    st.success("🧠 Smart DCA (Logika RSI)")
+                    st.metric("Modal Keluar (Fleksibel)", f"Rp {total_modal_smart:,.0f}")
+                    st.metric("Nilai Portofolio", f"Rp {nilai_smart:,.0f}", f"{profit_smart_pct:.2f}%")
+                    
+                if profit_smart_pct > profit_dumb_pct:
+                    st.info("💡 **Kesimpulan:** Algoritma Smart DCA menang telak! Anda menyelamatkan banyak uang dengan menahan diri saat pucuk dan menyerok banyak saat market berdarah.")
             except Exception as e:
-                st.error("Gagal menarik data masa lalu. Silakan coba lagi.")
+                st.error(f"Gagal melakukan simulasi: {e}")
 
 def render_prediksi_kripto():
-    st.markdown("<h2 class='gradient-text'>🔮 Prediksi Tren Kripto (Kuantitatif)</h2>", unsafe_allow_html=True)
-    st.info("Sistem menganalisis momentum rata-rata harga (Moving Average) 30 hari terakhir dan memproyeksikan arah tren 7 hari ke depan.")
+    st.markdown("<h2 class='gradient-text'>🎯 Auto-Fibonacci & Pivot Target</h2>", unsafe_allow_html=True)
+    st.info("Algoritma ini mengukur jarak titik tertinggi dan terendah 30 hari terakhir untuk mencetak garis Target Beli dan Jual menggunakan Rasio Emas Matematika (Fibonacci Retracement).")
     
-    koin_prediksi = st.selectbox("Pilih Koin untuk Diproyeksikan:", ["BTC", "ETH", "SOL", "DOGE"])
+    koin_prediksi = st.selectbox("Pilih Koin untuk Diukur:", ["BTC", "ETH", "SOL", "PEPE", "DOGE"])
     
-    if st.button("🔮 Tarik Garis Prediksi Tren", use_container_width=True):
-        with st.spinner("Mesin kuantitatif sedang mengkalkulasi..."):
+    if st.button("📏 Pasang Jaring Fibonacci", use_container_width=True):
+        with st.spinner("Menarik garis matematika presisi tinggi..."):
             try:
                 df_hist = yf.download(f"{koin_prediksi}-USD", period="30d", progress=False)['Close'].dropna()
                 if not df_hist.empty:
                     df_hist = df_hist.to_frame(name='Price')
-                    df_hist = df_hist.reset_index()
-                    df_hist['Hari_Ke'] = range(len(df_hist))
+                    df_hist['Date'] = df_hist.index
                     
-                    z = np.polyfit(df_hist['Hari_Ke'], df_hist['Price'], 1)
-                    p = np.poly1d(z)
+                    # Harga dikali kurs kasar untuk tampilan visual lokal
+                    df_hist['Price'] = df_hist['Price'] * 16000 
+                    
+                    tinggi = df_hist['Price'].max()
+                    rendah = df_hist['Price'].min()
+                    selisih = tinggi - rendah
+                    harga_sekarang = df_hist['Price'].iloc[-1]
+                    
+                    level_fib = {
+                        'Pucuk Tertinggi (0%)': tinggi,
+                        'Target Jual 2 (23.6%)': tinggi - 0.236 * selisih,
+                        'Target Jual 1 (38.2%)': tinggi - 0.382 * selisih,
+                        'Garis Emas / Titik Tengah (50%)': tinggi - 0.5 * selisih,
+                        'Support Pantulan (61.8%)': tinggi - 0.618 * selisih,
+                        'Support Kuat (78.6%)': tinggi - 0.786 * selisih,
+                        'Dasar Bawah (100%)': rendah
+                    }
                     
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df_hist['Date'], y=df_hist['Price'], mode='lines', name='Harga Aktual', line=dict(color='#2563EB', width=2)))
-                    fig.add_trace(go.Scatter(x=df_hist['Date'], y=p(df_hist['Hari_Ke']), mode='lines', name='Garis Tren Model', line=dict(color='#EF4444', width=2, dash='dash')))
+                    fig.add_trace(go.Scatter(x=df_hist['Date'], y=df_hist['Price'], mode='lines', name='Pergerakan Harga', line=dict(color='#2563EB', width=2)))
                     
-                    fig.update_layout(title=f"Proyeksi Tren {koin_prediksi} (Berdasarkan Momentum 30 Hari)", template="plotly_white")
+                    colors = ['#EF4444', '#F97316', '#FBBF24', '#A3A3A3', '#34D399', '#10B981', '#1E293B']
+                    for (nama_level, nilai), warna in zip(level_fib.items(), colors):
+                        fig.add_hline(y=nilai, line_dash="dash", line_color=warna, annotation_text=f"{nama_level}: Rp {nilai:,.0f}", annotation_position="right")
+                    
+                    fig.update_layout(title=f"X-Ray Fibonacci 30 Hari: {koin_prediksi}/IDR", template="plotly_white", height=500)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    kemiringan = z[0] 
-                    if kemiringan > 0:
-                        st.success(f"📈 **Sinyal Tren:** Algoritma membaca momentum {koin_prediksi} sedang **NAIK**. Jika tidak ada anomali pasar, arah 7 hari ke depan cenderung positif.")
+                    st.markdown("### 📝 Kesimpulan Trading Plan:")
+                    if harga_sekarang < level_fib['Support Pantulan (61.8%)']:
+                        st.success("🟢 **WAKTU BELI:** Harga saat ini berada di area bawah (Diskon). Lakukan cicil beli di sekitar area Support.")
+                    elif harga_sekarang > level_fib['Target Jual 1 (38.2%)']:
+                        st.error("🔴 **WAKTU JUAL:** Harga sudah memantul tinggi mendekati pucuk. Waktunya Anda bersiap *Take Profit*.")
                     else:
-                        st.error(f"📉 **Sinyal Tren:** Algoritma membaca momentum {koin_prediksi} sedang **TURUN**. Waspada terhadap koreksi lebih lanjut.")
-            except Exception as e:
-                st.error("Gagal menarik data model.")
+                        st.info("🟡 **AREA NETRAL:** Harga sedang terombang-ambing di tengah. Lebih baik menunggu konfirmasi arah selanjutnya.")
+            except:
+                st.error("Gagal menarik data Fibonacci.")
 
 def render_adu_kripto():
     st.markdown("<h2 class='gradient-text'>⚔️ Adu Kripto (Pair Comparison)</h2>", unsafe_allow_html=True)
-    st.info("Fitur untuk melihat koin mana yang tumbuh lebih cepat jika keduanya dimulai dari titik 0% di waktu yang sama (Normalisasi).")
+    st.info("Melihat koin mana yang tumbuh lebih cepat jika keduanya dimulai dari titik 0% di waktu yang sama (Normalisasi).")
     
     c1, c2 = st.columns(2)
     koin1 = c1.selectbox("Koin Penantang 1:", ["BTC", "ETH", "SOL", "ADA"], index=0)
@@ -357,31 +459,26 @@ def render_adu_kripto():
                 
                 fig.update_layout(title="Perbandingan Pertumbuhan (% Persentase)", yaxis_title="Pertumbuhan (Base 100)", template="plotly_white", hovermode="x unified")
                 st.plotly_chart(fig, use_container_width=True)
-                
-                akhir1 = df1_norm.iloc[-1] - 100
-                akhir2 = df2_norm.iloc[-1] - 100
-                st.success(f"🏆 Pemenang dalam periode ini adalah **{koin1 if akhir1 > akhir2 else koin2}**.")
             except:
-                st.error("Gagal menarik data grafik. Koin mungkin tidak tersedia.")
+                st.error("Gagal menarik data grafik.")
 
 def render_korelasi_kripto():
     st.markdown("<h2 class='gradient-text'>🧬 Matriks Korelasi Kripto</h2>", unsafe_allow_html=True)
-    st.info("Peta panas (Heatmap) ini mendeteksi seberapa kuat koin bergerak bersamaan. Skor mendekati 1 berarti mereka selalu naik/turun bareng. Skor negatif berarti saling bertolak belakang.")
+    st.info("Peta panas (Heatmap) ini mendeteksi seberapa kuat koin bergerak bersamaan. Skor mendekati 1 berarti mereka selalu naik/turun bareng.")
     
     if st.button("🧬 Pindai DNA Market (Top Koin)", use_container_width=True):
         with st.spinner("Mengunduh data pergerakan..."):
             try:
                 tickers = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'DOGE-USD', 'XRP-USD', 'LINK-USD']
                 df = yf.download(tickers, period="3mo", progress=False)['Close'].dropna()
-                
                 df.columns = [c.replace('-USD', '') for c in df.columns]
-                corr_matrix = df.corr()
                 
+                corr_matrix = df.corr()
                 fig = px.imshow(corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
                 fig.update_layout(title="Heatmap Korelasi (3 Bulan Terakhir)", template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
                 
-                st.markdown("💡 **Tips Trading:** Jangan beli koin yang korelasinya 0.9 ke atas sekaligus (Misal BTC dan ETH) karena itu sama saja menaruh uang di keranjang yang persis sama. Carilah koin dengan korelasi rendah untuk lindung nilai (Diversifikasi).")
+                st.markdown("💡 **Tips Trading:** Jangan beli koin yang korelasinya 0.9 ke atas sekaligus (Misal BTC dan ETH) karena itu sama saja menaruh uang di keranjang yang persis sama. Carilah diversifikasi.")
             except:
                 st.error("Gagal memuat matriks.")
 
@@ -393,10 +490,10 @@ def render_rotasi_narasi():
     if df.empty: return
     
     sektor_map = {
-        'Layer-1': ['BTC', 'ETH', 'SOL', 'ADA', 'AVAX', 'DOT', 'NEAR', 'FTM'],
-        'Meme': ['DOGE', 'SHIB', 'PEPE', 'FLOKI'],
-        'DeFi': ['UNI', 'LINK', 'AAVE', 'MKR', 'COMP'],
-        'Gaming/Web3': ['SAND', 'MANA', 'GALA', 'AXS', 'ENJ']
+        'Layer-1 Utama': ['BTC', 'ETH', 'SOL', 'ADA', 'AVAX', 'DOT', 'NEAR'],
+        'Koin Meme': ['DOGE', 'SHIB', 'PEPE', 'FLOKI'],
+        'Keuangan DeFi': ['UNI', 'LINK', 'AAVE', 'MKR', 'COMP'],
+        'Gaming & Metaverse': ['SAND', 'MANA', 'GALA', 'AXS', 'ENJ']
     }
     
     hasil_sektor = []
@@ -409,12 +506,10 @@ def render_rotasi_narasi():
             
     if hasil_sektor:
         df_hasil = pd.DataFrame(hasil_sektor).sort_values(by='Total Uang Masuk (Miliar)', ascending=False)
-        
         fig = px.bar(df_hasil, x='Sektor/Narasi', y='Total Uang Masuk (Miliar)', color='Rata-rata Pantulan', 
                      color_continuous_scale=['#1E293B', '#10B981', '#EF4444'], text_auto='.2s',
-                     title="Aliran Dana Per Sektor (Narasi) Hari Ini")
+                     title="Aliran Dana Per Sektor Hari Ini")
         st.plotly_chart(fig, use_container_width=True)
-        st.write("💡 Perhatikan sektor dengan **Volume tertinggi tetapi warnanya gelap (Pantulan kecil)**, itu tandanya sektor tersebut sedang diakumulasi dan bersiap meledak menyusul sektor lainnya.")
 
 def render_peta_kripto():
     st.markdown("<h2 class='gradient-text'>🌐 Peta Panas Indodax (Heatmap)</h2>", unsafe_allow_html=True)
@@ -440,7 +535,6 @@ def render_kripto_news():
             try:
                 crypto = yf.Ticker("BTC-USD")
                 berita = crypto.news
-                
                 if berita:
                     for b in berita[:5]: 
                         with st.expander(f"🔴 {b.get('title', 'Berita Tanpa Judul')}"):
