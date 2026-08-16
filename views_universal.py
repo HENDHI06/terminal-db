@@ -404,32 +404,20 @@ def render_asisten_ai(user_now, role):
                 with st.chat_message("assistant"):
                     with st.spinner("AI sedang berpikir..."):
                         try:
-                            # --- SISTEM AUTO-FALLBACK MODEL AI ---
-                            # Kita coba panggil dari versi terbaru yang stabil hingga versi lama
-                            daftar_model = [
-                                "gemini-2.0-flash", 
-                                "gemini-1.5-flash", 
-                                "gemini-1.5-pro", 
-                                "gemini-pro"
-                            ]
+                            # --- SISTEM AUTO-DETECT: BERTANYA LANGSUNG KE GOOGLE ---
+                            model_yang_tersedia = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                             
-                            response = None
-                            error_msg = ""
-                            
-                            for nama_model in daftar_model:
-                                try:
-                                    model = genai.GenerativeModel(nama_model)
-                                    response = model.generate_content(system_prompt)
-                                    break # Jika berhasil menjawab, langsung keluar dari loop!
-                                except Exception as e:
-                                    error_msg = str(e)
-                                    continue # Jika model ini diblokir/tidak ada, lanjut ke model berikutnya
-                            
-                            if response:
+                            if not model_yang_tersedia:
+                                st.error("Google tidak memberikan akses model apa pun untuk API Key ini.")
+                            else:
+                                # Prioritaskan mengambil varian 'flash' agar responnya cepat
+                                nama_model_pilihan = next((m for m in model_yang_tersedia if 'flash' in m), model_yang_tersedia[0])
+                                
+                                model = genai.GenerativeModel(nama_model_pilihan)
+                                response = model.generate_content(system_prompt)
                                 teks_balasan = response.text
+                                
                                 st.markdown(teks_balasan)
                                 st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
-                            else:
-                                st.error(f"Semua versi model AI gagal diakses. Error terakhir: {error_msg}")
                         except Exception as e:
                             st.error(f"Terjadi kesalahan sistem: {e}")
