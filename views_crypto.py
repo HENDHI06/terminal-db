@@ -140,7 +140,37 @@ def render_radar_altcoin():
     df_sorted['Pantulan_Dari_Dasar'] = df_sorted['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
     
     display_df = df_sorted[['ID', 'Status_Koin', 'Skor_Akumulasi', 'Harga_Live', 'Pantulan_Dari_Dasar', 'Volume_Uang_IDR']]
-    st.dataframe(display_df.style.background_gradient(subset=['Skor_Akumulasi'], cmap='RdYlGn', vmin=0, vmax=100), hide_index=True, use_container_width=True, height=600)
+    
+    # KODE PERBAIKAN: Pewarnaan manual (Tanpa library Matplotlib yang bikin error)
+    def warnai_skor_manual(val):
+        if val >= 90:
+            warna = '#10B981' # Hijau Kuat
+        elif val >= 70:
+            warna = '#34D399' # Hijau Terang
+        elif val >= 50:
+            warna = '#FBBF24' # Kuning
+        else:
+            warna = '#EF4444' # Merah
+        return f'background-color: {warna}; color: white; font-weight: bold;'
+    
+    # Terapkan gaya warna khusus ke kolom skor
+    styled_table = display_df.style.applymap(warnai_skor_manual, subset=['Skor_Akumulasi'])
+    
+    st.dataframe(
+        styled_table,
+        hide_index=True, 
+        use_container_width=True,
+        height=600 
+    )
+
+    with st.expander("📖 Panduan Cara Membaca Skor (WAJIB BACA)"):
+        st.markdown("""
+        **Cara Mencari Koin Bagger / PUMP:**
+        * **💎 SANGAT BAGUS (Skor 90-100):** Koin ini sedang mengalami anomali. Uang yang masuk miliaran rupiah, tetapi harganya anehnya tidak naik sama sekali (ditahan). Ini adalah prioritas utama untuk dianalisis lebih lanjut karena cukong sedang akumulasi keras.
+        * **⭐ BAGUS (Skor 70-80):** Koin bervolume cukup besar dan baru naik sedikit dari harga bawahnya. Masih sangat wajar untuk masuk (Entry).
+        * **⚠️ LUMAYAN (Skor 50-60):** Uangnya kecil atau harganya sudah mulai melesat sedikit. Harus hati-hati dan melihat grafik.
+        * **❌ BURUK (Skor di bawah 50):** Jangan beli! Koin ini harganya sudah terbang terlalu tinggi menjauhi dasarnya, jika Anda masuk sekarang Anda akan menjadi pihak yang membeli jualan para cukong.
+        """)
 
 def render_whale_tracker():
     st.markdown("<h2 class='gradient-text'>🐋 Detektor Tembok Cukong (Order Book)</h2>", unsafe_allow_html=True)
@@ -240,14 +270,12 @@ def render_dca():
     if btn:
         with st.spinner("Memutar waktu ke masa lalu..."):
             try:
-                # Menggunakan yfinance bulanan
                 df_hist = yf.download(f"{coin_pilihan}-USD", period=f"{durasi_bulan}mo", interval="1mo", progress=False)['Close']
                 if not df_hist.empty:
                     df_hist = df_hist.dropna()
                     total_koin = 0
                     total_modal = 0
                     
-                    # Simulasi pembelian setiap bulan (asumsi kurs 16.000)
                     for price_usd in df_hist.values:
                         price_idr = float(price_usd) * 16000
                         koin_didapat = nabung_rutin / price_idr
@@ -287,20 +315,17 @@ def render_prediksi_kripto():
                     df_hist = df_hist.reset_index()
                     df_hist['Hari_Ke'] = range(len(df_hist))
                     
-                    # Simple Linear Regression Line (Trend Line)
                     z = np.polyfit(df_hist['Hari_Ke'], df_hist['Price'], 1)
                     p = np.poly1d(z)
                     
                     fig = go.Figure()
-                    # Garis harga asli
                     fig.add_trace(go.Scatter(x=df_hist['Date'], y=df_hist['Price'], mode='lines', name='Harga Aktual', line=dict(color='#2563EB', width=2)))
-                    # Garis Tren/Prediksi
                     fig.add_trace(go.Scatter(x=df_hist['Date'], y=p(df_hist['Hari_Ke']), mode='lines', name='Garis Tren Model', line=dict(color='#EF4444', width=2, dash='dash')))
                     
                     fig.update_layout(title=f"Proyeksi Tren {koin_prediksi} (Berdasarkan Momentum 30 Hari)", template="plotly_white")
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    kemiringan = z[0] # Slope
+                    kemiringan = z[0] 
                     if kemiringan > 0:
                         st.success(f"📈 **Sinyal Tren:** Algoritma membaca momentum {koin_prediksi} sedang **NAIK**. Jika tidak ada anomali pasar, arah 7 hari ke depan cenderung positif.")
                     else:
@@ -323,7 +348,6 @@ def render_adu_kripto():
                 df1 = yf.download(f"{koin1}-USD", period=durasi, progress=False)['Close'].dropna()
                 df2 = yf.download(f"{koin2}-USD", period=durasi, progress=False)['Close'].dropna()
                 
-                # Normalisasi persentase pertumbuhan dari hari pertama
                 df1_norm = (df1 / df1.iloc[0]) * 100
                 df2_norm = (df2 / df2.iloc[0]) * 100
                 
@@ -350,10 +374,7 @@ def render_korelasi_kripto():
                 tickers = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'DOGE-USD', 'XRP-USD', 'LINK-USD']
                 df = yf.download(tickers, period="3mo", progress=False)['Close'].dropna()
                 
-                # Rapikan nama kolom
                 df.columns = [c.replace('-USD', '') for c in df.columns]
-                
-                # Hitung korelasi
                 corr_matrix = df.corr()
                 
                 fig = px.imshow(corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
@@ -371,7 +392,6 @@ def render_rotasi_narasi():
     df = fetch_indodax_live()
     if df.empty: return
     
-    # Pengelompokan Narasi Manual (Sederhana)
     sektor_map = {
         'Layer-1': ['BTC', 'ETH', 'SOL', 'ADA', 'AVAX', 'DOT', 'NEAR', 'FTM'],
         'Meme': ['DOGE', 'SHIB', 'PEPE', 'FLOKI'],
@@ -381,11 +401,10 @@ def render_rotasi_narasi():
     
     hasil_sektor = []
     for sektor, koin_list in sektor_map.items():
-        # Cari koin sektor ini di data Indodax
         df_sektor = df[df['ID'].isin(koin_list)]
         if not df_sektor.empty:
             avg_bounce = df_sektor['Bounce_Pct'].mean()
-            total_vol = df_sektor['Vol_IDR'].sum() / 1e9 # Miliar
+            total_vol = df_sektor['Vol_IDR'].sum() / 1e9 
             hasil_sektor.append({'Sektor/Narasi': sektor, 'Rata-rata Pantulan': avg_bounce, 'Total Uang Masuk (Miliar)': total_vol})
             
     if hasil_sektor:
@@ -419,12 +438,11 @@ def render_kripto_news():
     if st.button("📰 Tarik Berita Kripto Terkini", use_container_width=True):
         with st.spinner("Menghubungkan ke Feed Berita Global..."):
             try:
-                # Menggunakan library YFinance bawaan untuk menarik berita terkait BTC
                 crypto = yf.Ticker("BTC-USD")
                 berita = crypto.news
                 
                 if berita:
-                    for b in berita[:5]: # Ambil 5 berita terbaru
+                    for b in berita[:5]: 
                         with st.expander(f"🔴 {b.get('title', 'Berita Tanpa Judul')}"):
                             st.write(f"**Publisher:** {b.get('publisher', 'Global Media')}")
                             st.write(f"🔗 [Baca Selengkapnya di Sini]({b.get('link', '#')})")
