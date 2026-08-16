@@ -359,17 +359,89 @@ def render_dokter_portofolio(user_now, role):
 
 
 def render_ai_chat_panel(user_now, role):
+    # Gunakan CSS khusus untuk panel AI agar lebih profesional (Hapus paksa warna biru primary Streamlit)
     st.markdown("""
-    <div style='background: linear-gradient(90deg, #2563EB, #10B981); padding: 12px; border-radius: 8px 8px 0 0; color: white; margin-bottom: 10px;'>
-        <b style='font-size: 1.1rem;'>🤖 AI Quant Advisor</b>
+    <style>
+    .ai-header-container {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        padding: 15px 20px;
+        border-radius: 12px 12px 0 0;
+        border-bottom: 3px solid #3b82f6;
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .ai-title {
+        color: #f8fafc !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        letter-spacing: 0.5px;
+    }
+    .ai-icon {
+        font-size: 1.4rem;
+        margin-right: 10px;
+    }
+    
+    /* Tombol Aksi Kustom untuk Chat (Bersih & Elegan) */
+    div[data-testid="column"] button {
+        background-color: #ffffff !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s !important;
+        padding: 6px 12px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+    div[data-testid="column"] button:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        border-color: #cbd5e1 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    }
+    
+    /* Styling khusus bubble chat agar tidak kaku */
+    .stChatMessage {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) {
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+    }
+    .stChatInputContainer {
+        border-radius: 20px !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Header Profesional (Tanpa kotak biru kaku bawaan Streamlit)
+    st.markdown("""
+    <div class="ai-header-container">
+        <span class="ai-icon">🤖</span>
+        <h3 class="ai-title">AI Quant Advisor</h3>
     </div>
     """, unsafe_allow_html=True)
     
+    # Merapikan nama user (misal "hen_dhi" jadi "Hen_dhi", atau "HENDHI" jadi "Hendhi")
+    nama_tampil = user_now.title() if user_now else "Trader"
+    
+    # Tombol Aksi disejajarkan dengan rapi
     c1, c2 = st.columns(2)
-    if c1.button("🗑️ Hapus Chat", use_container_width=True):
-        st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya Asisten Pribadi Anda. Ada yang bisa saya bantu hari ini?"}]
+    if c1.button("🗑️ Bersihkan Chat", use_container_width=True, key="clear_chat_btn"):
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
         st.rerun()
-    if c2.button("❌ Tutup Panel", use_container_width=True):
+        
+    if c2.button("✖️ Tutup Panel AI", use_container_width=True, key="close_panel_btn"):
         st.session_state.show_ai_panel = False
         st.rerun()
 
@@ -378,37 +450,42 @@ def render_ai_chat_panel(user_now, role):
         api_key_rahasia = st.secrets["GEMINI_API_KEY"]
         
     if not api_key_rahasia:
-        st.error("⚠️ API Key belum diset di menu Secrets.")
+        st.error("⚠️ Kunci API (API Key) belum dikonfigurasi. Silakan tambahkan 'GEMINI_API_KEY' di pengaturan rahasia (Secrets) Streamlit.")
         return
         
     genai.configure(api_key=api_key_rahasia)
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": f"Halo {user_now.capitalize()}! Saya Asisten Pribadi Anda. Ada yang bisa saya bantu hari ini?"}]
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
 
-    chat_container = st.container(height=550, border=True)
+    # Kontainer Chatbox
+    chat_container = st.container(height=500, border=False)
+    
     with chat_container:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-    if prompt := st.chat_input("Tanya AI (Contoh: Analisis BBCA)..."):
+    # Input Chat
+    if prompt := st.chat_input("Tanya AI (Cth: Analisis fundamental ASII)..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-            system_prompt = "Anda adalah penasihat keuangan profesional, ahli saham IDX dan kripto. Jawab ringkas, tegas, dan tidak berbunga-bunga dalam bahasa Indonesia. Pertanyaan User: " + prompt
+            system_prompt = f"Anda adalah penasihat keuangan kuantitatif profesional untuk pasar saham IDX dan aset Kripto. Anda berbicara dengan {nama_tampil}. Jawablah secara ringkas, analitis, langsung pada intinya (to the point), dan gunakan bahasa Indonesia yang formal namun mudah dipahami. Hindari bahasa yang terlalu berbunga-bunga. Pertanyaan User: {prompt}"
             
             with st.chat_message("assistant"):
-                with st.spinner("AI berpikir..."):
+                with st.spinner("Menganalisis data pasar..."):
                     sukses = False
                     log_error = ""
                     
                     try:
+                        # Trik Sapu Jagat: Auto-Fallback Model (Anti Error 404)
                         daftar_model = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        daftar_model.sort(key=lambda x: (not ('flash' in x.lower() or 'pro' in x.lower()), x))
+                        # Urutkan: prioritas yang ada 'flash', lalu 'pro', sisanya di belakang
+                        daftar_model.sort(key=lambda x: (not ('flash' in x.lower()), not ('pro' in x.lower()), x))
                         
                         for nama_model in daftar_model:
                             try:
@@ -419,7 +496,7 @@ def render_ai_chat_panel(user_now, role):
                                     try:
                                         teks_balasan = response.text
                                     except ValueError:
-                                        teks_balasan = "Maaf, filter keamanan Google memblokir jawaban ini."
+                                        teks_balasan = "Mohon maaf, sistem keamanan Google memblokir respons ini karena mengandung kata kunci yang dibatasi."
                                         
                                     st.markdown(teks_balasan)
                                     st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
@@ -430,7 +507,7 @@ def render_ai_chat_panel(user_now, role):
                                 continue 
                                 
                         if not sukses:
-                            st.error(f"⚠️ Semua server AI Google penuh/ditolak. Log: {log_error}")
+                            st.error(f"⚠️ Saat ini server AI sedang sibuk atau menolak koneksi. Log teknis: {log_error}")
                     except Exception as e:
-                        st.error(f"Error sistem: {e}")
+                        st.error(f"Kesalahan sistem internal: {e}")
         st.rerun() 
