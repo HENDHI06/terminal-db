@@ -81,13 +81,61 @@ input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: inset 
 [data-testid="stMetricLabel"] * { color: #64748B !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #0F172A !important; font-weight: 600 !important; }
 
-.stButton>button { background-color: #2563EB !important; border: none !important; border-radius: 8px !important; min-height: 44px; width: 100%; margin-top: 5px; margin-bottom: 5px; transition: background-color 0.2s ease, transform 0.1s ease; position: relative; overflow: hidden; }
-.stButton>button p, .stButton>button span, .stButton>button div { color: #FFFFFF !important; font-family: 'Inter', sans-serif !important; font-weight: 600 !important; font-size: 0.9rem !important; position: relative; z-index: 2; }
-.stButton>button:hover { background-color: #1D4ED8 !important; transform: scale(1.02); }
-.stButton>button::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg); animation: shimmer 3s infinite; z-index: 1; }
-@keyframes shimmer { 100% { left: 200%; } }
-
 .text-green { color: #16A34A !important; } .text-red { color: #DC2626 !important; } .text-blue { color: #2563EB !important; } .text-muted { color: #64748B !important; font-size: 13px; }
+
+/* Custom AI Panel Styling (app.py level) */
+.ai-panel-header {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    color: white;
+    padding: 16px;
+    border-radius: 12px 12px 0 0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.ai-panel-header h3 {
+    margin: 0;
+    color: white !important;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.chat-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    background: #F1F5F9;
+    color: #475569;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid #E2E8F0;
+    transition: all 0.2s;
+    cursor: pointer;
+    width: 100%;
+}
+.chat-action-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+.ai-message {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px 12px 12px 0;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    color: #1E293B;
+}
+.user-message {
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: 12px 12px 0 12px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    color: #1E3A8A;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -158,7 +206,8 @@ menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility
 
 # TOMBOL AI DITETAPKAN DI SIDEBAR PALING BAWAH
 st.sidebar.write("---")
-if st.sidebar.button("💬 Bicara dengan AI", type="primary", use_container_width=True):
+# Menggunakan tombol standar (bukan primary) agar tidak menabrak tema warna
+if st.sidebar.button("💬 Bicara dengan AI", use_container_width=True):
     st.session_state.show_ai_panel = not st.session_state.show_ai_panel
     st.rerun()
 
