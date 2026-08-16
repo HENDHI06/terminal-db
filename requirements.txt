@@ -8,3 +8,4 @@ requests
 pytz
 st-gsheets-connection
 feedparser
+google-generativeai
