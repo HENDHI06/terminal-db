@@ -372,7 +372,6 @@ def render_asisten_ai(user_now, role):
         st.markdown("### Ngobrol dengan AI Quant Advisor")
         st.caption("Ketik pertanyaan seputar saham, kripto, atau kondisi makro ekonomi saat ini.")
         
-        # Mengekstrak kunci dari Brankas Streamlit Secrets
         api_key_rahasia = None
         if "GEMINI_API_KEY" in st.secrets:
             api_key_rahasia = st.secrets["GEMINI_API_KEY"]
@@ -381,7 +380,21 @@ def render_asisten_ai(user_now, role):
             st.error("⚠️ Sistem tidak mendeteksi kunci API. Pastikan Anda sudah menambahkan `GEMINI_API_KEY = '...'` di menu Settings > Secrets pada dashboard Streamlit Cloud Anda.")
         else:
             genai.configure(api_key=api_key_rahasia)
-            model = genai.GenerativeModel('gemini-pro')
+            
+            # --- KODE PINTAR: MENCARI OTOMATIS MODEL AI YANG TERSEDIA ---
+            nama_model_valid = "gemini-1.5-flash" # Cadangan
+            try:
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        nama_model_valid = m.name
+                        # Prioritaskan model "flash" karena responnya paling cepat untuk chat
+                        if "flash" in nama_model_valid.lower():
+                            break
+            except Exception:
+                pass
+                
+            model = genai.GenerativeModel(nama_model_valid)
+            # ------------------------------------------------------------
             
             # Memori chat sementara
             if "messages" not in st.session_state:
