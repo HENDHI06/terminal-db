@@ -4,15 +4,63 @@ import pandas as pd
 import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
-from core import get_indodax_data
+from core import *
+
+@st.cache_data(ttl=300)
+def fetch_live_crypto_data():
+    """Fungsi mandiri untuk menarik data Kripto (IDR) secara live"""
+    # Daftar 25 koin populer dengan volume tinggi
+    coins = [
+        'BTC-IDR', 'ETH-IDR', 'BNB-IDR', 'SOL-IDR', 'XRP-IDR', 
+        'DOGE-IDR', 'ADA-IDR', 'TRX-IDR', 'LINK-IDR', 'MATIC-IDR', 
+        'DOT-IDR', 'LTC-IDR', 'SHIB-IDR', 'AVAX-IDR', 'BCH-IDR', 
+        'ATOM-IDR', 'XLM-IDR', 'UNI-IDR', 'FTM-IDR', 'NEAR-IDR', 
+        'ALGO-IDR', 'VET-IDR', 'MANA-IDR', 'SAND-IDR', 'PEPE-USD' # PEPE pakai USD karena IDR kadang tidak likuid di server global
+    ]
+    
+    try:
+        df_yf = yf.download(coins, period="5d", progress=False)
+        results = []
+        
+        for coin in coins:
+            try:
+                close_prices = df_yf['Close'][coin].dropna()
+                volume_koin = df_yf['Volume'][coin].dropna()
+                
+                if len(close_prices) >= 2:
+                    last_price = float(close_prices.iloc[-1])
+                    prev_price = float(close_prices.iloc[-2])
+                    pct_change = ((last_price - prev_price) / prev_price) * 100
+                    
+                    # Konversi PEPE USD ke IDR secara kasar (asumsi kurs 16.000)
+                    if coin == 'PEPE-USD':
+                        last_price = last_price * 16000
+                        vol_idr = float(volume_koin.iloc[-1]) * last_price
+                        coin_name = 'PEPE'
+                    else:
+                        vol_idr = float(volume_koin.iloc[-1]) * last_price 
+                        coin_name = coin.replace('-IDR', '')
+                        
+                    results.append({
+                        'ID': coin_name,
+                        'Last_Price': last_price,
+                        '%_Change': pct_change,
+                        'Vol_IDR': vol_idr
+                    })
+            except Exception:
+                continue
+                
+        return pd.DataFrame(results)
+    except Exception:
+        return pd.DataFrame()
 
 def render_dasbor_indodax():
-    st.markdown("<h2 class='gradient-text'>🪙 Dasbor Indodax Utama</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='gradient-text'>🪙 Dasbor Kripto Utama</h2>", unsafe_allow_html=True)
     st.write("Gambaran cepat kondisi pasar kripto Indonesia saat ini.")
     
-    df = get_indodax_data()
+    df = fetch_live_crypto_data()
     if df.empty:
-        st.warning("Gagal mengambil data dari Indodax. Silakan coba lagi nanti.")
+        st.warning("Sedang memuat data Kripto... Silakan muat ulang (Refresh) dalam beberapa detik.")
         return
 
     # Hitung metrik cepat
@@ -21,7 +69,7 @@ def render_dasbor_indodax():
     koin_turun = len(df[df['%_Change'] < 0])
     
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Koin Aktif", f"{total_market} Koin")
+    c1.metric("Total Koin Dipantau", f"{total_market} Koin")
     c2.metric("Market Sentiment", "BULLISH" if koin_naik > koin_turun else "BEARISH", f"{koin_naik} Naik, {koin_turun} Turun")
     
     # Koin dengan Volume Tertinggi (IDR)
@@ -38,25 +86,30 @@ def render_dasbor_indodax():
     with col_gain:
         st.success("🚀 Top Gainers")
         top_gainers = df.sort_values(by='%_Change', ascending=False).head(5)
+        # Formatting
+        top_gainers['Last_Price'] = top_gainers['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+        top_gainers['%_Change'] = top_gainers['%_Change'].apply(lambda x: f"+{x:.2f}%")
         st.dataframe(top_gainers[['ID', 'Last_Price', '%_Change']], hide_index=True, use_container_width=True)
         
     with col_lose:
         st.error("🩸 Top Losers")
         top_losers = df.sort_values(by='%_Change', ascending=True).head(5)
+        # Formatting
+        top_losers['Last_Price'] = top_losers['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+        top_losers['%_Change'] = top_losers['%_Change'].apply(lambda x: f"{x:.2f}%")
         st.dataframe(top_losers[['ID', 'Last_Price', '%_Change']], hide_index=True, use_container_width=True)
 
 def render_radar_altcoin():
     st.markdown("<h2 class='gradient-text'>🚀 Radar Altcoin: Detektor Akumulasi Cukong</h2>", unsafe_allow_html=True)
     st.info("Algoritma Quant ini mencari anomali: Koin yang **volumenya masif** namun **harganya sedang ditahan/belum terbang**. Ini adalah ciri khas aktivitas akumulasi paus (Whale) sebelum harga didorong naik (PUMP).")
     
-    df = get_indodax_data()
+    df = fetch_live_crypto_data()
     if df.empty:
-        st.warning("Sedang memuat data dari Indodax... Silakan klik Refresh.")
+        st.warning("Sedang memuat data pasar... Silakan klik Refresh.")
         return
 
-    # Filter dasar untuk membuang koin gorengan dengan likuiditas sangat kecil
-    # Minimal volume 100 Juta Rupiah per hari agar aman ditradingkan
-    df_valid = df[df['Vol_IDR'] > 100_000_000].copy()
+    # Filter dasar untuk membuang koin dengan likuiditas sangat kecil
+    df_valid = df[df['Vol_IDR'] > 500_000_000].copy()
     
     # ---------------------------------------------------------------------
     # LOGIKA RADAR CUKONG (ANOMALY ACCUMULATION)
@@ -72,18 +125,16 @@ def render_radar_altcoin():
         st.warning("Belum ada koin yang memenuhi kriteria akumulasi saat ini.")
         return
 
-    # Kriteria Volume: Kita buat rasio buatan karena API publik Indodax hanya memberikan Vol 24h
-    # Asumsi: Jika Vol IDR sangat besar relatif terhadap harganya (rasio perpindahan uang), ada akumulasi.
     # Urutkan berdasarkan Volume Uang (IDR) terbesar di antara koin-koin yang harganya sideways
     df_accumulation = df_sideways.sort_values(by='Vol_IDR', ascending=False).head(15)
 
-    st.markdown("### 🎯 Top 15 Koin Terindikasi Diakumulasi")
+    st.markdown("### 🎯 Top Koin Terindikasi Diakumulasi")
     st.caption("Semakin atas posisinya, semakin besar perputaran uang (IDR) yang terjadi sementara harganya sengaja ditahan.")
     
     # Formatting tampilan
-    df_accumulation['Harga_Live'] = df_accumulation['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 100 else f"Rp {x:,.2f}")
+    df_accumulation['Harga_Live'] = df_accumulation['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 100 else f"Rp {x:,.4f}")
     df_accumulation['Volume_Uang'] = df_accumulation['Vol_IDR'].apply(lambda x: f"Rp {x/1e9:,.2f} Miliar")
-    df_accumulation['Pergerakan_Harga'] = df_accumulation['%_Change'].apply(lambda x: f"+{x}%" if x > 0 else f"{x}%")
+    df_accumulation['Pergerakan_Harga'] = df_accumulation['%_Change'].apply(lambda x: f"+{x:.2f}%" if x > 0 else f"{x:.2f}%")
     
     # Warna kolom untuk mempercantik tabel
     def highlight_accumulation(val):
@@ -104,13 +155,13 @@ def render_radar_altcoin():
         """)
 
 def render_whale_tracker():
-    st.markdown("<h2 class='gradient-text'>🐋 Whale Tracker Indodax</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='gradient-text'>🐋 Whale Tracker Crypto</h2>", unsafe_allow_html=True)
     st.info("Memantau pergerakan koin dengan volume masif secara mendadak.")
-    st.write("Fitur ini sedang dalam pengembangan untuk menarik data *Order Book* kedalaman level 2 dari Indodax.")
+    st.write("Fitur ini sedang dalam pengembangan untuk menarik data *Order Book* kedalaman level 2.")
 
 def render_arbitrase():
     st.markdown("<h2 class='gradient-text'>⚖️ Radar Arbitrase Kripto</h2>", unsafe_allow_html=True)
-    st.info("Mencari selisih harga antara Indodax dan market global (Binance/KuCoin).")
+    st.info("Mencari selisih harga antara Market IDR dan market global (Binance/KuCoin).")
     st.write("Fitur ini sedang sinkronisasi dengan WebSocket exchange eksternal.")
 
 def render_dca():
@@ -142,7 +193,7 @@ def render_peta_kripto():
     st.markdown("<h2 class='gradient-text'>🌐 Peta Panas Kripto (Heatmap)</h2>", unsafe_allow_html=True)
     st.info("Visualisasi pergerakan seluruh market kripto dalam satu layar.")
     
-    df = get_indodax_data()
+    df = fetch_live_crypto_data()
     if df.empty:
         st.warning("Data tidak tersedia saat ini.")
         return
@@ -151,7 +202,7 @@ def render_peta_kripto():
     if df_valid.empty:
         return
         
-    fig = px.treemap(df_valid.head(50), path=[px.Constant("Market Indodax (Top 50)"), 'ID'], values='Vol_IDR',
+    fig = px.treemap(df_valid.head(25), path=[px.Constant("Market Kripto"), 'ID'], values='Vol_IDR',
                      color='%_Change', hover_data=['Last_Price'],
                      color_continuous_scale=['#EF4444', '#1E293B', '#10B981'],
                      color_continuous_midpoint=0)
