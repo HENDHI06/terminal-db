@@ -510,12 +510,12 @@ def render_peta_kripto():
     fig.update_layout(margin=dict(t=30, l=0, r=0, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# KODE PERBAIKAN: Menembus SSL Error di Streamlit Cloud menggunakan AllOrigins Proxy dan SSL Context
+
+# KODE PERBAIKAN FINAL: Ganti sumber berita dan penanganan Anti-Bot
 def render_kripto_news():
     st.markdown("<h2 class='gradient-text'>📰 Radar Pengumuman & Sentimen</h2>", unsafe_allow_html=True)
-    st.info("Menarik liputan sentimen global dan Pengumuman Resmi (Maintenance/Delisting) langsung dari Indodax.")
+    st.info("Menarik liputan sentimen global dan Pengumuman Resmi (Maintenance/Delisting).")
     
-    # Bypass keamanan SSL bawaan server Linux yang sering kadaluwarsa
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -523,60 +523,53 @@ def render_kripto_news():
     tab_indodax, tab_global = st.tabs(["📢 PENGUMUMAN INDODAX", "🌎 BERITA GLOBAL (WALL STREET)"])
     
     with tab_indodax:
-        st.write("Pantau jadwal *Maintenance* jaringan, *Listing* koin baru, atau *Delisting* dari Indodax di sini.")
-        if st.button("📢 Tarik Pengumuman Indodax Terkini", use_container_width=True):
-            with st.spinner("Menembus Firewall Indodax dengan Proxy Khusus..."):
-                try:
-                    target_url = "https://indodax.com/academy/feed/"
-                    proxy_url = f"https://api.allorigins.win/get?url={urllib.parse.quote(target_url)}"
-                    
-                    req = urllib.request.Request(proxy_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
-                        data = json.loads(response.read().decode())
-                        raw_xml = data.get('contents', '')
-                        
-                        root = ET.fromstring(raw_xml)
-                        count = 0
-                        
-                        for item in root.findall('.//item'):
-                            title = item.find('title').text
-                            link = item.find('link').text
-                            
-                            if any(kata in title.upper() for kata in ['MAINTENANCE', 'DELISTING', 'LISTING', 'MIGRASI', 'UPDATE', 'PENGUMUMAN']):
-                                with st.expander(f"⚠️ {title}"):
-                                    st.write(f"🔗 [Baca Detail Jadwal di Sini]({link})")
-                                count += 1
-                                
-                            if count >= 5: 
-                                break
-                                
-                        if count == 0:
-                            st.success("✅ Tidak ada pengumuman Maintenance atau Delisting terbaru. Server Indodax aman.")
-                except Exception as e:
-                    st.error(f"Gagal menarik pengumuman. Proxy Timeout atau diblokir. (Detail Pesan Sistem: {e})")
+        st.write("Sistem keamanan (Cloudflare) Indodax saat ini memblokir akses robot/API secara ketat (Error 520). Namun, Anda tetap bisa memantau jadwal *Maintenance* atau *Delisting* secara langsung.")
+        
+        # Tampilan UI Elegan pengganti pesan error merah
+        st.markdown("""
+        <div style="background-color: #1E293B; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #334155;">
+            <h3 style="color: #F8FAFC;">🛡️ Papan Pengumuman Resmi Indodax</h3>
+            <p style="color: #94A3B8;">Cek status server, maintenance, dan koin baru langsung dari sumber resminya tanpa perantara.</p>
+            <a href="https://indodax.com/academy/category/announcement/" target="_blank" style="background-color: #3B82F6; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px;">
+                Buka Pengumuman Indodax ↗
+            </a>
+            <a href="https://status.indodax.com/" target="_blank" style="background-color: #10B981; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px; margin-left: 10px;">
+                Cek Status Server ↗
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
 
     with tab_global:
         st.write("Berita fundamental yang menggerakkan Bitcoin dan market dunia.")
         if st.button("📰 Tarik Berita Kripto Global", use_container_width=True):
-            with st.spinner("Menghubungkan ke Pusat Data Kripto Global..."):
+            with st.spinner("Menyadap dari Cointelegraph (Media Kripto Terbesar Dunia)..."):
                 try:
-                    url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    # MENGGUNAKAN COINTELEGRAPH RSS (Tanpa API Key, Bebas Error 401)
+                    url = "https://cointelegraph.com/rss"
+                    req = urllib.request.Request(url, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    })
                     with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
-                        data = json.loads(response.read().decode())
+                        raw_xml = response.read().decode('utf-8')
+                        root = ET.fromstring(raw_xml)
                         
-                        news_data = data.get('Data', [])[:5] 
-                        
-                        if news_data:
-                            for b in news_data:
-                                title = b.get('title', 'Berita Tanpa Judul')
-                                url_news = b.get('url', '#')
-                                source = b.get('source_info', {}).get('name', 'Media Global')
+                        count = 0
+                        # Membaca struktur RSS
+                        for item in root.findall('./channel/item'):
+                            title = item.find('title').text
+                            link = item.find('link').text
+                            pubDate = item.find('pubDate').text
+                            
+                            with st.expander(f"🔴 {title}"):
+                                st.write(f"**Waktu Tayang:** {pubDate}")
+                                st.write(f"**Sumber:** Cointelegraph Global")
+                                st.write(f"🔗 [Baca Berita Lengkap di Sini]({link})")
+                            
+                            count += 1
+                            if count >= 5: # Ambil 5 berita terbaru
+                                break
                                 
-                                with st.expander(f"🔴 {title}"):
-                                    st.write(f"**Publisher:** {source}")
-                                    st.write(f"🔗 [Baca Selengkapnya di Sini]({url_news})")
-                        else:
-                            st.write("Belum ada berita terbaru saat ini.")
+                        if count == 0:
+                            st.warning("Belum ada berita terbaru hari ini.")
                 except Exception as e:
-                    st.error(f"Gagal menarik feed berita global. (Detail Pesan Sistem: {e})")
+                    st.error(f"Gagal menarik berita. Server target mungkin sedang sibuk. (Detail: {e})")
