@@ -67,41 +67,59 @@ def fetch_fear_greed_index():
     except:
         return 50, "Neutral"
 
-# PERBAIKAN: Menyedot RATUSAN koin dari Binance, lalu memfilter khusus koin yang ada di Indodax
 @st.cache_data(ttl=300)
 def fetch_funding_rates():
+    pesan_error = ""
     try:
-        # Ambil daftar seluruh koin Indodax saat ini
         df_indo = fetch_indodax_live()
         koin_indodax_valid = df_indo['ID'].tolist() if not df_indo.empty else []
         
-        url = "https://fapi.binance.com/fapi/v1/premiumIndex"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
-        }
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as response:
-            data = json.loads(response.read().decode())
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
         
+        target_url = "https://fapi.binance.com/fapi/v1/premiumIndex"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        
+        data_binance = None
+        
+        try:
+            # PERCOBAAN 1: Jalur Langsung
+            req = urllib.request.Request(target_url, headers=headers)
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+                data_binance = json.loads(response.read().decode())
+        except Exception as e1:
+            pesan_error += f"[Direct: {e1}] "
+            # PERCOBAAN 2: Jalur Proxy
+            try:
+                proxy_url = f"https://api.allorigins.win/get?url={urllib.parse.quote(target_url)}"
+                req2 = urllib.request.Request(proxy_url, headers=headers)
+                with urllib.request.urlopen(req2, context=ctx, timeout=15) as response2:
+                    proxy_resp = json.loads(response2.read().decode())
+                    data_binance = json.loads(proxy_resp.get('contents', '[]'))
+            except Exception as e2:
+                pesan_error += f"[Proxy: {e2}]"
+        
+        if not data_binance:
+            return pd.DataFrame(), pesan_error
+            
         results = []
-        for item in data:
+        for item in data_binance:
             symbol = item.get('symbol', '')
             if symbol.endswith('USDT'):
                 koin = symbol.replace('USDT', '')
-                # Hanya masukkan ke daftar jika koin tersebut JUGA ADA di Indodax
                 if (not koin_indodax_valid) or (koin in koin_indodax_valid):
                     fr = float(item.get('lastFundingRate', 0)) * 100 
                     results.append({'Koin': koin, 'Funding Rate (%)': fr})
         
         df_res = pd.DataFrame(results)
         if not df_res.empty:
-            # Urutkan berdasarkan yang paling berbahaya (Paling Merah / Paling Hijau)
             df_res['Absolut'] = df_res['Funding Rate (%)'].abs()
             df_res = df_res.sort_values(by='Absolut', ascending=False).drop(columns=['Absolut'])
-        return df_res
-    except:
-        return pd.DataFrame()
+            
+        return df_res, "Aman"
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 def calculate_rsi(data, window=14):
     delta = data.diff()
@@ -257,7 +275,7 @@ def render_whale_tracker():
     
     with tab_order:
         st.info("Memindai uang nyata (Rupiah) yang sedang mengantre di pasar. Cari 'Tembok Hijau' yang tinggi menjulang, itu adalah *Support* buatan Cukong yang sangat kuat!")
-        koin_pilihan = st.selectbox("Pilih Koin untuk di-X-Ray Temboknya (Pilih dari 160+ Market Indodax):", semua_koin)
+        koin_pilihan = st.selectbox("Pilih Koin untuk di-X-Ray Temboknya (Semua Koin Indodax):", semua_koin)
         
         if st.button(f"🔍 Pindai Tembok {koin_pilihan} Sekarang", use_container_width=True):
             with st.spinner(f"Menyadap data antrean {koin_pilihan} di Indodax..."):
@@ -290,8 +308,8 @@ def render_whale_tracker():
         if st.button("🔄 Tarik Data Likuidasi Seluruh Koin", use_container_width=True):
             st.cache_data.clear() 
             
-        with st.spinner("Mengecek ratusan koin di API Binance Global..."):
-            df_funding = fetch_funding_rates()
+        with st.spinner("Mengecek ratusan koin di API Binance Global (Mencoba Jalur Langsung & Proxy)..."):
+            df_funding, pesan_status = fetch_funding_rates()
             
             if not df_funding.empty:
                 st.success(f"Berhasil melacak data Likuidasi dari {len(df_funding)} koin yang tersedia di Indodax!")
@@ -308,7 +326,7 @@ def render_whale_tracker():
                 df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
                 st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.applymap(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True, height=600)
             else:
-                st.error("⚠️ **Gagal memuat data likuidasi.** Silakan klik tombol 'Tarik Data' lagi.")
+                st.error(f"⚠️ **Gagal memuat data likuidasi.** Binance memblokir wilayah server Anda. \n\n**Detail Pelacak:** {pesan_status}")
 
 def render_arbitrase():
     st.markdown("<h2 class='gradient-text'>⚖️ Radar Arbitrase (Lokal vs Global)</h2>", unsafe_allow_html=True)
@@ -318,7 +336,7 @@ def render_arbitrase():
     semua_koin = sorted(df_indo['ID'].tolist()) if not df_indo.empty else ["BTC", "ETH", "SOL", "XRP", "DOGE"]
     
     default_coins = [c for c in ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA'] if c in semua_koin]
-    koin_target = st.multiselect("Pilih Koin yang Ingin Dicek Selisih Harganya (Pilih Semua Koin Indodax):", semua_koin, default=default_coins)
+    koin_target = st.multiselect("Pilih Koin yang Ingin Dicek Selisih Harganya:", semua_koin, default=default_coins)
     
     if st.button("⚖️ Mulai Pindai Perbedaan Harga", use_container_width=True):
         if not koin_target:
@@ -386,7 +404,7 @@ def render_dca():
     
     with st.form("dca_form"):
         c1, c2, c3 = st.columns(3)
-        coin_pilihan = c1.selectbox("Pilih Aset Historis (Semua Koin Indodax)", semua_koin, index=semua_koin.index('BTC') if 'BTC' in semua_koin else 0)
+        coin_pilihan = c1.selectbox("Pilih Aset Historis", semua_koin, index=semua_koin.index('BTC') if 'BTC' in semua_koin else 0)
         nabung_rutin = c2.number_input("Alokasi Mingguan (Rp)", min_value=100000, value=1000000, step=100000)
         durasi_bulan = c3.slider("Backtest Berapa Bulan Lalu?", 6, 48, 12)
         btn = st.form_submit_button("Simulasi Perang Algoritma", width="stretch")
@@ -397,7 +415,7 @@ def render_dca():
                 df_hist = yf.download(f"{coin_pilihan}-USD", period=f"{durasi_bulan}mo", interval="1d", progress=False)['Close'].dropna()
                 
                 if df_hist.empty:
-                    st.error(f"⚠️ Maaf, sejarah harga untuk koin '{coin_pilihan}' tidak tersedia di database Global (Hanya ada di Indodax).")
+                    st.error(f"⚠️ Maaf, sejarah harga untuk koin '{coin_pilihan}' tidak tersedia di database Global.")
                     return
                     
                 df_hist = df_hist.to_frame(name='Price')
@@ -440,7 +458,7 @@ def render_dca():
                     st.metric("Modal Keluar (Fleksibel)", f"Rp {total_modal_smart:,.0f}")
                     st.metric("Nilai Portofolio", f"Rp {nilai_smart:,.0f}", f"{profit_smart_pct:.2f}%")
             except:
-                st.error(f"Gagal melakukan simulasi. Data historis untuk {coin_pilihan} kemungkinan tidak tersedia.")
+                st.error("Gagal melakukan simulasi. Data historis kemungkinan tidak tersedia.")
 
 def render_prediksi_kripto():
     st.markdown("<h2 class='gradient-text'>🎯 Auto-Fibonacci & Pivot Target</h2>", unsafe_allow_html=True)
@@ -448,7 +466,7 @@ def render_prediksi_kripto():
     
     df_indo = fetch_indodax_live()
     semua_koin = sorted(df_indo['ID'].tolist()) if not df_indo.empty else ["BTC", "ETH", "SOL", "PEPE", "DOGE"]
-    koin_prediksi = st.selectbox("Pilih Koin untuk Diukur (Semua Koin Indodax):", semua_koin, index=semua_koin.index('BTC') if 'BTC' in semua_koin else 0)
+    koin_prediksi = st.selectbox("Pilih Koin untuk Diukur:", semua_koin, index=semua_koin.index('BTC') if 'BTC' in semua_koin else 0)
     
     if st.button("📏 Pasang Jaring Fibonacci", use_container_width=True):
         with st.spinner("Menarik garis matematika presisi tinggi..."):
@@ -456,7 +474,7 @@ def render_prediksi_kripto():
                 df_hist = yf.download(f"{koin_prediksi}-USD", period="30d", progress=False)['Close'].dropna()
                 
                 if df_hist.empty:
-                    st.error(f"⚠️ Maaf, grafik {koin_prediksi} tidak bisa diakses karena koin ini adalah koin lokal yang belum terdaftar di database Global.")
+                    st.error(f"⚠️ Maaf, grafik {koin_prediksi} tidak bisa diakses karena belum terdaftar di database Global.")
                     return
                     
                 df_hist = df_hist.to_frame(name='Price')
@@ -522,7 +540,7 @@ def render_adu_kripto():
                 fig.update_layout(title="Perbandingan Pertumbuhan (% Persentase)", yaxis_title="Pertumbuhan (Base 100)", template="plotly_white", hovermode="x unified")
                 st.plotly_chart(fig, use_container_width=True)
             except:
-                st.error("Gagal menarik data grafik. Koin mungkin tidak tersedia.")
+                st.error("Gagal menarik data grafik.")
 
 def render_korelasi_kripto():
     st.markdown("<h2 class='gradient-text'>🧬 Matriks Korelasi Kripto</h2>", unsafe_allow_html=True)
@@ -554,9 +572,8 @@ def render_korelasi_kripto():
                 fig.update_layout(title="Heatmap Korelasi (3 Bulan Terakhir)", template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
             except:
-                st.error("Gagal memuat matriks. Kemungkinan ada koin lokal yang tidak punya data global.")
+                st.error("Gagal memuat matriks.")
 
-# PERBAIKAN: Memasukkan SELURUH Koin Indodax ke dalam Sektor Narasi
 def render_rotasi_narasi():
     st.markdown("<h2 class='gradient-text'>🎡 Peta Rotasi Sektor Kripto</h2>", unsafe_allow_html=True)
     st.info("Menganalisis data live Indodax untuk melihat sektor mana yang sedang ramai disuntik dana.")
@@ -573,12 +590,10 @@ def render_rotasi_narasi():
         'Gaming & Metaverse': ['SAND', 'MANA', 'GALA', 'AXS', 'ENJ', 'IMX', 'ILV', 'ALICE']
     }
     
-    # Mencari koin yang sudah terpetakan di atas
     koin_terkategori = []
     for k_list in sektor_map.values():
         koin_terkategori.extend(k_list)
         
-    # Koin sisanya otomatis dimasukkan ke "Altcoin Lainnya" agar volume 100% terbaca
     koin_sisa = [c for c in semua_koin_live if c not in koin_terkategori]
     sektor_map['Altcoin Campuran (Lainnya)'] = koin_sisa
     
