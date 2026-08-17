@@ -63,7 +63,6 @@ def fetch_fear_greed_index():
     except:
         return 50, "Neutral"
 
-# KODE PERBAIKAN: Penyamaran yang lebih kuat dan timeout yang lebih lama
 @st.cache_data(ttl=300)
 def fetch_funding_rates():
     try:
@@ -73,7 +72,6 @@ def fetch_funding_rates():
             'Accept': 'application/json'
         }
         req = urllib.request.Request(url, headers=headers)
-        # Timeout dinaikkan jadi 10 detik agar server punya waktu menarik data
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
         
@@ -152,14 +150,16 @@ def render_dasbor_indodax():
         with col_gain:
             st.success("🚀 Terjauh dari Dasar (Terbang)")
             top_bounce = df.sort_values(by='Bounce_Pct', ascending=False).head(5)
-            top_bounce['Last_Price'] = top_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+            # PERBAIKAN: Format angka nol
+            top_bounce['Last_Price'] = top_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
             top_bounce['Jauh_Dari_Dasar'] = top_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
             st.dataframe(top_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
             
         with col_lose:
             st.error("🧊 Masih di Dasar (Tertahan)")
             bot_bounce = df.sort_values(by='Bounce_Pct', ascending=True).head(5)
-            bot_bounce['Last_Price'] = bot_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x > 100 else f"Rp {x:,.4f}")
+            # PERBAIKAN: Format angka nol
+            bot_bounce['Last_Price'] = bot_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
             bot_bounce['Jauh_Dari_Dasar'] = bot_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
             st.dataframe(bot_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
 
@@ -212,7 +212,8 @@ def render_radar_altcoin():
     
     st.markdown(f"### 📊 Tabel Peringkat Scanner (Terfilter: {len(df_sorted)} Koin Valid)")
     
-    df_sorted['Harga_Live'] = df_sorted['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 100 else f"Rp {x:,.4f}")
+    # PERBAIKAN: Format angka nol (Jika >= Rp 1 tidak ada desimal)
+    df_sorted['Harga_Live'] = df_sorted['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
     df_sorted['Vol_Uang_IDR'] = df_sorted['Vol_IDR'].apply(lambda x: f"Rp {x/1e9:,.2f} M")
     df_sorted['Pantulan'] = df_sorted['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
     
@@ -260,12 +261,11 @@ def render_whale_tracker():
                     c1.metric("Kekuatan Beli (Support)", f"Rp {total_beli_miliar:.2f} Miliar")
                     c2.metric("Tekanan Jual (Resistance)", f"Rp {total_jual_miliar:.2f} Miliar")
 
-    # KODE PERBAIKAN: Penambahan peringatan error jika gagal ditarik
     with tab_liq:
         st.info("Mendeteksi *Funding Rate* global. Jika nilai sangat positif (merah), Ritel sedang rakus berutang (Long) dan Cukong bersiap menjatuhkan harga untuk melikuidasi mereka!")
         
         if st.button("🔄 Coba Tarik Ulang Data Binance", use_container_width=True):
-            st.cache_data.clear() # Membersihkan memori cache agar ditarik ulang secara paksa
+            st.cache_data.clear() 
             
         with st.spinner("Menghubungkan ke API Binance Global..."):
             df_funding = fetch_funding_rates()
