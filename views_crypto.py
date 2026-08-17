@@ -10,6 +10,7 @@ import yfinance as yf
 import numpy as np
 import xml.etree.ElementTree as ET
 import ssl
+import re
 from datetime import datetime, timedelta
 
 # ==========================================
@@ -94,6 +95,12 @@ def calculate_rsi(data, window=14):
     loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
     rs = gain / loss
     return 100 - (100 / (1 + rs))
+
+# Pembersih kode HTML untuk ringkasan berita
+def clean_html_text(raw_html):
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext.strip()
 
 # ==========================================
 # 🖥️ ROUTING MENU TAMPILAN UTAMA
@@ -511,65 +518,86 @@ def render_peta_kripto():
     st.plotly_chart(fig, use_container_width=True)
 
 
-# KODE PERBAIKAN FINAL: Ganti sumber berita dan penanganan Anti-Bot
+# KODE PERBAIKAN: Berita Full Bahasa Indonesia + Penjelasan Singkat
 def render_kripto_news():
-    st.markdown("<h2 class='gradient-text'>📰 Radar Pengumuman & Sentimen</h2>", unsafe_allow_html=True)
-    st.info("Menarik liputan sentimen global dan Pengumuman Resmi (Maintenance/Delisting).")
+    st.markdown("<h2 class='gradient-text'>📰 Berita Fundamental Kripto</h2>", unsafe_allow_html=True)
+    st.info("Membaca langsung dari portal berita kripto ternama di Indonesia untuk memberikan Anda rangkuman sentimen pasar secara otomatis.")
     
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-
-    tab_indodax, tab_global = st.tabs(["📢 PENGUMUMAN INDODAX", "🌎 BERITA GLOBAL (WALL STREET)"])
-    
-    with tab_indodax:
-        st.write("Sistem keamanan (Cloudflare) Indodax saat ini memblokir akses robot/API secara ketat (Error 520). Namun, Anda tetap bisa memantau jadwal *Maintenance* atau *Delisting* secara langsung.")
-        
-        # Tampilan UI Elegan pengganti pesan error merah
-        st.markdown("""
-        <div style="background-color: #1E293B; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #334155;">
-            <h3 style="color: #F8FAFC;">🛡️ Papan Pengumuman Resmi Indodax</h3>
-            <p style="color: #94A3B8;">Cek status server, maintenance, dan koin baru langsung dari sumber resminya tanpa perantara.</p>
-            <a href="https://indodax.com/academy/category/announcement/" target="_blank" style="background-color: #3B82F6; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px;">
-                Buka Pengumuman Indodax ↗
-            </a>
-            <a href="https://status.indodax.com/" target="_blank" style="background-color: #10B981; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px; margin-left: 10px;">
-                Cek Status Server ↗
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with tab_global:
-        st.write("Berita fundamental yang menggerakkan Bitcoin dan market dunia.")
-        if st.button("📰 Tarik Berita Kripto Global", use_container_width=True):
-            with st.spinner("Menyadap dari Cointelegraph (Media Kripto Terbesar Dunia)..."):
+    if st.button("📰 Tarik Berita Kripto Terkini", use_container_width=True):
+        with st.spinner("Menyadap artikel terbaru dari media kripto Indonesia..."):
+            try:
+                # Setup Bypass Keamanan SSL
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                
+                # Menggunakan Feed dari Portal Kripto Berbahasa Indonesia (Coinvestasi)
+                url = "https://coinvestasi.com/feed" 
+                req = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                })
+                
+                with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+                    raw_xml = response.read().decode('utf-8')
+                    root = ET.fromstring(raw_xml)
+                    
+                    count = 0
+                    for item in root.findall('./channel/item'):
+                        title = item.find('title').text
+                        link = item.find('link').text
+                        pubDate = item.find('pubDate').text
+                        
+                        # Mengambil deskripsi (penjelasan berita)
+                        description = item.find('description')
+                        desc_text = description.text if description is not None else "Tidak ada ringkasan yang tersedia."
+                        
+                        # Membersihkan kode HTML yang mengganggu dari deskripsi
+                        desc_clean = clean_html_text(desc_text)
+                        
+                        # Memotong teks jika kepanjangan
+                        if len(desc_clean) > 250:
+                            desc_clean = desc_clean[:250] + "..."
+                        
+                        with st.expander(f"🔴 {title}"):
+                            st.caption(f"📅 **Waktu Tayang:** {pubDate}")
+                            st.markdown(f"**💡 Penjelasan Singkat:**")
+                            st.info(desc_clean)
+                            st.markdown(f"🔗 [Baca Artikel Lengkapnya di Sini]({link})")
+                        
+                        count += 1
+                        if count >= 7: # Tampilkan 7 berita paling panas
+                            break
+                            
+                    if count == 0:
+                        st.warning("Belum ada berita terbaru hari ini.")
+                        
+            except Exception as e:
+                # Fallback cadangan jika Coinvestasi error, pindah ke Blockchainmedia
                 try:
-                    # MENGGUNAKAN COINTELEGRAPH RSS (Tanpa API Key, Bebas Error 401)
-                    url = "https://cointelegraph.com/rss"
-                    req = urllib.request.Request(url, headers={
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    })
-                    with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+                    url2 = "https://blockchainmedia.id/feed/"
+                    req2 = urllib.request.Request(url2, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req2, context=ctx, timeout=15) as response:
                         raw_xml = response.read().decode('utf-8')
                         root = ET.fromstring(raw_xml)
                         
                         count = 0
-                        # Membaca struktur RSS
                         for item in root.findall('./channel/item'):
                             title = item.find('title').text
                             link = item.find('link').text
                             pubDate = item.find('pubDate').text
+                            description = item.find('description')
+                            desc_text = description.text if description is not None else "Tidak ada ringkasan yang tersedia."
+                            desc_clean = clean_html_text(desc_text)
+                            
+                            if len(desc_clean) > 250: desc_clean = desc_clean[:250] + "..."
                             
                             with st.expander(f"🔴 {title}"):
-                                st.write(f"**Waktu Tayang:** {pubDate}")
-                                st.write(f"**Sumber:** Cointelegraph Global")
-                                st.write(f"🔗 [Baca Berita Lengkap di Sini]({link})")
+                                st.caption(f"📅 **Waktu Tayang:** {pubDate}")
+                                st.markdown(f"**💡 Penjelasan Singkat:**")
+                                st.info(desc_clean)
+                                st.markdown(f"🔗 [Baca Artikel Lengkapnya di Sini]({link})")
                             
                             count += 1
-                            if count >= 5: # Ambil 5 berita terbaru
-                                break
-                                
-                        if count == 0:
-                            st.warning("Belum ada berita terbaru hari ini.")
-                except Exception as e:
-                    st.error(f"Gagal menarik berita. Server target mungkin sedang sibuk. (Detail: {e})")
+                            if count >= 7: break
+                except Exception as e2:
+                    st.error(f"Gagal menarik berita berbahasa Indonesia. Semua server target sedang sibuk. (Detail: {e2})")
