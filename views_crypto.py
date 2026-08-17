@@ -7,6 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
 import numpy as np
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 # ==========================================
@@ -150,7 +151,6 @@ def render_dasbor_indodax():
         with col_gain:
             st.success("🚀 Terjauh dari Dasar (Terbang)")
             top_bounce = df.sort_values(by='Bounce_Pct', ascending=False).head(5)
-            # PERBAIKAN: Format angka nol
             top_bounce['Last_Price'] = top_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
             top_bounce['Jauh_Dari_Dasar'] = top_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
             st.dataframe(top_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
@@ -158,7 +158,6 @@ def render_dasbor_indodax():
         with col_lose:
             st.error("🧊 Masih di Dasar (Tertahan)")
             bot_bounce = df.sort_values(by='Bounce_Pct', ascending=True).head(5)
-            # PERBAIKAN: Format angka nol
             bot_bounce['Last_Price'] = bot_bounce['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
             bot_bounce['Jauh_Dari_Dasar'] = bot_bounce['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
             st.dataframe(bot_bounce[['ID', 'Last_Price', 'Jauh_Dari_Dasar']], hide_index=True, use_container_width=True)
@@ -212,7 +211,6 @@ def render_radar_altcoin():
     
     st.markdown(f"### 📊 Tabel Peringkat Scanner (Terfilter: {len(df_sorted)} Koin Valid)")
     
-    # PERBAIKAN: Format angka nol (Jika >= Rp 1 tidak ada desimal)
     df_sorted['Harga_Live'] = df_sorted['Last_Price'].apply(lambda x: f"Rp {x:,.0f}" if x >= 1 else f"Rp {x:,.4f}")
     df_sorted['Vol_Uang_IDR'] = df_sorted['Vol_IDR'].apply(lambda x: f"Rp {x/1e9:,.2f} M")
     df_sorted['Pantulan'] = df_sorted['Bounce_Pct'].apply(lambda x: f"+{x:.2f}%")
@@ -511,17 +509,51 @@ def render_peta_kripto():
     st.plotly_chart(fig, use_container_width=True)
 
 def render_kripto_news():
-    st.markdown("<h2 class='gradient-text'>📰 Radar Sentimen Global</h2>", unsafe_allow_html=True)
-    st.info("Menarik liputan fundamental langsung dari Wall Street dan institusi finansial.")
-    if st.button("📰 Tarik Berita Kripto Terkini", use_container_width=True):
-        with st.spinner("Menghubungkan ke Feed Berita Global..."):
-            try:
-                crypto = yf.Ticker("BTC-USD")
-                berita = crypto.news
-                if berita:
-                    for b in berita[:5]: 
-                        with st.expander(f"🔴 {b.get('title', 'Berita Tanpa Judul')}"):
-                            st.write(f"**Publisher:** {b.get('publisher', 'Global Media')}")
-                            st.write(f"🔗 [Baca Selengkapnya di Sini]({b.get('link', '#')})")
-            except:
-                st.error("Gagal menarik feed berita.")
+    st.markdown("<h2 class='gradient-text'>📰 Radar Pengumuman & Sentimen</h2>", unsafe_allow_html=True)
+    st.info("Menarik liputan sentimen global dan Pengumuman Resmi (Maintenance/Delisting) langsung dari Indodax.")
+    
+    tab_indodax, tab_global = st.tabs(["📢 PENGUMUMAN INDODAX", "🌎 BERITA GLOBAL (WALL STREET)"])
+    
+    with tab_indodax:
+        st.write("Pantau jadwal *Maintenance* jaringan, *Listing* koin baru, atau *Delisting* dari Indodax di sini.")
+        if st.button("📢 Tarik Pengumuman Indodax Terkini", use_container_width=True):
+            with st.spinner("Menyadap blog resmi Indodax..."):
+                try:
+                    url = "https://indodax.com/academy/feed/"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        tree = ET.parse(response)
+                        root = tree.getroot()
+                        
+                        count = 0
+                        for item in root.findall('./channel/item'):
+                            title = item.find('title').text
+                            link = item.find('link').text
+                            
+                            if any(kata in title.upper() for kata in ['MAINTENANCE', 'DELISTING', 'LISTING', 'MIGRASI', 'UPDATE', 'PENGUMUMAN']):
+                                with st.expander(f"⚠️ {title}"):
+                                    st.write(f"🔗 [Baca Detail Jadwal di Sini]({link})")
+                                count += 1
+                                
+                            if count >= 5: 
+                                break
+                                
+                        if count == 0:
+                            st.success("✅ Tidak ada pengumuman Maintenance atau Delisting terbaru. Server Indodax aman.")
+                except Exception as e:
+                    st.error("Gagal menarik pengumuman dari server Indodax. Web Indodax mungkin sedang dilindungi Firewall.")
+
+    with tab_global:
+        st.write("Berita fundamental yang menggerakkan Bitcoin dan market dunia.")
+        if st.button("📰 Tarik Berita Kripto Global", use_container_width=True):
+            with st.spinner("Menghubungkan ke Feed Berita Global..."):
+                try:
+                    crypto = yf.Ticker("BTC-USD")
+                    berita = crypto.news
+                    if berita:
+                        for b in berita[:5]: 
+                            with st.expander(f"🔴 {b.get('title', 'Berita Tanpa Judul')}"):
+                                st.write(f"**Publisher:** {b.get('publisher', 'Global Media')}")
+                                st.write(f"🔗 [Baca Selengkapnya di Sini]({b.get('link', '#')})")
+                except:
+                    st.error("Gagal menarik feed berita global.")
