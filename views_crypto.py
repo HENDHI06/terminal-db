@@ -7,7 +7,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import yfinance as yf
 import numpy as np
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 # ==========================================
@@ -508,6 +507,7 @@ def render_peta_kripto():
     fig.update_layout(margin=dict(t=30, l=0, r=0, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
+# KODE PERBAIKAN: API Pihak Ketiga untuk menembus Firewall Indodax & Yahoo News
 def render_kripto_news():
     st.markdown("<h2 class='gradient-text'>📰 Radar Pengumuman & Sentimen</h2>", unsafe_allow_html=True)
     st.info("Menarik liputan sentimen global dan Pengumuman Resmi (Maintenance/Delisting) langsung dari Indodax.")
@@ -517,19 +517,22 @@ def render_kripto_news():
     with tab_indodax:
         st.write("Pantau jadwal *Maintenance* jaringan, *Listing* koin baru, atau *Delisting* dari Indodax di sini.")
         if st.button("📢 Tarik Pengumuman Indodax Terkini", use_container_width=True):
-            with st.spinner("Menyadap blog resmi Indodax..."):
+            with st.spinner("Menembus Firewall Indodax..."):
                 try:
-                    url = "https://indodax.com/academy/feed/"
+                    # Menggunakan Proxy RSS2JSON agar IP Server Anda tidak diblokir Indodax
+                    url = "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Findodax.com%2Facademy%2Ffeed%2F"
                     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                     with urllib.request.urlopen(req, timeout=10) as response:
-                        tree = ET.parse(response)
-                        root = tree.getroot()
+                        data = json.loads(response.read().decode())
                         
+                        items = data.get('items', [])
                         count = 0
-                        for item in root.findall('./channel/item'):
-                            title = item.find('title').text
-                            link = item.find('link').text
+                        
+                        for item in items:
+                            title = item.get('title', '')
+                            link = item.get('link', '#')
                             
+                            # Filter pengumuman krusial
                             if any(kata in title.upper() for kata in ['MAINTENANCE', 'DELISTING', 'LISTING', 'MIGRASI', 'UPDATE', 'PENGUMUMAN']):
                                 with st.expander(f"⚠️ {title}"):
                                     st.write(f"🔗 [Baca Detail Jadwal di Sini]({link})")
@@ -541,19 +544,31 @@ def render_kripto_news():
                         if count == 0:
                             st.success("✅ Tidak ada pengumuman Maintenance atau Delisting terbaru. Server Indodax aman.")
                 except Exception as e:
-                    st.error("Gagal menarik pengumuman dari server Indodax. Web Indodax mungkin sedang dilindungi Firewall.")
+                    st.error("Gagal menarik pengumuman. Firewall Indodax sedang sangat ketat. Coba lagi nanti.")
 
     with tab_global:
         st.write("Berita fundamental yang menggerakkan Bitcoin dan market dunia.")
         if st.button("📰 Tarik Berita Kripto Global", use_container_width=True):
-            with st.spinner("Menghubungkan ke Feed Berita Global..."):
+            with st.spinner("Menghubungkan ke Pusat Data Kripto Global..."):
                 try:
-                    crypto = yf.Ticker("BTC-USD")
-                    berita = crypto.news
-                    if berita:
-                        for b in berita[:5]: 
-                            with st.expander(f"🔴 {b.get('title', 'Berita Tanpa Judul')}"):
-                                st.write(f"**Publisher:** {b.get('publisher', 'Global Media')}")
-                                st.write(f"🔗 [Baca Selengkapnya di Sini]({b.get('link', '#')})")
+                    # Menggunakan CryptoCompare API (Standar Industri) menggantikan Yahoo Finance yang Error
+                    url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        data = json.loads(response.read().decode())
+                        
+                        news_data = data.get('Data', [])[:5] # Ambil 5 berita paling panas
+                        
+                        if news_data:
+                            for b in news_data:
+                                title = b.get('title', 'Berita Tanpa Judul')
+                                url_news = b.get('url', '#')
+                                source = b.get('source_info', {}).get('name', 'Media Global')
+                                
+                                with st.expander(f"🔴 {title}"):
+                                    st.write(f"**Publisher:** {source}")
+                                    st.write(f"🔗 [Baca Selengkapnya di Sini]({url_news})")
+                        else:
+                            st.write("Belum ada berita terbaru saat ini.")
                 except:
                     st.error("Gagal menarik feed berita global.")
