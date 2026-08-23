@@ -38,7 +38,7 @@ def set_futuristic_background(image_file):
     except Exception as e:
         pass # Jika gambar tidak ditemukan, biarkan tema aslinya berjalan
 
-# Panggil fungsi untuk menghidupkan background
+# Panggil fungsi untuk menghidupkan background (Pastikan nama gambar di GitHub = bg_crypto.jpg)
 set_futuristic_background("bg_crypto.jpg")
 
 # Impor dari modul lokal
@@ -144,6 +144,24 @@ input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: 0 0 0 
     width: 100%;
 }
 .chat-action-btn:hover { background: rgba(56, 189, 248, 0.2); color: #38BDF8; border-color: #38BDF8; }
+
+/* STYLING TOMBOL STREAMLIT (Teks Terlihat Jelas) */
+.stButton > button {
+    background-color: rgba(15, 23, 42, 0.9) !important;
+    color: #38BDF8 !important;
+    border: 1px solid #38BDF8 !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    transition: all 0.3s ease !important;
+}
+.stButton > button:hover {
+    background-color: rgba(56, 189, 248, 0.2) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5) !important;
+}
+.stButton > button * {
+    color: inherit !important; 
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -206,7 +224,7 @@ else:
 # MENU UNIVERSAL 
 menu_list.append("🧮 KALKULATOR TRADING")
 menu_list.append("💼 DOMPET TRADING")
-menu_list.append("🩺 DOKTER PORTOFOLIO") # Menu Audit dipisah jadi menu mandiri
+menu_list.append("🩺 DOKTER PORTOFOLIO") 
 menu_list.append("🔒 KEAMANAN")
 if role == "admin": menu_list.append("⚙️ USER MANAGEMENT")
 
@@ -214,7 +232,6 @@ menu = st.sidebar.radio("Navigasi", menu_list, key="side_menu", label_visibility
 
 # TOMBOL AI DITETAPKAN DI SIDEBAR PALING BAWAH
 st.sidebar.write("---")
-# Menggunakan tombol standar (bukan primary) agar tidak menabrak tema warna
 if st.sidebar.button("💬 Bicara dengan AI", use_container_width=True):
     st.session_state.show_ai_panel = not st.session_state.show_ai_panel
     st.rerun()
