@@ -1,11 +1,11 @@
 streamlit
 yfinance
 pandas
-numpy==1.26.4
+numpy
 plotly
 openpyxl
 requests
 pytz
-st-gsheets-connection
+git+https://github.com/streamlit/gsheets-connection
 feedparser
 google-generativeai
