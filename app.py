@@ -64,89 +64,79 @@ st.markdown("""
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
 
+/* OVERRIDE GLOBAL THEME TO DARK */
 .stApp { background-color: #0F172A; color: #F8FAFC; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-/* WARNA TEKS UTAMA */
+/* WARNA TEKS UTAMA KESELURUHAN */
 p, span, label, li, div.stMarkdown, .stText { color: #F8FAFC !important; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #FFFFFF !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #38BDF8, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #94A3B8 !important; }
 
+/* RUNNING TEXT (TICKER) */
 .ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; border: 1px solid #334155; }
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #38BDF8; }
 @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-50%, 0, 0); } }
 
-.pulsing-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #10B981; margin-right: 5px; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: pulse-dot 1.5s infinite; }
-@keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-
 /* TAB STYLING GELAP */
-.stTabs [data-baseweb="tab-list"] { background-color: rgba(30, 41, 59, 0.7) !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
+.stTabs [data-baseweb="tab-list"] { background-color: rgba(30, 41, 59, 0.9) !important; border-radius: 12px; padding: 4px; gap: 4px; border-bottom: none !important; }
 .stTabs [data-baseweb="tab"] { background-color: transparent !important; border-radius: 8px !important; padding: 8px 16px !important; border: none !important; margin: 0 !important; }
 .stTabs [data-baseweb="tab"] p { color: #94A3B8 !important; transition: all 0.3s ease; font-weight: 600 !important; }
 .stTabs [aria-selected="true"] { background-color: rgba(37, 99, 235, 0.2) !important; border: 1px solid rgba(56, 189, 248, 0.4) !important; }
 .stTabs [aria-selected="true"] p { color: #38BDF8 !important; font-weight: 800 !important; }
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
-/* SIDEBAR GELAP */
+/* SIDEBAR GELAP KESELURUHAN */
 section[data-testid="stSidebar"] { background-color: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #334155 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; font-weight: 600 !important; color: #CBD5E1 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: rgba(37, 99, 235, 0.2) !important; border: 1px solid rgba(56, 189, 248, 0.3) !important; border-left: 4px solid #38BDF8 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #38BDF8 !important; font-weight: 800 !important; }
 
-/* KOTAK-KOTAK GELAP / TRANSPARAN */
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { background-color: rgba(30, 41, 59, 0.6) !important; border: 1px solid #334155 !important; border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; backdrop-filter: blur(5px); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
-div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(56, 189, 248, 0.15) !important; border-color: #38BDF8 !important; }
-.dash-box { border-top: 1px solid #334155 !important; }
+/* KOTAK-KOTAK GELAP / TRANSPARAN (Form, Expander, Metric) */
+div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { 
+    background-color: rgba(30, 41, 59, 0.7) !important; 
+    border: 1px solid #334155 !important; 
+    border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; 
+    backdrop-filter: blur(5px); 
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+}
+div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { 
+    transform: translateY(-4px); 
+    box-shadow: 0 12px 20px -5px rgba(56, 189, 248, 0.15) !important; 
+    border-color: #38BDF8 !important; 
+}
 
-/* INPUT FORMS & METRICS */
-div[data-testid="stForm"] label p, .stTextInput label p, .stNumberInput label p, .stSelectbox label p { color: #38BDF8 !important; font-size: 0.85rem !important; font-weight: 600 !important; }
-input, select, textarea { background-color: rgba(15, 23, 42, 0.8) !important; border: 1px solid #475569 !important; color: #F8FAFC !important; font-family: 'JetBrains Mono', monospace !important; border-radius: 8px !important; height: 44px !important; font-size: 15px !important; font-weight: 600 !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; }
+/* KOLOM INPUT TEKS & ANGKA (MENCEGAH BACKGROUND PUTIH) */
+.stTextInput input, .stNumberInput input, .stPasswordInput input, .stSelectbox select, div[data-baseweb="select"] > div { 
+    background-color: rgba(15, 23, 42, 0.9) !important; 
+    border: 1px solid #475569 !important; 
+    color: #FFFFFF !important; 
+    font-family: 'JetBrains Mono', monospace !important; 
+    border-radius: 8px !important; 
+    height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
+    transition: border-color 0.2s ease, box-shadow 0.2s ease; 
+}
+.stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus { 
+    border-color: #38BDF8 !important; 
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
+}
+::placeholder { color: #64748B !important; }
+
+/* METRICS STYLING */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #F8FAFC !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; }
 .streamlit-expanderHeader * { color: #F8FAFC !important; font-weight: 600 !important; }
 
 /* TABLE / DATAFRAME */
-.stDataFrame { background-color: rgba(30, 41, 59, 0.6) !important; border-radius: 10px; }
+.stDataFrame { background-color: rgba(30, 41, 59, 0.8) !important; border-radius: 10px; }
 
-.text-green { color: #10B981 !important; } .text-red { color: #EF4444 !important; } .text-blue { color: #38BDF8 !important; } .text-muted { color: #94A3B8 !important; font-size: 13px; }
-
-/* Custom AI Panel Styling (app.py level) */
-.ai-panel-header {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    color: white;
-    padding: 16px;
-    border-radius: 12px 12px 0 0;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border: 1px solid #334155;
-}
-.chat-action-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 12px;
-    background: rgba(30, 41, 59, 0.6);
-    color: #94A3B8;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    border: 1px solid #334155;
-    transition: all 0.2s;
-    cursor: pointer;
-    width: 100%;
-}
-.chat-action-btn:hover { background: rgba(56, 189, 248, 0.2); color: #38BDF8; border-color: #38BDF8; }
-
-/* STYLING TOMBOL STREAMLIT (Teks Terlihat Jelas) */
-.stButton > button {
+/* STYLING SEMUA TOMBOL (LOGIN, SIDEBAR, MENU) AGAR TEKS TERBACA JELAS */
+button[kind="secondary"], button[kind="primary"], div[data-testid="stFormSubmitButton"] button, div[data-testid="stButton"] button {
     background-color: rgba(15, 23, 42, 0.9) !important;
     color: #38BDF8 !important;
     border: 1px solid #38BDF8 !important;
@@ -154,14 +144,28 @@ input:focus, select:focus { border-color: #38BDF8 !important; box-shadow: 0 0 0 
     font-weight: 700 !important;
     transition: all 0.3s ease !important;
 }
-.stButton > button:hover {
+button[kind="secondary"]:hover, button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] button:hover, div[data-testid="stButton"] button:hover {
     background-color: rgba(56, 189, 248, 0.2) !important;
     color: #FFFFFF !important;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.5) !important;
 }
-.stButton > button * {
+/* Memaksa teks di dalam tombol mewarisi warna biru/putih */
+button p, button div {
     color: inherit !important; 
 }
+
+/* WARNA BANTUAN */
+.text-green { color: #10B981 !important; } .text-red { color: #EF4444 !important; } .text-blue { color: #38BDF8 !important; } .text-muted { color: #94A3B8 !important; font-size: 13px; }
+
+/* Custom AI Panel Styling */
+.ai-panel-header {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    padding: 16px; border-radius: 12px 12px 0 0; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; border: 1px solid #334155;
+}
+.chat-action-btn {
+    display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; background: rgba(30, 41, 59, 0.6); color: #94A3B8; border-radius: 8px; font-size: 0.85rem; font-weight: 600; border: 1px solid #334155; transition: all 0.2s; cursor: pointer; width: 100%;
+}
+.chat-action-btn:hover { background: rgba(56, 189, 248, 0.2); color: #38BDF8; border-color: #38BDF8; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,7 +178,7 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     _, col2, _ = st.columns([1,1.5,1])
     with col2:
-        st.markdown("<div style='text-align:center; padding:50px 0; background-color: rgba(15, 23, 42, 0.6); border-radius: 15px; border: 1px solid rgba(56, 189, 248, 0.3); backdrop-filter: blur(10px); margin-top: 50px;'><h1 class='gradient-text'>IDX PRO TERMINAL</h1><p class='text-muted' style='letter-spacing:2px; margin-top:5px;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:50px 0; background-color: rgba(30, 41, 59, 0.8); border-radius: 15px; border: 1px solid rgba(56, 189, 248, 0.5); backdrop-filter: blur(10px); margin-top: 50px; box-shadow: 0 0 20px rgba(0,0,0,0.5);'><h1 class='gradient-text'>IDX PRO TERMINAL</h1><p class='text-muted' style='letter-spacing:2px; margin-top:5px;'>INSTITUTIONAL QUANT SUITE</p></div>", unsafe_allow_html=True)
         with st.form("login_form"):
             u = st.text_input("User ID").strip()
             p = st.text_input("Password", type="password")
@@ -195,7 +199,7 @@ user_now = st.session_state.user
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:16px; background-color:rgba(30, 41, 59, 0.7); border-radius:12px; border:1px solid rgba(56, 189, 248, 0.3); margin-bottom:15px; text-align:center;'>
+    <div style='padding:16px; background-color:rgba(30, 41, 59, 0.8); border-radius:12px; border:1px solid rgba(56, 189, 248, 0.3); margin-bottom:15px; text-align:center;'>
         <h3 style='margin:0; font-size:1.1rem; color:#F8FAFC;'>{user_now.upper()}</h3>
         <p style='margin:0; font-size:11px; color:#10B981; font-weight:700; margin-top:4px;'><span class='pulsing-dot'></span> ONLINE | {role.upper()}</p>
         <p style='font-size:10px; color:#94A3B8; margin:8px 0 0 0;'>IP : {ip_l}</p>
