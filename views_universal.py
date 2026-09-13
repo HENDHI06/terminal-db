@@ -6,6 +6,8 @@ import plotly.express as px
 import math
 import time
 import re
+import requests
+import feedparser
 from core import *
 import google.generativeai as genai
 
@@ -133,15 +135,39 @@ def format_rp(val):
     elif val < 1000: return f"Rp {val:,.2f}"
     else: return f"Rp {val:,.0f}"
 
+def topup_asset(row_id, new_p, new_l, is_cr):
+    df_port = conn_gs.read(worksheet="portfolio", ttl=0)
+    idx = df_port.index[df_port['id'] == row_id].tolist()
+    if idx:
+        old_p = float(df_port.at[idx[0], 'buy_price'])
+        old_l = float(df_port.at[idx[0], 'lots'])
+        pengali = 1 if is_cr else 100
+        total_modal_lama = old_p * old_l * pengali
+        total_modal_baru = new_p * new_l * pengali
+        total_lot_baru = old_l + new_l
+        avg_p = (total_modal_lama + total_modal_baru) / (total_lot_baru * pengali)
+        df_port.at[idx[0], 'buy_price'] = avg_p
+        df_port.at[idx[0], 'lots'] = total_lot_baru
+        conn_gs.update(worksheet="portfolio", data=df_port)
+        return True
+    return False
+
 def render_dompet(user_now, role):
     st.markdown(f"<h2 class='gradient-text'>💼 Dompet Omni-Wallet Pro</h2>", unsafe_allow_html=True)
     show_saldo = st.checkbox("👁️ Tampilkan Saldo", value=False)
     format_privacy = lambda v: f"Rp {v:,.0f}" if show_saldo else "Rp *****"
 
-    tab1, tab2, tab3 = st.tabs(["📈 KEPEMILIKAN", "📜 RIWAYAT", "📊 AUDIT JURNAL"])
+    tab1, tab2, tab_passive, tab3 = st.tabs(["📈 KEPEMILIKAN", "📜 RIWAYAT (REALIZED)", "💰 PASIF INCOME", "📊 AUDIT JURNAL AI"])
     
+    df_h_all = conn_gs.read(worksheet="history", ttl=0)
+    total_passive_income = 0
+    if not df_h_all.empty:
+        df_h_user = df_h_all[df_h_all['username'] == user_now].copy()
+        df_h_user['pnl'] = pd.to_numeric(df_h_user['pnl'], errors='coerce')
+        total_passive_income = df_h_user[df_h_user['strategy'] == 'PASIF_INCOME']['pnl'].sum()
+        
     with tab1:
-        with st.expander("➕ TAMBAH ASET", expanded=False):
+        with st.expander("➕ BELI ASET BARU", expanded=False):
             tipe_aset = st.radio("PILIH JENIS ASET:", ["🏢 Saham Indonesia (IDX)", "🪙 Kripto (Indodax & Global)"], horizontal=True)
             with st.form("form_add", clear_on_submit=True):
                 c1, c2 = st.columns(2)
@@ -154,15 +180,15 @@ def render_dompet(user_now, role):
                     l_in = c2.number_input("Jumlah Koin (Unit)", min_value=0.000001, value=1.0, step=0.1, format="%g")
                     p_in = st.number_input("Harga Beli Total (Rp per Unit)", min_value=1.0, value=100.0, format="%g")
                 
-                st.markdown("<p style='font-size:12px; color:#38BDF8;'>*Opsional: Pasang Target Cuan & Rugi (Visual Tracker)</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:12px; color:#38BDF8;'>*Opsional: Pasang Target agar dipantau AI</p>", unsafe_allow_html=True)
                 col_tp, col_sl = st.columns(2)
                 tp_in = col_tp.number_input("Target Jual (Take Profit) Rp", min_value=0.0, value=0.0, format="%g")
                 sl_in = col_sl.number_input("Batas Rugi (Cut Loss) Rp", min_value=0.0, value=0.0, format="%g")
                     
-                strat_in = st.selectbox("Alasan Beli?", ["Serok Bawah", "Breakout", "Fundamental", "Feeling / FOMO"])
-                if st.form_submit_button("MASUKKAN", width="stretch") and t_in and p_in > 0:
+                strat_in = st.selectbox("Alasan Beli (Untuk dievaluasi AI nantinya):", ["Serok Bawah", "Breakout", "Fundamental", "Feeling / FOMO"])
+                if st.form_submit_button("MASUKKAN KE DOMPET", width="stretch") and t_in and p_in > 0:
                     add_to_portfolio(user_now, t_in, p_in, l_in, tp_in, sl_in, strat_in, is_crypto=("Kripto" in tipe_aset))
-                    st.success("Tersimpan!"); time.sleep(1); st.rerun()
+                    st.success("Tersimpan di Cloud!"); time.sleep(1); st.rerun()
 
         df_p = get_user_portfolio(user_now)
         if not df_p.empty:
@@ -191,7 +217,6 @@ def render_dompet(user_now, role):
             def calc_active(r):
                 t = str(r['ticker']).strip().upper()
                 is_cr = r['Is_Cr_Strict'] 
-                
                 bp, lots = float(r['buy_price']), float(r['lots'])
                 
                 if is_cr:
@@ -211,18 +236,20 @@ def render_dompet(user_now, role):
                         try: curr_rp = float(yf.Ticker(tk_yf).fast_info.get('lastPrice', bp))
                         except: curr_rp = bp
                     cost_rp, val_rp = bp * lots * 100, curr_rp * lots * 100
-                    fee_cost = (cost_rp * 0.0015) + (val_rp * 0.0025)
+                    fee_cost = (cost_rp * 0.0015) + (val_rp * 0.0025) 
                 
                 net_pnl = (val_rp - cost_rp) - fee_cost
                 return pd.Series([curr_rp, cost_rp, val_rp, net_pnl, is_cr])
 
             df_p[['Live_Rp', 'Cost', 'Val', 'Net_PnL', 'Is_Cr']] = df_p.apply(calc_active, axis=1)
             
-            st.write("---")
+            t_inv_rp, t_pl_rp = df_p['Cost'].sum(), df_p['Net_PnL'].sum()
+            total_kekayaan = t_inv_rp + t_pl_rp + total_passive_income
+            
             m1, m2, m3 = st.columns(3)
-            m1.metric("MODAL MENGAMBANG", format_privacy(df_p['Cost'].sum()))
-            m2.metric("NET PROFIT (Dipotong Fee)", format_privacy(df_p['Net_PnL'].sum()), f"{(df_p['Net_PnL'].sum()/df_p['Cost'].sum()*100 if df_p['Cost'].sum()!=0 else 0):.2f}%" if show_saldo else "*****")
-            m3.metric("NILAI SEKARANG", format_privacy(df_p['Cost'].sum() + df_p['Net_PnL'].sum()))
+            m1.metric("MODAL MENGAMBANG", format_privacy(t_inv_rp))
+            m2.metric("NET PROFIT (Dipotong Fee)", format_privacy(t_pl_rp), f"{(t_pl_rp/t_inv_rp*100 if t_inv_rp!=0 else 0):.2f}%" if show_saldo else "*****")
+            m3.metric("TOTAL KEKAYAAN AKTIF", format_privacy(total_kekayaan), f"+ Rp {total_passive_income:,.0f} Pasif Income" if show_saldo and total_passive_income > 0 else "")
             
             st.write("---")
             for _, r in df_p.iterrows():
@@ -231,8 +258,9 @@ def render_dompet(user_now, role):
                 sign = "+" if r['Net_PnL'] > 0 else ""
                 
                 title = f"{icon} {r['ticker']} | {r['lots']:g} {sat} | Live: {format_rp(r['Live_Rp'])} | Net PnL: {sign}Rp {r['Net_PnL']:,.0f} ({sign}{pct:.2f}%)"
+                
                 with st.expander(title):
-                    st.markdown(f"<span class='badge-blue'>Kategori: {r.get('strategy', 'Bebas')}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='badge-blue'>{r.get('strategy', 'Bebas')}</span>", unsafe_allow_html=True)
                     
                     tp_val = float(r.get('tp_price', 0) if pd.notna(r.get('tp_price')) else 0)
                     sl_val = float(r.get('cl_price', 0) if pd.notna(r.get('cl_price')) else 0)
@@ -242,14 +270,14 @@ def render_dompet(user_now, role):
                     if tp_val > 0 and sl_val > 0 and tp_val > sl_val:
                         jarak_total = tp_val - sl_val
                         posisi_skrng = ((lv_val - sl_val) / jarak_total) * 100
-                        posisi_clamp = max(0, min(100, posisi_skrng)) 
+                        posisi_clamp = max(0, min(100, posisi_skrng))
                         bar_color = "#34D399" if posisi_skrng > 50 else "#EF4444"
                         st.markdown(f"""
                             <div style="margin: 15px 0;">
                                 <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94A3B8; margin-bottom: 4px;">
                                     <span>Cut Loss<br><b>Rp {sl_val:,.0f}</b></span>
                                     <span style="text-align:center;">Avg Beli<br><b>Rp {bp_val:,.0f}</b></span>
-                                    <span style="text-align:right;">Take Profit<br><b>Rp {tp_val:,.0f}</b></span>
+                                    <span style="text-align:right;">Target Profit<br><b>Rp {tp_val:,.0f}</b></span>
                                 </div>
                                 <div style="height: 10px; width: 100%; background: rgba(255,255,255,0.1); border-radius: 5px; position: relative;">
                                     <div style="position: absolute; top: 0; left: 0; width: {posisi_clamp}%; height: 10px; background: {bar_color}; border-radius: 5px;"></div>
@@ -257,31 +285,77 @@ def render_dompet(user_now, role):
                             </div>
                         """, unsafe_allow_html=True)
                     
-                    st.write("")
-                    c_price, c_lots, c_btn = st.columns([2, 2, 1])
-                    s_prc = c_price.number_input("Harga Jual (Rp)", value=float(lv_val), format="%g", key=f"p_{r['id']}")
-                    s_lot = c_lots.number_input(f"Jumlah Dilepas", min_value=0.000001, max_value=float(r['lots']), value=float(r['lots']), format="%g", key=f"l_{r['id']}")
-                    if c_btn.button("JUAL", key=f"b_{r['id']}", use_container_width=True):
-                        sell_position(user_now, r['id'], r['ticker'], r['buy_price'], s_prc, r['lots'], s_lot, is_crypto=is_c)
-                        st.toast("Terjual!"); time.sleep(1); st.rerun()
+                    tab_jual, tab_beli = st.tabs(["🔴 LIKUIDASI ASET", "🟢 BELI LAGI (AVERAGE DOWN/UP)"])
+                    
+                    with tab_jual:
+                        cp, cl, cb = st.columns([2, 2, 1])
+                        s_prc = cp.number_input("Harga Jual (Rp)", value=float(lv_val), format="%g", key=f"pj_{r['id']}")
+                        s_lot = cl.number_input("Jumlah Dilepas", min_value=0.000001, max_value=float(r['lots']), value=float(r['lots']), format="%g", key=f"lj_{r['id']}")
+                        if cb.button("JUAL", key=f"bj_{r['id']}", use_container_width=True):
+                            sell_position(user_now, r['id'], r['ticker'], bp_val, s_prc, r['lots'], s_lot, is_crypto=is_c)
+                            st.toast("Terjual!"); time.sleep(1); st.rerun()
+                            
+                    with tab_beli:
+                        cp2, cl2, cb2 = st.columns([2, 2, 1])
+                        b_prc = cp2.number_input("Harga Beli Baru (Rp)", value=float(lv_val), format="%g", key=f"pb_{r['id']}")
+                        b_lot = cl2.number_input("Beli Tambahan?", min_value=0.000001, value=1.0 if not is_c else 0.1, format="%g", key=f"lb_{r['id']}")
+                        if cb2.button("TOP UP", key=f"bb_{r['id']}", use_container_width=True):
+                            if topup_asset(r['id'], b_prc, b_lot, is_c):
+                                st.toast("Lot Berhasil Digabung!"); time.sleep(1); st.rerun()
         else: st.info("Dompet kosong.")
 
     with tab2:
-        df_h = conn_gs.read(worksheet="history", ttl=0)
-        if not df_h.empty:
-            for _, r in df_h[df_h['username'] == user_now].sort_values('date', ascending=False).iterrows():
+        if not df_h_all.empty:
+            df_h_trade = df_h_user[df_h_user['strategy'] != 'PASIF_INCOME']
+            for _, r in df_h_trade.sort_values('date', ascending=False).iterrows():
                 display_tick_h = r['ticker'].replace("-IDR", "")
-                with st.expander(f"{r['date']} | {display_tick_h} | Net Profit Nyata: {format_privacy(float(r['pnl']))}"):
+                with st.expander(f"{r['date']} | {display_tick_h} | Profit: {format_privacy(float(r['pnl']))}"):
+                    st.write(f"Harga Beli: Rp {r['buy_price']:,.0f} | Harga Jual: Rp {r['sell_price']:,.0f} | Alasan Beli: {r.get('strategy', 'Bebas')}")
                     if st.button("Hapus Rekor", key=f"d_{r['id']}"):
-                        df_a = conn_gs.read(worksheet="history", ttl=0)
-                        conn_gs.update(worksheet="history", data=df_a.drop(df_a.index[df_a['id'] == r['id']][0]).reset_index(drop=True)); st.rerun()
+                        conn_gs.update(worksheet="history", data=df_h_all.drop(df_h_all.index[df_h_all['id'] == r['id']][0]).reset_index(drop=True)); st.rerun()
+
+    with tab_passive:
+        st.info("Pencatat Keuangan Khusus Dividen Saham & Hasil Staking Kripto. Uang ini dihitung sebagai Profit Murni (Modal = 0).")
+        with st.form("form_passive_inc"):
+            c_p1, c_p2 = st.columns([2, 1])
+            sumber_dana = c_p1.text_input("Sumber Dana (Contoh: Dividen ITMG / Staking ETH)").upper().strip()
+            jumlah_dana = c_p2.number_input("Total Uang Masuk (Rp)", min_value=1.0, value=500000.0, format="%g")
+            if st.form_submit_button("Catat Pemasukan", width="stretch") and sumber_dana:
+                df_hist_p = conn_gs.read(worksheet="history", ttl=0)
+                n_id_p = int(pd.to_numeric(df_hist_p['id'], errors='coerce').max() + 1) if not df_hist_p.empty and 'id' in df_hist_p.columns else 1
+                new_pasif = pd.DataFrame([{'id': n_id_p, 'username': user_now, 'ticker': sumber_dana, 'buy_price': 0, 'sell_price': 0, 'lots': 0, 'pnl': float(jumlah_dana), 'date': datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d"), 'strategy': 'PASIF_INCOME'}])
+                conn_gs.update(worksheet="history", data=pd.concat([df_hist_p, new_pasif], ignore_index=True))
+                st.success("Pasif Income Berhasil Ditambahkan!"); time.sleep(1); st.rerun()
+                
+        df_pasif = df_h_user[df_h_user['strategy'] == 'PASIF_INCOME']
+        if not df_pasif.empty:
+            st.write("---")
+            st.markdown(f"### Total Pemasukan Pasif: {format_privacy(total_passive_income)}")
+            for _, r in df_pasif.sort_values('date', ascending=False).iterrows():
+                st.markdown(f"💸 **{r['date']}** | {r['ticker']} | **+Rp {float(r['pnl']):,.0f}**")
 
     with tab3: 
-        if 'df_h' in locals() and not df_h.empty:
-            dh = df_h[df_h['username'] == user_now].sort_values('date').copy()
-            if not dh.empty:
-                dh['c'] = pd.to_numeric(dh['pnl']).cumsum()
-                st.plotly_chart(px.area(dh, x='date', y='c', title="Kurva Profit Nyata (Sudah Dijual)").update_layout(template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
+        if not df_h_all.empty:
+            df_h_trade = df_h_user[df_h_user['strategy'] != 'PASIF_INCOME'].copy()
+            if not df_h_trade.empty:
+                df_h_trade = df_h_trade.sort_values('date')
+                df_h_trade['Cumulative_PnL'] = pd.to_numeric(df_h_trade['pnl']).cumsum()
+                st.plotly_chart(px.area(df_h_trade, x='date', y='Cumulative_PnL', title="Kurva Profit Trading (Realized)").update_layout(template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
+                
+                st.markdown("### 🤖 Evaluasi Psikologi Trading (Rapor AI)")
+                strat_analysis = df_h_trade.groupby('strategy').apply(
+                    lambda x: pd.Series({'Total Transaksi': len(x), 'Win Rate (%)': (x['pnl'] > 0).mean() * 100, 'Total PnL': x['pnl'].sum()})
+                ).reset_index()
+                
+                st.dataframe(strat_analysis.style.format({'Win Rate (%)': "{:.1f}%", 'Total PnL': "Rp {:,.0f}"}), hide_index=True, use_container_width=True)
+                
+                if len(strat_analysis) >= 2:
+                    best_strat = strat_analysis.loc[strat_analysis['Win Rate (%)'].idxmax()]
+                    worst_strat = strat_analysis.loc[strat_analysis['Win Rate (%)'].idxmin()]
+                    
+                    st.success(f"💡 **AI Menganalisis:** Berdasarkan rekam jejak, Anda sangat mahir menggunakan strategi **'{best_strat['strategy']}'** dengan tingkat kemenangan {best_strat['Win Rate (%)']:.0f}%. AI menyarankan Anda untuk terus berpegang pada metode ini.")
+                    if worst_strat['Win Rate (%)'] < 50:
+                        st.error(f"⚠️ **Peringatan AI:** Hentikan membeli aset dengan alasan **'{worst_strat['strategy']}'**. Data membuktikan strategi ini membuat Anda merugi dengan tingkat kemenangan hanya {worst_strat['Win Rate (%)']:.0f}%. Jangan diulangi!")
 
 def render_dokter_portofolio(user_now, role):
     st.markdown("<h2 class='gradient-text'>🩺 Dokter Portofolio</h2>", unsafe_allow_html=True)
@@ -296,7 +370,10 @@ def render_dokter_portofolio(user_now, role):
             else:
                 def hitung_modal_idr(row):
                     tk_asli = str(row['ticker']).strip().upper()
-                    is_cr = is_crypto_ticker(tk_asli)
+                    is_cr = getattr(row, 'is_crypto', False)
+                    try:
+                        if not is_cr: is_cr = is_crypto_ticker(tk_asli)
+                    except: pass
                     pengali = 1 if is_cr else 100
                     return float(row['buy_price']) * float(row['lots']) * pengali
                 
@@ -348,19 +425,19 @@ def render_keamanan(user_now):
             if update_password_db(user_now, new_p): st.success("Sandikunci berhasil diubah dan diamankan oleh sistem!")
 
 # =======================================================
-# 🧠 AI QUANT ADVISOR (DENGAN INJEKSI DATA TEKNIKAL PRO)
+# 🧠 AI QUANT ADVISOR (GOD-TIER V6 - OMNI-AWARENESS)
 # =======================================================
 def render_ai_chat_panel(user_now, role):
     st.markdown("""
     <div style='background: linear-gradient(90deg, #38BDF8, #34D399); padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
-        <b style='font-size: 1.25rem; color: #0F172A;'>🤖 AI Quant Advisor</b>
+        <b style='font-size: 1.25rem; color: #0F172A;'>🤖 AI Quant Advisor (V6 God-Tier)</b>
     </div>
     """, unsafe_allow_html=True)
     
     nama_tampil = user_now.capitalize() if user_now else "Trader"
     c1, c2 = st.columns(2)
     if c1.button("🗑️ Bersihkan Chat", use_container_width=True, key="clear_chat_btn"):
-        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Mesin V6 siap menganalisis portofolio, memindai berita terkini, atau mencarikan saham diskon untuk Anda. Ada yang bisa saya bantu hari ini?"}]
         st.rerun()
         
     if c2.button("✖️ Tutup Panel AI", use_container_width=True, key="close_panel_btn"):
@@ -378,7 +455,7 @@ def render_ai_chat_panel(user_now, role):
     genai.configure(api_key=api_key_rahasia)
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Saya AI Advisor siap membantu analisis pasar Anda."}]
+        st.session_state.messages = [{"role": "assistant", "content": f"Halo {nama_tampil}! Mesin V6 siap menganalisis portofolio, memindai berita terkini, atau mencarikan saham diskon untuk Anda. Ada yang bisa saya bantu hari ini?"}]
 
     chat_container = st.container(height=500, border=True)
     
@@ -387,27 +464,89 @@ def render_ai_chat_panel(user_now, role):
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-    if prompt := st.chat_input("Tanya AI (Cth: Analisis BUMI hari ini)..."):
+    if prompt := st.chat_input("Tanya AI (Cth: Evaluasi portofolio saya / Berita BBRI / Carikan saham diskon)..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                with st.spinner("🤖 Mengunduh data teknikal 2 bulan terakhir..."):
+                with st.spinner("🤖 Mengaktifkan Indra AI (Koneksi ke Market, Berita, & Dompet)..."):
                     
-                    # --- FITUR SUPER PRO: INJEKSI TEKNIKAL LENGKAP KE OTAK AI (RAG V3) ---
+                    # 1. KONDISI MAKRO
+                    macro_context = ""
+                    try:
+                        ihsg_price = float(yf.Ticker("^JKSE").fast_info['lastPrice'])
+                        btc_price = float(yf.Ticker("BTC-USD").fast_info['lastPrice'])
+                        macro_context += f"- Posisi IHSG Saat Ini: {ihsg_price:,.0f}\n"
+                        macro_context += f"- Posisi Bitcoin (BTC) Saat Ini: $ {btc_price:,.0f}\n"
+                    except: pass
+                    
+                    # 2. FITUR 1: MATA BATIN PORTOFOLIO (Membaca Dompet User)
+                    portfolio_context = ""
+                    if any(word in prompt.lower() for word in ['portofolio', 'dompet', 'aset', 'punya saya', 'cut loss', 'evaluasi', 'nyangkut', 'jual', 'beli']):
+                        df_port = get_user_portfolio(user_now)
+                        if not df_port.empty:
+                            portfolio_context += "INFO RAHASIA: DATA PORTOFOLIO KLIEN SAAT INI (GUNAKAN INI JIKA KLIEN MEMINTA EVALUASI/SARAN CUTLOSS):\n"
+                            for _, row in df_port.iterrows():
+                                tk = str(row['ticker']).upper()
+                                bp = float(row['buy_price'])
+                                lots = float(row['lots'])
+                                is_cr = is_crypto_ticker(tk)
+                                sat = "Unit" if is_cr else "Lot"
+                                try:
+                                    if is_cr: lp = float(yf.Ticker(f"{tk.replace('-USD', '')}-USD").fast_info['lastPrice'])
+                                    else: lp = float(yf.Ticker(f"{tk}.JK" if not tk.endswith(".JK") else tk).fast_info['lastPrice'])
+                                    pct = ((lp - bp)/bp)*100
+                                    portfolio_context += f"- Klien pegang {tk}: Beli @ Rp/USD {bp:,.0f}, Harga Skrg @ {lp:,.0f} (Floating Profit/Loss: {pct:+.2f}%)\n"
+                                except: pass
+                            portfolio_context += "\n"
+                        else:
+                            portfolio_context += "INFO: Klien saat ini TIDAK memiliki aset apa pun di dompetnya. Arahkan untuk mencari aset bagus.\n\n"
+
+                    # 3. FITUR 3: AUTO-SCREENER SAHAM (Menyapu Saham Diskon)
+                    screener_context = ""
+                    if any(word in prompt.lower() for word in ['carikan', 'rekomendasi', 'screener', 'saham bagus', 'potensi', 'diskon', 'oversold']):
+                        blue_chips = ["BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK", "TLKM.JK", "ASII.JK", "GOTO.JK", "ADRO.JK", "PGAS.JK", "ITMG.JK"]
+                        screener_context += "INFO RAHASIA: HASIL RADAR SCREENING SAHAM BLUE CHIP SAAT INI:\n"
+                        try:
+                            df_blue = yf.download(blue_chips, period="1mo", progress=False)
+                            if isinstance(df_blue.columns, pd.MultiIndex): df_close = df_blue['Close']
+                            else: df_close = df_blue
+                                
+                            for bc in blue_chips:
+                                try:
+                                    c_data = df_close[bc].dropna()
+                                    if len(c_data) > 15:
+                                        c_p = float(c_data.iloc[-1])
+                                        ma20 = float(c_data.tail(20).mean())
+                                        
+                                        # Fast RSI
+                                        delta = c_data.diff()
+                                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                                        rs = gain / loss
+                                        rsi = float((100 - (100 / (1 + rs))).iloc[-1])
+                                        if math.isnan(rsi): rsi = 50.0
+                                        
+                                        trend = "Uptrend" if c_p > ma20 else "Downtrend"
+                                        status_rsi = "Sangat Diskon (Oversold)" if rsi < 35 else "Kemahalan (Overbought)" if rsi > 70 else "Netral"
+                                        screener_context += f"- {bc.replace('.JK','')}: Rp {c_p:,.0f} | Tren: {trend} | RSI: {rsi:.1f} ({status_rsi})\n"
+                                except: pass
+                            screener_context += "Berikan klien maksimal 3 saham terbaik (yang trennya naik atau lagi diskon besar) dari data di atas.\n\n"
+                        except: pass
+
+                    # 4. FITUR 2: ANALISIS TICKER SPESIFIK & PENCARI BERITA (SENTIMEN)
                     live_context = ""
-                    potential_tickers = [w.upper() for w in re.findall(r'\b[a-zA-Z]{3,5}\b', prompt)]
-                    
+                    potential_tickers = [w.upper() for w in re.findall(r'\b[a-zA-Z]{3,6}\b', prompt)]
                     if potential_tickers:
-                        live_context += "INFO WAJIB UNTUK AI (GUNAKAN DATA TEKNIKAL REAL-TIME INI SEBAGAI PATOKAN UTAMA, JANGAN MENGARANG):\n"
+                        live_context += "INFO WAJIB UNTUK AI (DATA TEKNIKAL & SENTIMEN BERITA REAL-TIME):\n"
                         seen = set()
                         unique_tickers = [x for x in potential_tickers if not (x in seen or seen.add(x))]
                         
                         valid_count = 0
                         for tk in unique_tickers:
-                            if valid_count >= 2: break # Maksimal 2 aset agar tidak berat
+                            if valid_count >= 2: break 
                             
                             is_crypto_check = is_crypto_ticker(tk)
                             ticker_symbol = f"{tk}-USD" if is_crypto_check else f"{tk}.JK"
@@ -415,46 +554,62 @@ def render_ai_chat_panel(user_now, role):
                             mata_uang = "$" if is_crypto_check else "Rp"
                             
                             try:
-                                # Ekstrak sejarah harga 2 bulan secara kilat
+                                # A. Tarik Teknikal & Fundamental
                                 df_raw = yf.download(ticker_symbol, period="2mo", progress=False)
-                                
-                                # Mengatasi jika formatnya MultiIndex
-                                if isinstance(df_raw.columns, pd.MultiIndex): 
-                                    df_raw.columns = df_raw.columns.get_level_values(0)
-                                    
-                                df_hist = df_raw['Close'].dropna()
-                                df_vol = df_raw['Volume'].dropna()
-                                
-                                if len(df_hist) >= 20:
-                                    c_price = float(df_hist.iloc[-1])
-                                    c_vol = float(df_vol.iloc[-1])
-                                    avg_vol = float(df_vol.tail(20).mean())
-                                    high_20 = float(df_hist.tail(20).max())
-                                    low_20 = float(df_hist.tail(20).min())
-                                    ma20 = float(df_hist.tail(20).mean())
-                                    
-                                    # Hitung RSI secara mandiri
-                                    delta = df_hist.diff()
-                                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                                    rs = gain / loss
-                                    rsi = float((100 - (100 / (1 + rs))).iloc[-1])
-                                    if math.isnan(rsi): rsi = 50.0
+                                if not df_raw.empty:
+                                    fund_text = ""
+                                    if not is_crypto_check:
+                                        try:
+                                            tk_info = yf.Ticker(ticker_symbol).info
+                                            pe = tk_info.get('trailingPE', 0) or 0
+                                            pbv = tk_info.get('priceToBook', 0) or 0
+                                            roe = (tk_info.get('returnOnEquity', 0) or 0) * 100
+                                            fund_text = f"- Fundamental: P/E {pe:.1f}x | PBV {pbv:.1f}x | ROE {roe:.1f}%\n"
+                                        except: pass
 
-                                    vol_status = "Meledak (Akumulasi Besar)" if c_vol > (avg_vol * 1.5) else "Normal/Sepi"
-                                    trend_status = "Uptrend" if c_price > ma20 else "Downtrend"
-                                    
-                                    live_context += f"--- DATA TEKNIKAL LIVE {tipe_aset} {tk} ---\n"
-                                    live_context += f"- Harga Berjalan: {mata_uang} {c_price:,.0f} \n"
-                                    live_context += f"- Status Tren (MA20): {trend_status} (Garis Batas MA20: {mata_uang} {ma20:,.0f})\n"
-                                    live_context += f"- Nilai RSI 14-Hari: {rsi:.1f} (Angka di atas 70 = Terlalu Mahal/Overbought, di bawah 30 = Terlalu Murah/Oversold)\n"
-                                    live_context += f"- Status Volume Transaksi: {vol_status}\n"
-                                    live_context += f"- Support Terdekat (Lantai): {mata_uang} {low_20:,.0f}\n"
-                                    live_context += f"- Resistensi Terdekat (Atap): {mata_uang} {high_20:,.0f}\n\n"
-                                    valid_count += 1
+                                    if isinstance(df_raw.columns, pd.MultiIndex): df_raw.columns = df_raw.columns.get_level_values(0)
+                                    df_hist = df_raw['Close'].dropna()
+                                    if len(df_hist) >= 20:
+                                        c_price = float(df_hist.iloc[-1])
+                                        ma20 = float(df_hist.tail(20).mean())
+                                        
+                                        live_context += f"--- {tipe_aset} {tk} ---\n"
+                                        live_context += f"- Harga Terakhir: {mata_uang} {c_price:,.0f} (Tren: {'Uptrend' if c_price>ma20 else 'Downtrend'})\n"
+                                        live_context += fund_text
+                                        
+                                        # B. Tarik Berita Terkini via Google RSS
+                                        try:
+                                            q_news = f"{tk}+kripto" if is_crypto_check else f"{tk}+saham"
+                                            feed = feedparser.parse(requests.get(f"https://news.google.com/rss/search?q={q_news}&hl=id&gl=ID&ceid=ID:id", headers={'User-Agent': 'Mozilla/5.0'}, timeout=3).content)
+                                            if feed.entries:
+                                                live_context += f"- Top Berita Terkini ({tk}):\n"
+                                                for entry in feed.entries[:3]:
+                                                    live_context += f"  * {entry.title}\n"
+                                        except: live_context += "- (Tidak ada berita mayor terdeteksi hari ini)\n"
+                                        
+                                        live_context += "\n"
+                                        valid_count += 1
                             except: pass
 
-                    system_prompt = f"Anda adalah Manajer Hedge Fund & Analis Kuantitatif Senior. Anda sedang berdiskusi dengan klien bernama {nama_tampil}. {live_context}\nINSTRUKSI MUTLAK: Gunakan murni data teknikal di atas (seperti RSI, Tren MA20, Support/Resistance) untuk merumuskan trading plan. Analisis kondisi momentumnya. Berikan probabilitas kenaikan dan rekomendasi area Take Profit/Cut Loss yang logis berdasarkan angka-angka di atas. Gunakan format poin-poin yang mudah dibaca, bahasa Indonesia profesional kelas institusi, tegas, dan tajam. Jangan pernah menggunakan data harga dari ingatan masa lalu Anda. Pertanyaan Klien: {prompt}"
+                    system_prompt = f"""Anda adalah 'Omni-Quant V6', Manajer Hedge Fund Institusional dan Penasihat Kekayaan Pribadi level dunia. Klien VVIP Anda bernama {nama_tampil}.
+
+[KONDISI MAKRO GLOBAL]
+{macro_context}
+[DATA DOMPET/PORTOFOLIO KLIEN]
+{portfolio_context}
+[DATA SCREENER/RADAR SAHAM]
+{screener_context}
+[DATA TICKER SPESIFIK & BERITA]
+{live_context}
+
+INSTRUKSI MUTLAK (BACA BAIK-BAIK):
+1. JIKA KLIEN MEMINTA EVALUASI PORTOFOLIO: Baca bagian [DATA DOMPET]. Beritahu dia saham mana yang untung/rugi, lalu berikan rekomendasi konkrit (mana yang harus di Hold, mana yang segera Cut Loss).
+2. JIKA KLIEN MINTA CARIKAN SAHAM: Baca bagian [DATA SCREENER]. Berikan 1-3 rekomendasi terbaik yang masuk akal beserta alasannya (RSI oversold, dll).
+3. JIKA KLIEN TANYA SAHAM SPESIFIK (Misal "Analisis BUMI"): Baca bagian [DATA TICKER & BERITA]. Analisis teknikalnya, dan pastikan Anda MENYEBUTKAN sentimen berita terkininya (jika ada) untuk menjawab alasan kenaikan/penurunannya.
+4. JIKA KLIEN BERTANYA TEORI: Jawab sebagai Mentor yang edukatif dan mudah dipahami.
+5. JANGAN PERNAH MENGARANG HARGA. Gunakan semua data di atas. Bahasa Indonesia profesional, tajam, dan memiliki empati terhadap uang klien.
+
+Pertanyaan Klien: {prompt}"""
                     
                     sukses, log_error = False, ""
                     try:
@@ -466,7 +621,7 @@ def render_ai_chat_panel(user_now, role):
                                 response = model.generate_content(system_prompt)
                                 if response:
                                     try: teks_balasan = response.text
-                                    except ValueError: teks_balasan = "Mohon maaf, sistem keamanan memblokir respons ini karena mengandung kata kunci yang dibatasi."
+                                    except ValueError: teks_balasan = "Mohon maaf, sistem memblokir respons karena alasan keamanan kata kunci."
                                     st.markdown(teks_balasan)
                                     st.session_state.messages.append({"role": "assistant", "content": teks_balasan})
                                     sukses = True
@@ -475,7 +630,7 @@ def render_ai_chat_panel(user_now, role):
                                 log_error += f"[{nama_model} gagal] "
                                 continue 
                         if not sukses:
-                            st.error(f"⚠️ Saat ini server AI sedang sibuk atau menolak koneksi. Log teknis: {log_error}")
+                            st.error(f"⚠️ Server AI sedang sibuk. Log teknis: {log_error}")
                     except Exception as e:
-                        st.error(f"Kesalahan sistem internal: {e}")
+                        st.error(f"Kesalahan internal: {e}")
         st.rerun() 
