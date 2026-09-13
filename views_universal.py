@@ -391,35 +391,41 @@ def render_ai_chat_panel(user_now, role):
                 st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                with st.spinner("Mengambil data live dan menganalisis..."):
+                with st.spinner("Mengambil data live pasar..."):
                     
-                    # --- FITUR BARU: INJEKSI DATA LIVE KE OTAK AI (RAG) ---
+                    # --- FITUR BARU: INJEKSI DATA LIVE KE OTAK AI (RAG V2) ---
                     live_context = ""
-                    # Mencari kata berukuran 3-5 huruf kapital yang diinput oleh user (contoh: BBCA, ASII, BTC)
-                    potential_tickers = re.findall(r'\b[a-zA-Z]{3,5}\b', prompt)
+                    # Ambil semua kata berukuran 3-5 huruf dari prompt user (contoh: BBCA, BUMI, BTC)
+                    potential_tickers = [w.upper() for w in re.findall(r'\b[a-zA-Z]{3,5}\b', prompt)]
+                    
                     if potential_tickers:
-                        live_context += "INFO RAHASIA UNTUK AI (GUNAKAN HARGA INI, JANGAN MENGARANG):\n"
-                        # Batasi max 4 kata agar tidak lama loadingnya
-                        for tk in list(set(potential_tickers))[:4]:
-                            tk_upper = tk.upper()
+                        live_context += "INFO WAJIB UNTUK AI (GUNAKAN HARGA INI SEBAGAI PATOKAN ANALISIS, JANGAN MENGARANG):\n"
+                        # Hapus kata duplikat agar prosesnya lebih ringan
+                        seen = set()
+                        unique_tickers = [x for x in potential_tickers if not (x in seen or seen.add(x))]
+                        
+                        valid_count = 0
+                        for tk in unique_tickers:
+                            if valid_count >= 3: break # Maksimal narik 3 aset agar loading tidak lemot
+                            
+                            is_crypto_check = is_crypto_ticker(tk)
                             try:
-                                # Coba tebak kalau ini Saham Indonesia
-                                df_live = yf.download(f"{tk_upper}.JK", period="1d", progress=False)
-                                if not df_live.empty:
-                                    c_price = float(df_live['Close'].iloc[-1])
-                                    live_context += f"- HARGA LIVE SAHAM {tk_upper}: Rp {c_price:,.0f}\n"
-                                    continue # Kalo berhasil, langsung lanjut ke kata berikutnya
+                                if is_crypto_check:
+                                    # Pake fast_info yang 10x lebih ngebut dari .download
+                                    price = float(yf.Ticker(f"{tk}-USD").fast_info['lastPrice'])
+                                    live_context += f"- HARGA LIVE KRIPTO {tk} SAAT INI: $ {price:,.4f}\n"
+                                    valid_count += 1
+                                    continue
                             except: pass
                             
                             try:
-                                # Coba tebak kalau ini Kripto
-                                df_cr = yf.download(f"{tk_upper}-USD", period="1d", progress=False)
-                                if not df_cr.empty:
-                                    cr_price = float(df_cr['Close'].iloc[-1])
-                                    live_context += f"- HARGA LIVE KRIPTO {tk_upper}: $ {cr_price:,.4f}\n"
+                                # Jika bukan kripto, coba tembak sebagai Saham IDX
+                                price = float(yf.Ticker(f"{tk}.JK").fast_info['lastPrice'])
+                                live_context += f"- HARGA LIVE SAHAM {tk} SAAT INI: Rp {price:,.0f}\n"
+                                valid_count += 1
                             except: pass
 
-                    system_prompt = f"Anda adalah penasihat keuangan kuantitatif profesional untuk pasar saham IDX dan aset Kripto. Anda berbicara dengan {nama_tampil}. {live_context} Jawablah secara ringkas, analitis, langsung pada intinya (to the point), dan gunakan bahasa Indonesia yang formal namun mudah dipahami. Hindari bahasa yang terlalu berbunga-bunga. Pertanyaan User: {prompt}"
+                    system_prompt = f"Anda adalah penasihat keuangan kuantitatif profesional untuk pasar saham IDX dan aset Kripto. Anda berbicara dengan {nama_tampil}. {live_context}\nJawablah secara ringkas, analitis, langsung pada intinya (to the point), dan gunakan bahasa Indonesia yang formal namun mudah dipahami. Hindari bahasa yang terlalu berbunga-bunga. Pertanyaan User: {prompt}"
                     
                     sukses, log_error = False, ""
                     try:
