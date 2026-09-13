@@ -347,6 +347,9 @@ def render_keamanan(user_now):
         if st.form_submit_button("ENKRIPSI DAN SIMPAN", width="stretch"):
             if update_password_db(user_now, new_p): st.success("Sandikunci berhasil diubah dan diamankan oleh sistem!")
 
+# =======================================================
+# 🧠 AI QUANT ADVISOR (DENGAN INJEKSI DATA TEKNIKAL PRO)
+# =======================================================
 def render_ai_chat_panel(user_now, role):
     st.markdown("""
     <div style='background: linear-gradient(90deg, #38BDF8, #34D399); padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
@@ -384,48 +387,74 @@ def render_ai_chat_panel(user_now, role):
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-    if prompt := st.chat_input("Tanya AI (Cth: Analisis fundamental ASII)..."):
+    if prompt := st.chat_input("Tanya AI (Cth: Analisis BUMI hari ini)..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                with st.spinner("Mengambil data live pasar..."):
+                with st.spinner("🤖 Mengunduh data teknikal 2 bulan terakhir..."):
                     
-                    # --- FITUR BARU: INJEKSI DATA LIVE KE OTAK AI (RAG V2) ---
+                    # --- FITUR SUPER PRO: INJEKSI TEKNIKAL LENGKAP KE OTAK AI (RAG V3) ---
                     live_context = ""
-                    # Ambil semua kata berukuran 3-5 huruf dari prompt user (contoh: BBCA, BUMI, BTC)
                     potential_tickers = [w.upper() for w in re.findall(r'\b[a-zA-Z]{3,5}\b', prompt)]
                     
                     if potential_tickers:
-                        live_context += "INFO WAJIB UNTUK AI (GUNAKAN HARGA INI SEBAGAI PATOKAN ANALISIS, JANGAN MENGARANG):\n"
-                        # Hapus kata duplikat agar prosesnya lebih ringan
+                        live_context += "INFO WAJIB UNTUK AI (GUNAKAN DATA TEKNIKAL REAL-TIME INI SEBAGAI PATOKAN UTAMA, JANGAN MENGARANG):\n"
                         seen = set()
                         unique_tickers = [x for x in potential_tickers if not (x in seen or seen.add(x))]
                         
                         valid_count = 0
                         for tk in unique_tickers:
-                            if valid_count >= 3: break # Maksimal narik 3 aset agar loading tidak lemot
+                            if valid_count >= 2: break # Maksimal 2 aset agar tidak berat
                             
                             is_crypto_check = is_crypto_ticker(tk)
-                            try:
-                                if is_crypto_check:
-                                    # Pake fast_info yang 10x lebih ngebut dari .download
-                                    price = float(yf.Ticker(f"{tk}-USD").fast_info['lastPrice'])
-                                    live_context += f"- HARGA LIVE KRIPTO {tk} SAAT INI: $ {price:,.4f}\n"
-                                    valid_count += 1
-                                    continue
-                            except: pass
+                            ticker_symbol = f"{tk}-USD" if is_crypto_check else f"{tk}.JK"
+                            tipe_aset = "KRIPTO" if is_crypto_check else "SAHAM"
+                            mata_uang = "$" if is_crypto_check else "Rp"
                             
                             try:
-                                # Jika bukan kripto, coba tembak sebagai Saham IDX
-                                price = float(yf.Ticker(f"{tk}.JK").fast_info['lastPrice'])
-                                live_context += f"- HARGA LIVE SAHAM {tk} SAAT INI: Rp {price:,.0f}\n"
-                                valid_count += 1
+                                # Ekstrak sejarah harga 2 bulan secara kilat
+                                df_raw = yf.download(ticker_symbol, period="2mo", progress=False)
+                                
+                                # Mengatasi jika formatnya MultiIndex
+                                if isinstance(df_raw.columns, pd.MultiIndex): 
+                                    df_raw.columns = df_raw.columns.get_level_values(0)
+                                    
+                                df_hist = df_raw['Close'].dropna()
+                                df_vol = df_raw['Volume'].dropna()
+                                
+                                if len(df_hist) >= 20:
+                                    c_price = float(df_hist.iloc[-1])
+                                    c_vol = float(df_vol.iloc[-1])
+                                    avg_vol = float(df_vol.tail(20).mean())
+                                    high_20 = float(df_hist.tail(20).max())
+                                    low_20 = float(df_hist.tail(20).min())
+                                    ma20 = float(df_hist.tail(20).mean())
+                                    
+                                    # Hitung RSI secara mandiri
+                                    delta = df_hist.diff()
+                                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                                    rs = gain / loss
+                                    rsi = float((100 - (100 / (1 + rs))).iloc[-1])
+                                    if math.isnan(rsi): rsi = 50.0
+
+                                    vol_status = "Meledak (Akumulasi Besar)" if c_vol > (avg_vol * 1.5) else "Normal/Sepi"
+                                    trend_status = "Uptrend" if c_price > ma20 else "Downtrend"
+                                    
+                                    live_context += f"--- DATA TEKNIKAL LIVE {tipe_aset} {tk} ---\n"
+                                    live_context += f"- Harga Berjalan: {mata_uang} {c_price:,.0f} \n"
+                                    live_context += f"- Status Tren (MA20): {trend_status} (Garis Batas MA20: {mata_uang} {ma20:,.0f})\n"
+                                    live_context += f"- Nilai RSI 14-Hari: {rsi:.1f} (Angka di atas 70 = Terlalu Mahal/Overbought, di bawah 30 = Terlalu Murah/Oversold)\n"
+                                    live_context += f"- Status Volume Transaksi: {vol_status}\n"
+                                    live_context += f"- Support Terdekat (Lantai): {mata_uang} {low_20:,.0f}\n"
+                                    live_context += f"- Resistensi Terdekat (Atap): {mata_uang} {high_20:,.0f}\n\n"
+                                    valid_count += 1
                             except: pass
 
-                    system_prompt = f"Anda adalah penasihat keuangan kuantitatif profesional untuk pasar saham IDX dan aset Kripto. Anda berbicara dengan {nama_tampil}. {live_context}\nJawablah secara ringkas, analitis, langsung pada intinya (to the point), dan gunakan bahasa Indonesia yang formal namun mudah dipahami. Hindari bahasa yang terlalu berbunga-bunga. Pertanyaan User: {prompt}"
+                    system_prompt = f"Anda adalah Manajer Hedge Fund & Analis Kuantitatif Senior. Anda sedang berdiskusi dengan klien bernama {nama_tampil}. {live_context}\nINSTRUKSI MUTLAK: Gunakan murni data teknikal di atas (seperti RSI, Tren MA20, Support/Resistance) untuk merumuskan trading plan. Analisis kondisi momentumnya. Berikan probabilitas kenaikan dan rekomendasi area Take Profit/Cut Loss yang logis berdasarkan angka-angka di atas. Gunakan format poin-poin yang mudah dibaca, bahasa Indonesia profesional kelas institusi, tegas, dan tajam. Jangan pernah menggunakan data harga dari ingatan masa lalu Anda. Pertanyaan Klien: {prompt}"
                     
                     sukses, log_error = False, ""
                     try:
