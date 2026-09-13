@@ -1,4 +1,4 @@
-# --- FILE: core.py ---
+# core.py
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -149,6 +149,9 @@ def load_tickers():
         return [str(t).strip().upper() + ".JK" for t in pd.read_csv(url)['ticker'].tolist() if len(str(t)) <= 5]
     except: return []
 
+# ============================================================
+# ⚙️ MESIN SCANNER SUPER (VPA STANDAR)
+# ============================================================
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
@@ -196,6 +199,114 @@ def run_scan_accurate(tickers, mode, is_crypto=False):
         except: continue
     progress.empty()
     return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
+
+
+# ============================================================
+# ⚙️ MESIN SCANNER INSTITUSI (MINERVINI, RS, VCP, FVG)
+# ============================================================
+def run_pro_scanner(tickers, strategy):
+    results = []
+    try:
+        # RS Butuh IHSG sebagai pembanding
+        tickers_to_dl = list(set(tickers + ['^JKSE'])) if strategy == "RS" else list(set(tickers))
+        
+        # Tarik data 1 Tahun ke belakang untuk MA200 dan 52W High/Low
+        data = yf.download(tickers_to_dl, period="1y", interval="1d", group_by="ticker", progress=False, threads=True)
+        
+        for t in tickers:
+            try:
+                df = data[t].dropna() if len(tickers_to_dl) > 1 else data.dropna()
+                if len(df) < 200 and strategy == "Minervini": continue
+                if len(df) < 30: continue
+                
+                c = float(df['Close'].iloc[-1])
+                
+                # 1. MINERVINI TREND TEMPLATE
+                if strategy == "Minervini":
+                    ma50 = float(df['Close'].rolling(50).mean().iloc[-1])
+                    ma150 = float(df['Close'].rolling(150).mean().iloc[-1])
+                    ma200 = float(df['Close'].rolling(200).mean().iloc[-1])
+                    ma200_past = float(df['Close'].rolling(200).mean().iloc[-21]) # 1 bulan lalu
+                    high52 = float(df['High'].rolling(250).max().iloc[-1])
+                    low52 = float(df['Low'].rolling(250).min().iloc[-1])
+                    
+                    cond1 = c > ma150 and c > ma200
+                    cond2 = ma150 > ma200
+                    cond3 = ma200 > ma200_past
+                    cond4 = ma50 > ma150 and ma50 > ma200
+                    cond5 = c > ma50
+                    cond6 = c >= (1.3 * low52) # Harga 30% di atas titik terendah
+                    cond7 = c >= (0.75 * high52) # Harga berjarak max 25% dari titik tertinggi
+                    
+                    if cond1 and cond2 and cond3 and cond4 and cond5 and cond6 and cond7:
+                        results.append({
+                            "Saham": t.replace(".JK",""), "Harga": c, 
+                            "Sinyal": "🔥 SUPER TREND (Fase 2)", 
+                            "Detail": f"Tren Mark-Up Kuat. Saham melesat +{((c-low52)/low52)*100:.0f}% dari Dasar dan berada di atas garis MA 50, 150 & 200."
+                        })
+                        
+                # 2. RELATIVE STRENGTH (ALPHA MARKET)
+                elif strategy == "RS":
+                    idx_df = data['^JKSE'].dropna() if len(tickers_to_dl) > 1 else yf.download("^JKSE", period="1mo", progress=False).dropna()
+                    if len(df) < 20 or len(idx_df) < 20: continue
+                    
+                    pct_stock = ((c - float(df['Close'].iloc[-21])) / float(df['Close'].iloc[-21])) * 100
+                    pct_ihsg = ((float(idx_df['Close'].iloc[-1]) - float(idx_df['Close'].iloc[-21])) / float(idx_df['Close'].iloc[-21])) * 100
+                    rs = pct_stock - pct_ihsg
+                    
+                    if rs > 5: # Harus mengalahkan IHSG minimal 5% sebulan terakhir
+                        results.append({
+                            "Saham": t.replace(".JK",""), "Harga": c, 
+                            "Sinyal": "💪 ALPHA STRONG", 
+                            "Detail": f"Saham melawan arus. Kinerja: {pct_stock:+.2f}% VS IHSG {pct_ihsg:+.2f}% (Menang: {rs:+.2f}%)"
+                        })
+                        
+                # 3. VOLATILITY CONTRACTION (VCP) / SQUEEZE
+                elif strategy == "VCP":
+                    v_20 = float(df['Volume'].tail(20).mean())
+                    v_3 = float(df['Volume'].tail(3).mean())
+                    r_20 = float((df['High'] - df['Low']).tail(20).mean())
+                    r_3 = float((df['High'] - df['Low']).tail(3).mean())
+                    
+                    if r_3 < (r_20 * 0.6) and v_3 < (v_20 * 0.6): # Penyempitan drastis
+                        results.append({
+                            "Saham": t.replace(".JK",""), "Harga": c, 
+                            "Sinyal": "🗜️ SQUEEZE KERING (VCP)", 
+                            "Detail": f"Volatilitas harian dan Volume mengering drastis. Saham tertekan seperti pegas, bersiap untuk Breakout besar!"
+                        })
+                        
+                # 4. FAIR VALUE GAP (FVG) / SMART MONEY
+                elif strategy == "FVG":
+                    df_recent = df.tail(15) # Cari celah di 15 hari terakhir
+                    for k in range(2, len(df_recent)):
+                        low_3 = float(df_recent['Low'].iloc[k])
+                        high_1 = float(df_recent['High'].iloc[k-2])
+                        close_2 = float(df_recent['Close'].iloc[k-1])
+                        
+                        if low_3 > high_1 and close_2 > high_1: # Bullish Imbalance
+                            results.append({
+                                "Saham": t.replace(".JK",""), "Harga": c, 
+                                "Sinyal": "🧲 BULLISH FVG TERDETEKSI", 
+                                "Detail": f"Celah Magnet (Order Block) tertinggal di area Rp {high_1:,.0f} - Rp {low_3:,.0f}. Area optimal untuk antre beli."
+                            })
+                            break
+                            
+                        low_1 = float(df_recent['Low'].iloc[k-2])
+                        high_3 = float(df_recent['High'].iloc[k])
+                        if high_3 < low_1 and close_2 < low_1: # Bearish Imbalance
+                            results.append({
+                                "Saham": t.replace(".JK",""), "Harga": c, 
+                                "Sinyal": "⚠️ BEARISH FVG TERDETEKSI", 
+                                "Detail": f"Celah bahaya tertinggal di area Rp {high_3:,.0f} - Rp {low_1:,.0f}. Harga rawan diguyur turun."
+                            })
+                            break
+
+            except Exception as e:
+                continue
+        
+        return pd.DataFrame(results).drop_duplicates(subset=['Saham']) if results else pd.DataFrame()
+    except: return pd.DataFrame()
+
 
 def get_trend_signals(ticker_list):
     signals = []
