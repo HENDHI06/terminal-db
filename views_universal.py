@@ -9,127 +9,16 @@ from core import *
 import google.generativeai as genai
 
 def render_kalkulator(zona_market):
-    st.markdown(f"<h2 class='gradient-text'>Kalkulator Manajemen Risiko</h2>", unsafe_allow_html=True)
-    with st.expander("📖 PANDUAN CARA BACA & EKSEKUSI (WAJIB BACA)", expanded=False):
-        st.markdown("""
-        **Cara Menyelamatkan Uang Anda:**
-        * **Kalkulator Risiko:** Sebelum beli aset, masukkan modal dan batas rugi. Beli lot sesuai angka "BELI MAKSIMAL". Jangan serakah!
-        * **Averaging Down:** Khusus kalau Anda sudah nyangkut parah. Kalkulator ini mencari titik impas baru (BEP) jika Anda membeli lagi di harga bawah.
-        * **Kelly Criterion:** Rumus Anti-Bangkrut kasino. AI akan melihat rekam jejak jurnal Anda (Win Rate). Jika disarankan alokasi 10%, berarti jangan beli 1 aset pakai 100% uang Anda!
-        """)
-        
-    tab_risk, tab_avg, tab_comp, tab_kelly = st.tabs(["🛡️ KALK. RISIKO", "🛟 AVERAGING DOWN", "📈 JALUR 1 MILIAR", "⚖️ KELLY CRITERION"])
-    
-    with tab_risk:
-        st.info("Hitung lot/unit maksimal agar modal tidak habis saat terpaksa Cut Loss.")
-        with st.form("risk_calc_form"):
-            c1, c2 = st.columns(2)
-            capital = c1.number_input("Modal Trading Disiapkan (Rp)", min_value=100.0, value=10000000.0, step=50000.0, format="%g")
-            risk_pct = c2.number_input("Toleransi Rugi Maksimal (%)", min_value=0.1, max_value=10.0, value=2.0, step=0.1, format="%g")
-            c3, c4 = st.columns(2)
-            entry_p = c3.number_input("Rencana Harga Beli / Entry (Rp)", min_value=1.0, value=5000.0, step=100.0, format="%g")
-            stop_loss_p = c4.number_input("Batas Harga Cut Loss (Rp)", min_value=1.0, value=4800.0, step=100.0, format="%g")
-            calc_btn = st.form_submit_button("Kalkulasi Lot/Unit Aman", width="stretch")
-            
-        if calc_btn:
-            if stop_loss_p >= entry_p: st.error("⚠️ Batas Harga Cut Loss harus lebih rendah dari Harga Beli!")
-            else:
-                max_risk_idr = capital * (risk_pct / 100)
-                risk_per_share = entry_p - stop_loss_p
-                total_lots = math.floor((max_risk_idr / risk_per_share) / 100) if zona_market == "🏢 ZONA SAHAM (IDX)" else (max_risk_idr / risk_per_share)
-                actual_shares = total_lots * 100 if zona_market == "🏢 ZONA SAHAM (IDX)" else total_lots
-                st.markdown("---")
-                m1, m2, m3 = st.columns(3)
-                if zona_market == "🏢 ZONA SAHAM (IDX)":
-                    m1.metric("BELI MAKSIMAL", f"{total_lots:,.0f} Lot")
-                    m2.metric("MODAL DIBUTUHKAN", f"Rp {actual_shares * entry_p:,.0f}")
-                    m3.metric("UANG HILANG (JIKA CL)", f"Rp {actual_shares * risk_per_share:,.0f}", delta_color="inverse")
-                else:
-                    m1.metric("BELI MAKSIMAL", f"{total_lots:,.4f} Unit")
-                    m2.metric("MODAL DIBUTUHKAN", f"Rp {actual_shares * entry_p:,.0f}")
-                    m3.metric("UANG HILANG (JIKA CL)", f"Rp {actual_shares * risk_per_share:,.0f}", delta_color="inverse")
-                
-    with tab_avg:
-        st.info("Penyelamat portofolio: Hitung lot/unit tambahan yang diperlukan untuk menurunkan beban harga rata-rata pada posisi yang menyangkut (Average Down).")
-        with st.form("avg_calc_form"):
-            c1, c2 = st.columns(2)
-            p1 = c1.number_input("Harga Tersangkut (Atas)", min_value=1.0, value=1000.0, format="%g")
-            l1 = c2.number_input("Jumlah Lot/Unit Nyangkut", min_value=0.0001, value=10.0, format="%g")
-            c3, c4 = st.columns(2)
-            p2 = c3.number_input("Harga Bawah Saat Ini", min_value=1.0, value=800.0, format="%g")
-            l2 = c4.number_input("Rencana Pembelian Baru", min_value=0.0001, value=20.0, format="%g")
-            calc_avg_btn = st.form_submit_button("Hitung Harga Penyelamatan", width="stretch")
-            
-        if calc_avg_btn:
-            if p2 >= p1: st.error("⚠️ Harga pembelian tambahan harus lebih murah dari harga nyangkut!")
-            else:
-                pengali = 100 if zona_market == "🏢 ZONA SAHAM (IDX)" else 1
-                total_modal_lama = p1 * l1 * pengali
-                total_modal_baru = p2 * l2 * pengali
-                total_lot_akhir = l1 + l2
-                new_avg = (total_modal_lama + total_modal_baru) / (total_lot_akhir * pengali)
-                st.markdown("---")
-                a1, a2, a3 = st.columns(3)
-                
-                if zona_market == "🏢 ZONA SAHAM (IDX)":
-                    a1.metric("HARGA BEP BARU", f"Rp {new_avg:,.0f}")
-                    a2.metric("TOTAL KESELURUHAN LOT", f"{total_lot_akhir:,.0f} Lot")
-                    a3.metric("DANA TAMBAHAN DIPERLUKAN", f"Rp {total_modal_baru:,.0f}")
-                    st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**. Jual posisi segera ketika harga mencapai titik ini.")
-                else:
-                    a1.metric("HARGA BEP BARU", f"Rp {new_avg:,.0f}")
-                    a2.metric("TOTAL KESELURUHAN UNIT", f"{total_lot_akhir:,.4f} Unit")
-                    a3.metric("DANA TAMBAHAN DIPERLUKAN", f"Rp {total_modal_baru:,.0f}")
-                    st.success(f"Harga rata-ratamu berhasil turun ke level aman **Rp {new_avg:,.0f}**.")
-                
-    with tab_comp:
-        st.info("Kalkulator Bunga Berbunga (Compounding). Hitung secara presisi kapan portofoliomu akan menembus Rp 1 Miliar!")
-        with st.form("comp_form"):
-            c1, c2 = st.columns(2)
-            p_awal = c1.number_input("Modal Awal Saat Ini (Rp)", min_value=100000.0, value=10000000.0, step=1000000.0, format="%g")
-            r_bulan = c2.number_input("Target Profit Konsisten per Bulan (%)", min_value=0.1, max_value=100.0, value=5.0, step=0.5, format="%g")
-            btn_comp = st.form_submit_button("Hitung Peta Jalan 1 Miliar", width="stretch")
-        
-        if btn_comp:
-            target_fv = 1000000000
-            if p_awal >= target_fv:
-                st.success("🎉 Luar Biasa! Anda sudah memiliki lebih dari 1 Miliar di tangan Anda!")
-            else:
-                r_decimal = r_bulan / 100
-                months_needed = math.log(target_fv / p_awal) / math.log(1 + r_decimal)
-                years = int(months_needed // 12)
-                months = int(math.ceil(months_needed % 12))
-                
-                if months == 12:
-                    years += 1
-                    months = 0
-                
-                st.markdown("---")
-                st.markdown(f"<h3 style='text-align:center; color:#38BDF8;'>Pencapaian 1 Miliar Anda:</h3>", unsafe_allow_html=True)
-                st.markdown(f"<h1 style='text-align:center; color:#34D399; font-size:3.5rem; margin-bottom:0;'>{years} Tahun {months} Bulan</h1>", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.info(f"💡 Dengan modal awal **Rp {p_awal:,.0f}** dan konsistensi profit **{r_bulan}% tiap bulan** tanpa ditarik, kekuatan bunga berbunga (*compounding interest*) akan melipatgandakan aset Anda menjadi Rp 1 Miliar dalam waktu **{years} tahun {months} bulan**. Tetap disiplin dan bersabar!")
-
-    with tab_kelly:
-        with st.form("kelly_form"):
-            c1, c2 = st.columns(2)
-            w_rate = c1.number_input("Win Rate Trading Anda (%) (Lihat Jurnal AI)", min_value=1.0, max_value=100.0, value=55.0, format="%g")
-            rr_ratio = c2.number_input("Risk/Reward Ratio (Misal 2 untuk target cuan 2x lipat dari risiko cut loss)", min_value=0.1, max_value=10.0, value=2.0, format="%g")
-            btn_kelly = st.form_submit_button("Hitung Batas Maksimal Pembelian", width="stretch")
-            
-        if btn_kelly:
-            W = w_rate / 100
-            R = rr_ratio
-            kelly_pct = W - ((1 - W) / R)
-            
-            st.markdown("---")
-            if kelly_pct <= 0:
-                st.error("⚠️ **STOP TRADING SEMENTARA!** Sistem Anda saat ini merugikan secara matematis. Anda harus memperbaiki Win Rate atau memperbesar target keuntungan Anda (Risk/Reward) sebelum menaruh uang lagi ke market.")
-            else:
-                st.markdown(f"<h3 style='text-align:center; color:#38BDF8;'>Alokasi Dana Maksimal (Per Transaksi):</h3>", unsafe_allow_html=True)
-                st.markdown(f"<h1 style='text-align:center; color:#34D399; font-size:3.5rem; margin-bottom:0;'>{kelly_pct*100:.1f}%</h1>", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.success(f"💡 Pemenang Nobel Matematika menyarankan Anda untuk TIDAK menggunakan lebih dari **{kelly_pct*100:.1f}% total modal Anda** untuk 1 posisi transaksi (berdasarkan statistik pribadi Anda). Ini adalah batas pertahanan agar portofolio Anda tidak akan pernah hancur (margin call).")
+    st.markdown(f"<h2 class='gradient-text'>🧮 Kalkulator Trading</h2>", unsafe_allow_html=True)
+    with st.form("risk_calc_form"):
+        c1, c2 = st.columns(2)
+        capital = c1.number_input("Modal Disiapkan (Rp)", min_value=100.0, value=10000000.0, format="%g")
+        risk_pct = c2.number_input("Toleransi Rugi (%)", min_value=0.1, max_value=10.0, value=2.0, format="%g")
+        entry_p = st.number_input("Harga Beli / Entry (Rp)", min_value=1.0, value=5000.0, format="%g")
+        stop_loss_p = st.number_input("Harga Cut Loss (Rp)", min_value=1.0, value=4800.0, format="%g")
+        if st.form_submit_button("Hitung Lot Aman", width="stretch") and stop_loss_p < entry_p:
+            total_lots = math.floor((capital * (risk_pct / 100)) / (entry_p - stop_loss_p) / 100)
+            st.success(f"Anda boleh beli maksimal: **{total_lots} Lot**")
 
 def format_rp(val):
     if pd.isna(val) or val == 0: return "Rp 0"
@@ -152,11 +41,11 @@ def render_dompet(user_now, role):
                 if "Saham" in tipe_aset:
                     t_in = c1.text_input("Kode Saham (Cth: BBCA)").upper().strip()
                     l_in = c2.number_input("Jumlah Lot", min_value=1.0, value=1.0, step=1.0, format="%g")
-                    p_in = st.number_input("Harga Beli (Rp per Lembar)", min_value=1.0, value=1000.0, format="%g")
+                    p_in = st.number_input("Harga Beli (Rp per Lembar)", min_value=1.0, value=100.0, format="%g")
                 else:
                     t_in = c1.text_input("Kode Koin (Cth: BTC, FWOG)").upper().strip()
                     l_in = c2.number_input("Jumlah Koin (Unit)", min_value=0.000001, value=1.0, step=0.1, format="%g")
-                    p_in = st.number_input("Harga Beli Total (Rp per Unit)", min_value=1.0, value=1000.0, format="%g")
+                    p_in = st.number_input("Harga Beli Total (Rp per Unit)", min_value=1.0, value=100.0, format="%g")
                     
                 strat_in = st.selectbox("Alasan Beli?", ["Serok Bawah", "Breakout", "Fundamental", "Feeling / FOMO"])
                 if st.form_submit_button("MASUKKAN", width="stretch") and t_in and p_in > 0:
@@ -171,20 +60,26 @@ def render_dompet(user_now, role):
             try: kurs_idr = float(yf.download("IDR=X", period="1d", progress=False)['Close'].iloc[-1])
             except: kurs_idr = 15500.0 
             
-            saham_tkrs = [f"{t}.JK" for t, is_c in zip(df_p['ticker'], df_p['is_crypto']) if not is_c]
+            # --- FIX: KECERDASAN BUATAN UNTUK MEMAKSA SAHAM MENJADI SAHAM MESKIPUN DATABASE SALAH ---
+            df_p['Is_Cr_Strict'] = df_p['ticker'].apply(lambda x: is_crypto_ticker(str(x)))
+            
+            saham_tkrs = []
+            for t in df_p[~df_p['Is_Cr_Strict']]['ticker'].unique():
+                clean_t = str(t).strip().upper()
+                if not clean_t.endswith(".JK"): clean_t += ".JK"
+                saham_tkrs.append(clean_t)
+                
             live_saham = {}
             if saham_tkrs:
                 try:
                     df_dl = yf.download(list(set(saham_tkrs)), period="5d", progress=False, threads=True)['Close']
-                    for tk in set(saham_tkrs): live_saham[tk] = float(df_dl[tk].dropna().iloc[-1]) if isinstance(df_dl, pd.DataFrame) else float(df_dl.dropna().iloc[-1])
+                    for tk in set(saham_tkrs): 
+                        live_saham[tk] = float(df_dl[tk].dropna().iloc[-1]) if isinstance(df_dl, pd.DataFrame) else float(df_dl.dropna().iloc[-1])
                 except: pass
 
             def calc_active(r):
                 t = str(r['ticker']).strip().upper()
-                is_cr = ("-" in t) or ("IDR" in t) or getattr(r, 'is_crypto', False)
-                try:
-                    if not is_cr: is_cr = is_crypto_ticker(t)
-                except: pass
+                is_cr = r['Is_Cr_Strict'] # Gunakan deteksi paksa yang baru
                 
                 bp, lots = float(r['buy_price']), float(r['lots'])
                 
@@ -198,7 +93,7 @@ def render_dompet(user_now, role):
                         except: curr_rp = bp
                     cost_rp, val_rp = bp * lots, curr_rp * lots
                 else:
-                    tk_yf = f"{t}.JK"
+                    tk_yf = f"{t}.JK" if not t.endswith(".JK") else t
                     curr_rp = live_saham.get(tk_yf, 0)
                     if curr_rp == 0:
                         try: curr_rp = float(yf.Ticker(tk_yf).fast_info.get('lastPrice', bp))
@@ -209,7 +104,7 @@ def render_dompet(user_now, role):
             df_p[['Live_Rp', 'Cost', 'Val', 'PnL', 'Is_Cr']] = df_p.apply(calc_active, axis=1)
             st.write("---")
             m1, m2, m3 = st.columns(3)
-            m1.metric("MODAL", format_privacy(df_p['Cost'].sum()))
+            m1.metric("MODAL (Mengambang)", format_privacy(df_p['Cost'].sum()))
             m2.metric("PROFIT KESELURUHAN", format_privacy(df_p['PnL'].sum()), f"{(df_p['PnL'].sum()/df_p['Cost'].sum()*100 if df_p['Cost'].sum()!=0 else 0):.2f}%" if show_saldo else "*****")
             m3.metric("NILAI SEKARANG", format_privacy(df_p['Cost'].sum() + df_p['PnL'].sum()))
             
@@ -233,15 +128,16 @@ def render_dompet(user_now, role):
         df_h = conn_gs.read(worksheet="history", ttl=0)
         if not df_h.empty:
             for _, r in df_h[df_h['username'] == user_now].sort_values('date', ascending=False).iterrows():
-                with st.expander(f"{r['date']} | {r['ticker']} | Profit: {format_privacy(float(r['pnl']))}"):
+                with st.expander(f"{r['date']} | {r['ticker']} | Realized Profit: {format_privacy(float(r['pnl']))}"):
                     if st.button("Hapus", key=f"d_{r['id']}"):
                         df_a = conn_gs.read(worksheet="history", ttl=0)
                         conn_gs.update(worksheet="history", data=df_a.drop(df_a.index[df_a['id'] == r['id']][0]).reset_index(drop=True)); st.rerun()
 
     with tab3: 
         if 'df_h' in locals() and not df_h.empty:
-            dh = df_h.sort_values('date'); dh['c'] = pd.to_numeric(dh['pnl']).cumsum()
-            st.plotly_chart(px.area(dh, x='date', y='c', title="Kurva Profit").update_layout(template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
+            dh = df_h[df_h['username'] == user_now].sort_values('date').copy()
+            dh['c'] = pd.to_numeric(dh['pnl']).cumsum()
+            st.plotly_chart(px.area(dh, x='date', y='c', title="Kurva Profit Nyata (Sudah Dijual)").update_layout(template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
 
 def render_dokter_portofolio(user_now, role):
     st.markdown("<h2 class='gradient-text'>🩺 Dokter Portofolio</h2>", unsafe_allow_html=True)
@@ -256,10 +152,7 @@ def render_dokter_portofolio(user_now, role):
             else:
                 def hitung_modal_idr(row):
                     tk_asli = str(row['ticker']).strip().upper()
-                    is_cr = getattr(row, 'is_crypto', False)
-                    try:
-                        if not is_cr: is_cr = is_crypto_ticker(tk_asli)
-                    except: pass
+                    is_cr = is_crypto_ticker(tk_asli) # Pakai fungsi deteksi cerdas
                     pengali = 1 if is_cr else 100
                     return float(row['buy_price']) * float(row['lots']) * pengali
                 
@@ -379,4 +272,4 @@ def render_ai_chat_panel(user_now, role):
                             st.error(f"⚠️ Saat ini server AI sedang sibuk atau menolak koneksi. Log teknis: {log_error}")
                     except Exception as e:
                         st.error(f"Kesalahan sistem internal: {e}")
-        st.rerun() 
+        st.rerun()
