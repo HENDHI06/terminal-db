@@ -163,7 +163,7 @@ def render_dompet(user_now, role):
                     add_to_portfolio(user_now, t_in, p_in, l_in, 0, 0, strat_in, is_crypto=("Kripto" in tipe_aset))
                     st.success("Tersimpan!"); time.sleep(1); st.rerun()
 
-        df_p = get_user_portfolio(user_now, role)
+        df_p = get_user_portfolio(user_now)
         if not df_p.empty:
             import requests
             try: indo = requests.get("https://indodax.com/api/tickers", timeout=5).json().get('tickers', {})
@@ -249,7 +249,7 @@ def render_dokter_portofolio(user_now, role):
     
     if st.button("Mulai Audit Kesehatan Keuangan", use_container_width=True):
         with st.spinner("Memindai sektor aset di dompet Anda..."):
-            df_p = get_user_portfolio(user_now, role)
+            df_p = get_user_portfolio(user_now)
             
             if df_p.empty:
                 st.warning("Dompet Anda masih kosong. Silakan beli beberapa aset di menu Dompet Trading terlebih dahulu.")
@@ -379,4 +379,4 @@ def render_ai_chat_panel(user_now, role):
                             st.error(f"⚠️ Saat ini server AI sedang sibuk atau menolak koneksi. Log teknis: {log_error}")
                     except Exception as e:
                         st.error(f"Kesalahan sistem internal: {e}")
-        st.rerun()
+        st.rerun() 
