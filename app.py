@@ -65,18 +65,18 @@ st.markdown("""
 .dash-box, div[data-testid="stMetric"], div[data-testid="stForm"], div[data-testid="stExpander"], .stDataFrame { animation: fadeInUp 0.6s ease-out forwards; }
 
 /* OVERRIDE GLOBAL THEME TO DARK */
-.stApp { background-color: #0F172A; color: #F8FAFC; font-family: 'Inter', sans-serif; }
+.stApp { background-color: #0F172A; color: #E2E8F0; font-family: 'Inter', sans-serif; }
 header {background: transparent !important;}
 [data-testid="stHeaderActionElements"], .stDeployButton, #MainMenu { display: none !important; }
 
-/* WARNA TEKS UTAMA KESELURUHAN */
-p, span, label, li, div.stMarkdown, .stText { color: #F8FAFC !important; }
-h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #FFFFFF !important; letter-spacing: -0.5px; }
+/* WARNA TEKS UTAMA KESELURUHAN (UBAH KE SOFT GRAY/BLUE AGAR NYAMAN DI MATA) */
+p, span, label, li, div.stMarkdown, .stText { color: #E2E8F0 !important; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weight: 700 !important; color: #F8FAFC !important; letter-spacing: -0.5px; }
 .gradient-text { background: linear-gradient(90deg, #38BDF8, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
 .stCaptionContainer p, [data-testid="stCaptionContainer"] p { color: #94A3B8 !important; }
 
 /* RUNNING TEXT (TICKER) */
-.ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); color: #FFFFFF !important; padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; border: 1px solid #334155; }
+.ticker-wrap { position: sticky; top: 0; z-index: 9999; width: 100%; overflow: hidden; background-color: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); padding: 10px 0; border-radius: 8px; margin-bottom: 20px; white-space: nowrap; border: 1px solid #334155; }
 .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; box-sizing: content-box; animation: ticker 40s linear infinite; }
 .ticker:hover { animation-play-state: paused; }
 .ticker-item { display: inline-block; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #38BDF8; }
@@ -91,19 +91,18 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', sans-serif !important; font-weigh
 .stTabs [data-baseweb="tab-highlight"] { display: none !important; }
 
 /* SIDEBAR GELAP KESELURUHAN */
-section[data-testid="stSidebar"] { background-color: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #334155 !important; }
+section[data-testid="stSidebar"] { background-color: #0F172A !important; backdrop-filter: blur(12px) !important; border-right: 1px solid #334155 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label { background: transparent !important; border: none !important; border-radius: 8px !important; padding: 10px 14px !important; margin-bottom: 4px !important; }
 section[data-testid="stSidebar"] .stRadio p, section[data-testid="stSidebar"] .stRadio span, section[data-testid="stSidebar"] .stRadio label { font-family: 'Inter', sans-serif !important; font-size: 0.95rem !important; font-weight: 600 !important; color: #CBD5E1 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] { background-color: rgba(37, 99, 235, 0.2) !important; border: 1px solid rgba(56, 189, 248, 0.3) !important; border-left: 4px solid #38BDF8 !important; }
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] p, section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] [aria-checked="true"] span { color: #38BDF8 !important; font-weight: 800 !important; }
 
-/* KOTAK-KOTAK GELAP / TRANSPARAN (Form, Expander, Metric) */
-div[data-testid="stForm"], div[data-testid="stExpander"], div[data-testid="stMetric"], .dash-box { 
-    background-color: rgba(30, 41, 59, 0.7) !important; 
+/* KOTAK-KOTAK GELAP (Form, Metric, Container) */
+div[data-testid="stForm"], div[data-testid="stMetric"], .dash-box { 
+    background-color: rgba(30, 41, 59, 0.8) !important; 
     border: 1px solid #334155 !important; 
     border-radius: 12px; padding: 16px !important; margin-bottom: 16px !important; 
-    backdrop-filter: blur(5px); 
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+    transition: transform 0.25s, box-shadow 0.25s; 
 }
 div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:hover { 
     transform: translateY(-4px); 
@@ -113,78 +112,86 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
 
 
 /* ========================================================
-   OBAT ANTI TEKS HILANG & KOTAK PUTIH SILAU (REVISI FINAL)
+   OBAT ANTI SILAU: MEMAKSA BACKGROUND SOLID DONGKER
    ======================================================== */
 
-/* 1. KOTAK EXPANDER (DOMPET ASET) DIBUAT TRANSPARAN */
+/* 1. KOTAK EXPANDER (DOMPET ASET) DIPAKSA GELAP SOLID */
+div[data-testid="stExpander"] {
+    background-color: #1E293B !important; /* Dongker Solid */
+    border: 1px solid #475569 !important;
+    border-radius: 10px !important;
+    margin-bottom: 10px !important;
+}
 div[data-testid="stExpander"] details summary,
 div[data-testid="stExpander"] summary,
 .streamlit-expanderHeader {
-    background-color: transparent !important;
-    color: #FFFFFF !important;
+    background-color: #1E293B !important; 
+    color: #38BDF8 !important; /* Warna teks biru agar tidak nyaru */
+    padding: 10px !important;
+    border-radius: 10px !important;
 }
-div[data-testid="stExpander"] details summary:hover,
-div[data-testid="stExpander"] summary:hover {
-    background-color: rgba(56, 189, 248, 0.1) !important;
-    color: #38BDF8 !important;
-}
-[data-testid="stExpanderDetails"] {
-    background-color: transparent !important;
+div[data-testid="stExpanderDetails"] {
+    background-color: #0F172A !important; /* Latar isi expander lebih gelap */
+    padding: 15px !important;
 }
 
 /* 2. MENGHANCURKAN BACKGROUND PUTIH PADA SEMUA KOTAK INPUT */
 div[data-baseweb="base-input"],
 div[data-baseweb="input"],
-div[data-baseweb="select"] > div {
-    background-color: rgba(15, 23, 42, 0.8) !important; /* Biru Dongker Gelap */
+div[data-baseweb="select"] > div,
+div[data-baseweb="number-input"] > div {
+    background-color: #1E293B !important; /* Gelap Solid */
     border: 1px solid #475569 !important;
     border-radius: 8px !important;
 }
 
-/* Mencegah layer luar Streamlit ikut berwarna putih */
+/* Menyembunyikan div lapisan Streamlit yang menutupi background */
 .stTextInput > div > div > div,
 .stNumberInput > div > div > div,
 .stPasswordInput > div > div > div {
     background-color: transparent !important;
-    border: none !important;
 }
 
-/* 3. MEMASTIKAN TEKS DI DALAM KOTAK INPUT BERWARNA PUTIH */
+/* 3. MEMASTIKAN TEKS DI DALAM KOTAK INPUT BERWARNA BIRU TERANG */
 input, select, textarea {
-    background-color: transparent !important;
-    color: #FFFFFF !important;
+    background-color: #1E293B !important;
+    color: #38BDF8 !important; /* Ketikan berwarna biru cerah */
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 15px !important; 
     font-weight: 600 !important;
+    -webkit-text-fill-color: #38BDF8 !important;
 }
 input:focus, select:focus { 
     outline: none !important;
     box-shadow: none !important;
 }
-::placeholder { color: #64748B !important; }
+::placeholder { color: #64748B !important; -webkit-text-fill-color: #64748B !important;}
 
-/* 4. MEMAKSA LIST DROPDOWN (SAAT DIKLIK) MENJADI GELAP */
+/* 4. MEMAKSA LIST DROPDOWN (SAAT DIKLIK) MENJADI GELAP SOLID */
 ul[data-baseweb="menu"], ul[role="listbox"], div[data-baseweb="popover"] {
     background-color: #0F172A !important;
     border: 1px solid #38BDF8 !important;
     border-radius: 8px !important;
 }
 li[role="option"] {
-    color: #F8FAFC !important;
-    background-color: transparent !important;
+    color: #E2E8F0 !important;
+    background-color: #0F172A !important;
     font-family: 'Inter', sans-serif !important;
 }
 li[role="option"]:hover, li[role="option"][aria-selected="true"] {
-    background-color: rgba(56, 189, 248, 0.2) !important;
+    background-color: #1E293B !important;
     color: #38BDF8 !important;
     font-weight: 700 !important;
 }
 
-/* 5. MEMAKSA KOTAK CHAT AI AGAR GELAP */
+/* 5. MEMAKSA KOTAK CHAT AI (POJOK KANAN BAWAH) AGAR GELAP SOLID */
 [data-testid="stChatInput"], [data-testid="stChatInput"] > div {
-    background-color: rgba(15, 23, 42, 0.9) !important;
+    background-color: #1E293B !important;
     border-color: #475569 !important;
-    color: white !important;
+}
+[data-testid="stChatInput"] textarea {
+    color: #38BDF8 !important;
+    -webkit-text-fill-color: #38BDF8 !important;
 }
 /* ======================================================== */
 
@@ -192,14 +199,13 @@ li[role="option"]:hover, li[role="option"][aria-selected="true"] {
 /* METRICS STYLING */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #F8FAFC !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; }
-.streamlit-expanderHeader * { color: #F8FAFC !important; font-weight: 600 !important; }
 
 /* TABLE / DATAFRAME */
-.stDataFrame { background-color: rgba(30, 41, 59, 0.8) !important; border-radius: 10px; }
+.stDataFrame { background-color: #1E293B !important; border-radius: 10px; }
 
-/* STYLING SEMUA TOMBOL (LOGIN, SIDEBAR, MENU) AGAR TEKS TERBACA JELAS */
+/* STYLING SEMUA TOMBOL (LOGIN, SIDEBAR, MENU) */
 button[kind="secondary"], button[kind="primary"], div[data-testid="stFormSubmitButton"] button, div[data-testid="stButton"] button {
-    background-color: rgba(15, 23, 42, 0.9) !important;
+    background-color: #0F172A !important;
     color: #38BDF8 !important;
     border: 1px solid #38BDF8 !important;
     border-radius: 8px !important;
@@ -208,7 +214,7 @@ button[kind="secondary"], button[kind="primary"], div[data-testid="stFormSubmitB
 }
 button[kind="secondary"]:hover, button[kind="primary"]:hover, div[data-testid="stFormSubmitButton"] button:hover, div[data-testid="stButton"] button:hover {
     background-color: rgba(56, 189, 248, 0.2) !important;
-    color: #FFFFFF !important;
+    color: #F8FAFC !important;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.5) !important;
 }
 /* Memaksa teks di dalam tombol mewarisi warna biru/putih */
@@ -261,7 +267,7 @@ user_now = st.session_state.user
 last_l, ip_l, loc_l = get_sidebar_log(user_now)
 
 st.sidebar.markdown(f"""
-    <div style='padding:16px; background-color:rgba(30, 41, 59, 0.8); border-radius:12px; border:1px solid rgba(56, 189, 248, 0.3); margin-bottom:15px; text-align:center;'>
+    <div style='padding:16px; background-color:#1E293B; border-radius:12px; border:1px solid rgba(56, 189, 248, 0.3); margin-bottom:15px; text-align:center;'>
         <h3 style='margin:0; font-size:1.1rem; color:#F8FAFC;'>{user_now.upper()}</h3>
         <p style='margin:0; font-size:11px; color:#10B981; font-weight:700; margin-top:4px;'><span class='pulsing-dot'></span> ONLINE | {role.upper()}</p>
         <p style='font-size:10px; color:#94A3B8; margin:8px 0 0 0;'>IP : {ip_l}</p>
