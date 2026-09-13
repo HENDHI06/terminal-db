@@ -321,6 +321,7 @@ def render_radar_altcoin():
         else: warna = '#EF4444'
         return f'background-color: {warna}; color: white; font-weight: bold;'
     
+    # PERBAIKAN: Menggunakan .map() agar kompatibel dengan Pandas versi baru
     st.dataframe(display_df.style.map(warnai_skor_manual, subset=['Skor_Akumulasi']), hide_index=True, use_container_width=True, height=600)
 
 def render_whale_tracker():
@@ -396,9 +397,10 @@ def render_whale_tracker():
                 def color_funding(val):
                     if 'BANTINGAN' in val: return 'color: #EF4444; font-weight: bold;'
                     elif 'PUMP' in val: return 'color: #10B981; font-weight: bold;'
-                    return 'color: #94A3B8;'
+                    return 'color: #64748B;'
                     
                 df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
+                # PERBAIKAN: Menggunakan .map()
                 st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.map(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True, height=600)
             else:
                 st.error(f"⚠️ **Gagal memuat data likuidasi.** \n\n**Detail Pelacak:** {pesan_status}")
@@ -461,9 +463,10 @@ def render_arbitrase():
                     def warna_status(val):
                         if 'DISKON' in val: return 'color: #10B981; font-weight: bold;'
                         elif 'PREMIUM' in val: return 'color: #EF4444; font-weight: bold;'
-                        return 'color: #94A3B8;'
+                        return 'color: #64748B;'
                         
                     df_hasil['Status Harga'] = df_hasil['Status Harga'].apply(format_status)
+                    # PERBAIKAN: Menggunakan .map()
                     st.dataframe(df_hasil.style.map(warna_status, subset=['Status Harga']), hide_index=True, use_container_width=True)
                 else:
                     st.warning("Tidak dapat membandingkan harga. Mungkin koin lokal.")
