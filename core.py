@@ -162,7 +162,7 @@ def get_hot_news_tickers():
         return " ".join([entry.title for entry in feed.entries]).upper()
     except: return ""
 
-# 5. FUNGSI SCANNER SUPER (TELAH DIPERBAIKI LOADING BAR-NYA)
+# 5. FUNGSI SCANNER REGULER (VPA) 
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
@@ -182,7 +182,7 @@ def run_scan_accurate(tickers, mode, is_crypto=False):
     try: 
         data = yf.download(tickers, period="20d", interval="1d", group_by="ticker", threads=True, progress=False)
     except: 
-        progress.empty() # MENGHAPUS LOADING BAR JIKA KONEKSI YAHOO GAGAL
+        progress.empty() # ANTI NYANGKUT
         return pd.DataFrame()
 
     total = len(tickers)
@@ -238,9 +238,10 @@ def run_scan_accurate(tickers, mode, is_crypto=False):
             })
         except: continue
         
-    progress.empty() # MENGHAPUS LOADING BAR JIKA BERHASIL
+    progress.empty() # ANTI NYANGKUT
     return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
 
+# 6. FUNGSI SCANNER INSTITUSI (MINERVINI, dll)
 def run_pro_scanner(tickers, strategy):
     results = []
     try:
@@ -338,9 +339,3 @@ def style_dataframe(val):
     if isinstance(val, str) and "⚠️" in val: return 'color: #FBBF24; font-weight:bold;'
     if isinstance(val, str) and "🔥" in val: return 'color: #EF4444; font-weight:bold;'
     return ''
-
-def format_rupiah_bersih(val):
-    if pd.isna(val): return "Rp 0"
-    if val < 10: return f"Rp {val:,.4f}"
-    elif val < 1000: return f"Rp {val:,.2f}"
-    else: return f"Rp {val:,.0f}"
