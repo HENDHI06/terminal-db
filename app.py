@@ -111,25 +111,15 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
     border-color: #38BDF8 !important; 
 }
 
-/* KOLOM INPUT TEKS & ANGKA (MENCEGAH BACKGROUND PUTIH) */
-.stTextInput input, .stNumberInput input, .stPasswordInput input, .stSelectbox select, div[data-baseweb="select"] > div { 
-    background-color: rgba(15, 23, 42, 0.9) !important; 
-    border: 1px solid #475569 !important; 
-    color: #FFFFFF !important; 
-    font-family: 'JetBrains Mono', monospace !important; 
-    border-radius: 8px !important; 
-    height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
-    transition: border-color 0.2s ease, box-shadow 0.2s ease; 
-}
-.stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus { 
-    border-color: #38BDF8 !important; 
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
-}
-::placeholder { color: #64748B !important; }
-
 /* ========================================================
-   OBAT ANTI TEKS HILANG (MEMAKSA DROPDOWN JADI GELAP) 
+   OBAT ANTI TEKS HILANG (MEMAKSA BACKGROUND TRANSPARAN & GELAP)
    ======================================================== */
+/* Membuat isi dalam menu Expander menjadi transparan */
+[data-testid="stExpanderDetails"] {
+    background-color: transparent !important;
+}
+
+/* Memaksa List Dropdown / Pilihan Selectbox menjadi gelap */
 ul[data-baseweb="menu"], ul[role="listbox"], div[data-baseweb="popover"] {
     background-color: #0F172A !important;
     border: 1px solid #38BDF8 !important;
@@ -145,6 +135,29 @@ li[role="option"]:hover, li[role="option"][aria-selected="true"] {
     color: #38BDF8 !important;
     font-weight: 700 !important;
 }
+
+/* Memaksa kotak Chat AI input di pojok kanan bawah agar gelap */
+[data-testid="stChatInput"], [data-testid="stChatInput"] > div {
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    border-color: #475569 !important;
+    color: white !important;
+}
+
+/* KOLOM INPUT TEKS & ANGKA (MENCEGAH BACKGROUND PUTIH) */
+.stTextInput input, .stNumberInput input, .stPasswordInput input, .stSelectbox select, div[data-baseweb="select"] > div { 
+    background-color: rgba(15, 23, 42, 0.9) !important; 
+    border: 1px solid #475569 !important; 
+    color: #FFFFFF !important; 
+    font-family: 'JetBrains Mono', monospace !important; 
+    border-radius: 8px !important; 
+    height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
+    transition: border-color 0.2s ease, box-shadow 0.2s ease; 
+}
+.stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus { 
+    border-color: #38BDF8 !important; 
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
+}
+::placeholder { color: #64748B !important; }
 
 /* METRICS STYLING */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #F8FAFC !important; font-weight: 700 !important; }
@@ -231,7 +244,8 @@ st.sidebar.write("---")
 
 if zona_market == "🏢 ZONA SAHAM (IDX)":
     menu_list = [
-        "🖥️ DASHBOARD UTAMA", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER", 
+        "🖥️ DASHBOARD UTAMA", "📈 STOCK CHART", "🛰️ AUTO SCANNER", "⚡ STRATEGY SCANNER",
+        "🐋 WHALE ALERT", "🌍 PERGERAKAN ASING", "👥 BROKER FLOW",
         "⭐ WATCHLIST FAVORIT", "🎯 AUTO SUP/RES", "📅 SIKLUS MUSIMAN", "📟 CEK FUNDAMENTAL", 
         "⚔️ ADU SAHAM", "🌐 PETA SEKTOR", "💰 PEMBURU DIVIDEN", 
         "🧬 KORELASI SAHAM", "🏛️ JEJAK BANDAR", "📰 BERITA PASAR"
@@ -297,8 +311,12 @@ with col_main:
 
     # ================= ZONA SAHAM =================
     elif menu == "🖥️ DASHBOARD UTAMA": views_idx.render_dashboard_utama()
+    elif menu == "📈 STOCK CHART": views_idx.render_stock_chart()
     elif menu == "🛰️ AUTO SCANNER": views_idx.render_auto_scanner()
     elif menu == "⚡ STRATEGY SCANNER": views_idx.render_strategy_scanner()
+    elif menu == "🐋 WHALE ALERT": views_idx.render_whale_alert()
+    elif menu == "🌍 PERGERAKAN ASING": views_idx.render_pergerakan_asing()
+    elif menu == "👥 BROKER FLOW": views_idx.render_broker_flow()
     elif menu == "⭐ WATCHLIST FAVORIT": views_idx.render_watchlist(user_now)
     elif menu == "🎯 AUTO SUP/RES": views_idx.render_auto_supres()
     elif menu == "📅 SIKLUS MUSIMAN": views_idx.render_siklus_musiman()
