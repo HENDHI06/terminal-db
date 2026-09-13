@@ -113,10 +113,10 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
 
 
 /* ========================================================
-   OBAT ANTI TEKS HILANG & KOTAK PUTIH SILAU (SESUAI SARAN ANDA)
+   OBAT ANTI TEKS HILANG & KOTAK PUTIH SILAU (REVISI FINAL)
    ======================================================== */
 
-/* 1. MENGHANCURKAN KOTAK PUTIH PADA JUDUL EXPANDER (ASET DOMPET) MENJADI TRANSPARAN */
+/* 1. KOTAK EXPANDER (DOMPET ASET) DIBUAT TRANSPARAN */
 div[data-testid="stExpander"] details summary,
 div[data-testid="stExpander"] summary,
 .streamlit-expanderHeader {
@@ -128,17 +128,28 @@ div[data-testid="stExpander"] summary:hover {
     background-color: rgba(56, 189, 248, 0.1) !important;
     color: #38BDF8 !important;
 }
+[data-testid="stExpanderDetails"] {
+    background-color: transparent !important;
+}
 
-/* 2. MENCEGAH BACKGROUND PUTIH DI DALAM FORM INPUT (Text, Number, Dropdown) */
-div[data-baseweb="input"] > div, 
-div[data-baseweb="select"] > div, 
-div[data-baseweb="number-input"] > div {
-    background-color: rgba(15, 23, 42, 0.6) !important; /* Dibuat Gelap Transparan */
+/* 2. MENGHANCURKAN BACKGROUND PUTIH PADA SEMUA KOTAK INPUT */
+div[data-baseweb="base-input"],
+div[data-baseweb="input"],
+div[data-baseweb="select"] > div {
+    background-color: rgba(15, 23, 42, 0.8) !important; /* Biru Dongker Gelap */
     border: 1px solid #475569 !important;
     border-radius: 8px !important;
 }
 
-/* 3. MEMAKSA TEKS DI DALAM INPUT MENJADI PUTIH TERANG */
+/* Mencegah layer luar Streamlit ikut berwarna putih */
+.stTextInput > div > div > div,
+.stNumberInput > div > div > div,
+.stPasswordInput > div > div > div {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* 3. MEMASTIKAN TEKS DI DALAM KOTAK INPUT BERWARNA PUTIH */
 input, select, textarea {
     background-color: transparent !important;
     color: #FFFFFF !important;
@@ -147,8 +158,8 @@ input, select, textarea {
     font-weight: 600 !important;
 }
 input:focus, select:focus { 
-    border-color: #38BDF8 !important; 
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
+    outline: none !important;
+    box-shadow: none !important;
 }
 ::placeholder { color: #64748B !important; }
 
@@ -169,13 +180,12 @@ li[role="option"]:hover, li[role="option"][aria-selected="true"] {
     font-weight: 700 !important;
 }
 
-/* 5. MEMAKSA KOTAK CHAT AI (BAWAH KANAN) AGAR GELAP DAN TRANSPARAN */
+/* 5. MEMAKSA KOTAK CHAT AI AGAR GELAP */
 [data-testid="stChatInput"], [data-testid="stChatInput"] > div {
-    background-color: rgba(15, 23, 42, 0.8) !important;
+    background-color: rgba(15, 23, 42, 0.9) !important;
     border-color: #475569 !important;
     color: white !important;
 }
-
 /* ======================================================== */
 
 
