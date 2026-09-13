@@ -127,6 +127,25 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
 }
 ::placeholder { color: #64748B !important; }
 
+/* ========================================================
+   OBAT ANTI TEKS HILANG (MEMAKSA DROPDOWN JADI GELAP) 
+   ======================================================== */
+ul[data-baseweb="menu"], ul[role="listbox"], div[data-baseweb="popover"] {
+    background-color: #0F172A !important;
+    border: 1px solid #38BDF8 !important;
+    border-radius: 8px !important;
+}
+li[role="option"] {
+    color: #F8FAFC !important;
+    background-color: transparent !important;
+    font-family: 'Inter', sans-serif !important;
+}
+li[role="option"]:hover, li[role="option"][aria-selected="true"] {
+    background-color: rgba(56, 189, 248, 0.2) !important;
+    color: #38BDF8 !important;
+    font-weight: 700 !important;
+}
+
 /* METRICS STYLING */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #F8FAFC !important; font-weight: 700 !important; }
 [data-testid="stMetricLabel"] * { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; }
