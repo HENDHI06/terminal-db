@@ -1,4 +1,4 @@
-# views_universal.py
+# --- FILE: views_universal.py ---
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -105,8 +105,8 @@ def render_kalkulator(zona_market):
                     months = 0
                 
                 st.markdown("---")
-                st.markdown(f"<h3 style='text-align:center; color:#2563EB;'>Pencapaian 1 Miliar Anda:</h3>", unsafe_allow_html=True)
-                st.markdown(f"<h1 style='text-align:center; color:#10B981; font-size:3.5rem; margin-bottom:0;'>{years} Tahun {months} Bulan</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h3 style='text-align:center; color:#38BDF8;'>Pencapaian 1 Miliar Anda:</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='text-align:center; color:#34D399; font-size:3.5rem; margin-bottom:0;'>{years} Tahun {months} Bulan</h1>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.info(f"💡 Dengan modal awal **Rp {p_awal:,.0f}** dan konsistensi profit **{r_bulan}% tiap bulan** tanpa ditarik, kekuatan bunga berbunga (*compounding interest*) akan melipatgandakan aset Anda menjadi Rp 1 Miliar dalam waktu **{years} tahun {months} bulan**. Tetap disiplin dan bersabar!")
 
@@ -126,8 +126,8 @@ def render_kalkulator(zona_market):
             if kelly_pct <= 0:
                 st.error("⚠️ **STOP TRADING SEMENTARA!** Sistem Anda saat ini merugikan secara matematis. Anda harus memperbaiki Win Rate atau memperbesar target keuntungan Anda (Risk/Reward) sebelum menaruh uang lagi ke market.")
             else:
-                st.markdown(f"<h3 style='text-align:center; color:#2563EB;'>Alokasi Dana Maksimal (Per Transaksi):</h3>", unsafe_allow_html=True)
-                st.markdown(f"<h1 style='text-align:center; color:#10B981; font-size:3.5rem; margin-bottom:0;'>{kelly_pct*100:.1f}%</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h3 style='text-align:center; color:#38BDF8;'>Alokasi Dana Maksimal (Per Transaksi):</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='text-align:center; color:#34D399; font-size:3.5rem; margin-bottom:0;'>{kelly_pct*100:.1f}%</h1>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.success(f"💡 Pemenang Nobel Matematika menyarankan Anda untuk TIDAK menggunakan lebih dari **{kelly_pct*100:.1f}% total modal Anda** untuk 1 posisi transaksi (berdasarkan statistik pribadi Anda). Ini adalah batas pertahanan agar portofolio Anda tidak akan pernah hancur (margin call).")
 
@@ -241,7 +241,7 @@ def render_dompet(user_now, role):
     with tab3: 
         if 'df_h' in locals() and not df_h.empty:
             dh = df_h.sort_values('date'); dh['c'] = pd.to_numeric(dh['pnl']).cumsum()
-            st.plotly_chart(px.area(dh, x='date', y='c', title="Kurva Profit").update_layout(template="plotly_white", height=300), use_container_width=True)
+            st.plotly_chart(px.area(dh, x='date', y='c', title="Kurva Profit").update_layout(template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'), use_container_width=True)
 
 def render_dokter_portofolio(user_now, role):
     st.markdown("<h2 class='gradient-text'>🩺 Dokter Portofolio</h2>", unsafe_allow_html=True)
@@ -273,7 +273,7 @@ def render_dokter_portofolio(user_now, role):
                 fig_pie = px.pie(distribusi, values='Modal_IDR', names='Sektor', title='Distribusi Sektor Portofolio Anda',
                                  color_discrete_sequence=px.colors.sequential.Teal)
                 fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-                fig_pie.update_layout(template="plotly_white", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                fig_pie.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig_pie, use_container_width=True)
                 
                 sektor_terbesar = distribusi.loc[distribusi['Persentase'].idxmax()]
@@ -312,8 +312,8 @@ def render_keamanan(user_now):
 
 def render_ai_chat_panel(user_now, role):
     st.markdown("""
-    <div style='background: linear-gradient(90deg, #2563EB, #10B981); padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
-        <b style='font-size: 1.25rem; color: white;'>🤖 AI Quant Advisor</b>
+    <div style='background: linear-gradient(90deg, #38BDF8, #34D399); padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
+        <b style='font-size: 1.25rem; color: #0F172A;'>🤖 AI Quant Advisor</b>
     </div>
     """, unsafe_allow_html=True)
     
