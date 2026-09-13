@@ -1,4 +1,4 @@
-# views_crypto.py
+# --- FILE: views_crypto.py ---
 import streamlit as st
 import pandas as pd
 import urllib.request
@@ -321,7 +321,6 @@ def render_radar_altcoin():
         else: warna = '#EF4444'
         return f'background-color: {warna}; color: white; font-weight: bold;'
     
-    # PERBAIKAN: Menggunakan .map() agar kompatibel dengan Pandas versi baru
     st.dataframe(display_df.style.map(warnai_skor_manual, subset=['Skor_Akumulasi']), hide_index=True, use_container_width=True, height=600)
 
 def render_whale_tracker():
@@ -377,7 +376,7 @@ def render_whale_tracker():
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=df_buy['Price'], y=df_buy['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#10B981', name='Antrean Beli (Tembok Support)'))
                     fig.add_trace(go.Scatter(x=df_sell['Price'], y=df_sell['Cumulative_IDR'], fill='tozeroy', mode='lines', line_color='#EF4444', name='Antrean Jual (Tembok Resistance)'))
-                    fig.update_layout(title=f"Peta Kedalaman - {koin_pilihan}/IDR", xaxis_title="Tingkat Harga (Rp)", yaxis_title="Akumulasi Uang (Rp)", template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+                    fig.update_layout(title=f"Peta Kedalaman - {koin_pilihan}/IDR", xaxis_title="Tingkat Harga (Rp)", yaxis_title="Akumulasi Uang (Rp)", template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
                     st.plotly_chart(fig, use_container_width=True)
 
     with tab_liq:
@@ -397,10 +396,9 @@ def render_whale_tracker():
                 def color_funding(val):
                     if 'BANTINGAN' in val: return 'color: #EF4444; font-weight: bold;'
                     elif 'PUMP' in val: return 'color: #10B981; font-weight: bold;'
-                    return 'color: #64748B;'
+                    return 'color: #94A3B8;'
                     
                 df_funding['Status Likuidasi (Squeeze)'] = df_funding['Funding Rate (%)'].apply(format_funding)
-                # PERBAIKAN: Menggunakan .map()
                 st.dataframe(df_funding[['Koin', 'Status Likuidasi (Squeeze)']].style.map(color_funding, subset=['Status Likuidasi (Squeeze)']), hide_index=True, use_container_width=True, height=600)
             else:
                 st.error(f"⚠️ **Gagal memuat data likuidasi.** \n\n**Detail Pelacak:** {pesan_status}")
@@ -463,10 +461,9 @@ def render_arbitrase():
                     def warna_status(val):
                         if 'DISKON' in val: return 'color: #10B981; font-weight: bold;'
                         elif 'PREMIUM' in val: return 'color: #EF4444; font-weight: bold;'
-                        return 'color: #64748B;'
+                        return 'color: #94A3B8;'
                         
                     df_hasil['Status Harga'] = df_hasil['Status Harga'].apply(format_status)
-                    # PERBAIKAN: Menggunakan .map()
                     st.dataframe(df_hasil.style.map(warna_status, subset=['Status Harga']), hide_index=True, use_container_width=True)
                 else:
                     st.warning("Tidak dapat membandingkan harga. Mungkin koin lokal.")
@@ -574,7 +571,7 @@ def render_prediksi_kripto():
                         nilai_str = f"Rp {nilai:,.0f}" if nilai >= 1 else f"Rp {nilai:,.4f}"
                         fig.add_hline(y=nilai, line_dash="dash", line_color=warna, annotation_text=f"{nama_level}: {nilai_str}", annotation_position="right")
                     
-                    fig.update_layout(title=f"X-Ray Fibonacci 30 Hari: {koin_prediksi}/IDR", template="plotly_white", height=500, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+                    fig.update_layout(title=f"X-Ray Fibonacci 30 Hari: {koin_prediksi}/IDR", template="plotly_dark", height=500, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
                     st.plotly_chart(fig, use_container_width=True)
                 except:
                     st.error("Gagal menarik data Fibonacci.")
@@ -625,7 +622,7 @@ def render_adu_kripto():
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=df1_norm.index, y=df1_norm.values, name=koin1, line=dict(width=3)))
                 fig.add_trace(go.Scatter(x=df2_norm.index, y=df2_norm.values, name=koin2, line=dict(width=3)))
-                fig.update_layout(title="Perbandingan Pertumbuhan (% Persentase)", yaxis_title="Pertumbuhan (Base 100)", template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+                fig.update_layout(title="Perbandingan Pertumbuhan (% Persentase)", yaxis_title="Pertumbuhan (Base 100)", template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
                 st.plotly_chart(fig, use_container_width=True)
             except:
                 st.error("Gagal menarik data grafik. Koin mungkin tidak tersedia.")
@@ -652,7 +649,7 @@ def render_korelasi_kripto():
                 df.columns = [c.replace('-USD', '') for c in df.columns]
                 corr_matrix = df.corr()
                 fig = px.imshow(corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
-                fig.update_layout(title="Heatmap Korelasi (3 Bulan Terakhir)", template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+                fig.update_layout(title="Heatmap Korelasi (3 Bulan Terakhir)", template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
                 st.plotly_chart(fig, use_container_width=True)
             except:
                 st.error("Gagal memuat matriks. Kemungkinan ada koin lokal yang tidak punya data global.")
@@ -688,7 +685,7 @@ def render_rotasi_narasi():
         fig = px.bar(df_hasil, x='Sektor/Narasi', y='Total Uang Masuk (Miliar)', color='Rata-rata Pantulan', 
                      color_continuous_scale=['#1E293B', '#10B981', '#EF4444'], text_auto='.2s',
                      title="Aliran Dana Keseluruhan Per Sektor Hari Ini")
-        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
         st.plotly_chart(fig, use_container_width=True)
 
 def render_peta_kripto():
