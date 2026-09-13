@@ -68,6 +68,7 @@ def fetch_fear_greed_index():
     except:
         return 50, "Neutral"
 
+# --- PERBAIKAN: JALUR PROXY PENEMBUS BINANCE DIPERKUAT ---
 @st.cache_data(ttl=300)
 def fetch_funding_rates():
     pesan_error = ""
@@ -80,9 +81,10 @@ def fetch_funding_rates():
         ctx.verify_mode = ssl.CERT_NONE
         
         target_url = "https://fapi.binance.com/fapi/v1/premiumIndex"
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         data_binance = None
         
+        # JALUR 1: Jalur Resmi (Bakal diblokir 451 jika server di US)
         try:
             req = urllib.request.Request(target_url, headers=headers)
             with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
@@ -90,23 +92,35 @@ def fetch_funding_rates():
         except Exception as e1:
             pesan_error += f"[Jalur Utama: {e1}] "
             
+        # JALUR 2: Proxy Corsproxy.io (Sangat Cepat)
         if not data_binance:
             try:
-                proxy1 = f"https://api.codetabs.com/v1/proxy/?quest={urllib.parse.quote(target_url)}"
+                proxy1 = f"https://corsproxy.io/?{urllib.parse.quote(target_url)}"
                 req2 = urllib.request.Request(proxy1, headers=headers)
-                with urllib.request.urlopen(req2, context=ctx, timeout=10) as response2:
+                with urllib.request.urlopen(req2, context=ctx, timeout=8) as response2:
                     data_binance = json.loads(response2.read().decode())
             except Exception as e2:
-                pesan_error += f"[Proxy Cepat: {e2}] "
+                pesan_error += f"[Proxy 1: Timeout] "
 
+        # JALUR 3: Proxy AllOrigins (Lambat tapi sangat stabil)
         if not data_binance:
             try:
                 proxy2 = f"https://api.allorigins.win/raw?url={urllib.parse.quote(target_url)}"
                 req3 = urllib.request.Request(proxy2, headers=headers)
-                with urllib.request.urlopen(req3, context=ctx, timeout=15) as response3:
+                with urllib.request.urlopen(req3, context=ctx, timeout=12) as response3:
                     data_binance = json.loads(response3.read().decode())
             except Exception as e3:
-                pesan_error += f"[Proxy Lambat: {e3}]"
+                pesan_error += f"[Proxy 2: Timeout]"
+                
+        # JALUR 4: Proxy Codetabs (Jalur Cadangan Terakhir)
+        if not data_binance:
+            try:
+                proxy3 = f"https://api.codetabs.com/v1/proxy/?quest={urllib.parse.quote(target_url)}"
+                req4 = urllib.request.Request(proxy3, headers=headers)
+                with urllib.request.urlopen(req4, context=ctx, timeout=15) as response4:
+                    data_binance = json.loads(response4.read().decode())
+            except Exception as e4:
+                pesan_error += f"[Proxy 3: Timeout]"
         
         if not data_binance:
             return pd.DataFrame(), pesan_error
@@ -685,7 +699,7 @@ def render_rotasi_narasi():
         fig = px.bar(df_hasil, x='Sektor/Narasi', y='Total Uang Masuk (Miliar)', color='Rata-rata Pantulan', 
                      color_continuous_scale=['#1E293B', '#10B981', '#EF4444'], text_auto='.2s',
                      title="Aliran Dana Keseluruhan Per Sektor Hari Ini")
-        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
         st.plotly_chart(fig, use_container_width=True)
 
 def render_peta_kripto():
