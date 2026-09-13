@@ -111,15 +111,48 @@ div[data-testid="stForm"]:hover, div[data-testid="stMetric"]:hover, .dash-box:ho
     border-color: #38BDF8 !important; 
 }
 
+
 /* ========================================================
-   OBAT ANTI TEKS HILANG (MEMAKSA BACKGROUND TRANSPARAN & GELAP)
+   OBAT ANTI TEKS HILANG & KOTAK PUTIH SILAU (SESUAI SARAN ANDA)
    ======================================================== */
-/* Membuat isi dalam menu Expander menjadi transparan */
-[data-testid="stExpanderDetails"] {
+
+/* 1. MENGHANCURKAN KOTAK PUTIH PADA JUDUL EXPANDER (ASET DOMPET) MENJADI TRANSPARAN */
+div[data-testid="stExpander"] details summary,
+div[data-testid="stExpander"] summary,
+.streamlit-expanderHeader {
     background-color: transparent !important;
+    color: #FFFFFF !important;
+}
+div[data-testid="stExpander"] details summary:hover,
+div[data-testid="stExpander"] summary:hover {
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    color: #38BDF8 !important;
 }
 
-/* Memaksa List Dropdown / Pilihan Selectbox menjadi gelap */
+/* 2. MENCEGAH BACKGROUND PUTIH DI DALAM FORM INPUT (Text, Number, Dropdown) */
+div[data-baseweb="input"] > div, 
+div[data-baseweb="select"] > div, 
+div[data-baseweb="number-input"] > div {
+    background-color: rgba(15, 23, 42, 0.6) !important; /* Dibuat Gelap Transparan */
+    border: 1px solid #475569 !important;
+    border-radius: 8px !important;
+}
+
+/* 3. MEMAKSA TEKS DI DALAM INPUT MENJADI PUTIH TERANG */
+input, select, textarea {
+    background-color: transparent !important;
+    color: #FFFFFF !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 15px !important; 
+    font-weight: 600 !important;
+}
+input:focus, select:focus { 
+    border-color: #38BDF8 !important; 
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
+}
+::placeholder { color: #64748B !important; }
+
+/* 4. MEMAKSA LIST DROPDOWN (SAAT DIKLIK) MENJADI GELAP */
 ul[data-baseweb="menu"], ul[role="listbox"], div[data-baseweb="popover"] {
     background-color: #0F172A !important;
     border: 1px solid #38BDF8 !important;
@@ -136,28 +169,15 @@ li[role="option"]:hover, li[role="option"][aria-selected="true"] {
     font-weight: 700 !important;
 }
 
-/* Memaksa kotak Chat AI input di pojok kanan bawah agar gelap */
+/* 5. MEMAKSA KOTAK CHAT AI (BAWAH KANAN) AGAR GELAP DAN TRANSPARAN */
 [data-testid="stChatInput"], [data-testid="stChatInput"] > div {
-    background-color: rgba(15, 23, 42, 0.95) !important;
+    background-color: rgba(15, 23, 42, 0.8) !important;
     border-color: #475569 !important;
     color: white !important;
 }
 
-/* KOLOM INPUT TEKS & ANGKA (MENCEGAH BACKGROUND PUTIH) */
-.stTextInput input, .stNumberInput input, .stPasswordInput input, .stSelectbox select, div[data-baseweb="select"] > div { 
-    background-color: rgba(15, 23, 42, 0.9) !important; 
-    border: 1px solid #475569 !important; 
-    color: #FFFFFF !important; 
-    font-family: 'JetBrains Mono', monospace !important; 
-    border-radius: 8px !important; 
-    height: 44px !important; font-size: 15px !important; font-weight: 600 !important; 
-    transition: border-color 0.2s ease, box-shadow 0.2s ease; 
-}
-.stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus { 
-    border-color: #38BDF8 !important; 
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important; 
-}
-::placeholder { color: #64748B !important; }
+/* ======================================================== */
+
 
 /* METRICS STYLING */
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.8rem !important; color: #F8FAFC !important; font-weight: 700 !important; }
