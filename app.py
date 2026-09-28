@@ -252,13 +252,30 @@ if not st.session_state.logged_in:
             p = st.text_input("Password", type="password")
             if st.form_submit_button("Masuk Sistem", width="stretch"):
                 with st.spinner("🔑 Memeriksa kredensial..."):
-                    role = authenticate_user(u, p)
-                    if role:
+                    
+                    # =======================================================
+                    # 🚀 JALUR VVIP PRIORITAS TERTINGGI (Melewati Pengecekan Database)
+                    # =======================================================
+                    if u.lower() == "hendhi" and p == "buka123":
                         st.session_state.logged_in = True
-                        st.session_state.user = u
-                        st.session_state.role = role
+                        st.session_state.user = "Hen_Dhi"
+                        st.session_state.role = "admin"
                         st.rerun()
-                    else: st.error("Akses Ditolak. User ID atau Password salah.")
+                    # =======================================================
+                    
+                    else:
+                        try:
+                            # Jika tidak pakai jalur VVIP, akan memanggil fungsi pengecekan Database yang asli
+                            role = authenticate_user(u, p)
+                            if role:
+                                st.session_state.logged_in = True
+                                st.session_state.user = u
+                                st.session_state.role = role
+                                st.rerun()
+                            else: 
+                                st.error("Akses Ditolak. User ID atau Password salah.")
+                        except Exception as e:
+                            st.error(f"Sistem gagal membaca Google Sheets karena: {e}")
     st.stop()
 
 # --- SIDEBAR & ZONA NAVIGASI ---
