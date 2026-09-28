@@ -285,23 +285,33 @@ def render_dompet(user_now, role):
                             </div>
                         """, unsafe_allow_html=True)
                     
-                    tab_jual, tab_beli = st.tabs(["🔴 LIKUIDASI ASET", "🟢 BELI LAGI (AVERAGE DOWN/UP)"])
+                    tab_jual, tab_beli = st.tabs(["🔴 LIKUIDASI ASET", "🟢 BELI LAGI (AVERAGE DOWN)"])
                     
                     with tab_jual:
-                        cp, cl, cb = st.columns([2, 2, 1])
+                        cp, cl, cpin, cb = st.columns([1.5, 1.5, 1.5, 1])
                         s_prc = cp.number_input("Harga Jual (Rp)", value=float(lv_val), format="%g", key=f"pj_{r['id']}")
                         s_lot = cl.number_input("Jumlah Dilepas", min_value=0.000001, max_value=float(r['lots']), value=float(r['lots']), format="%g", key=f"lj_{r['id']}")
+                        s_pin = cpin.text_input("PIN Transaksi", type="password", placeholder="123456", key=f"pin_j_{r['id']}")
+                        
                         if cb.button("JUAL", key=f"bj_{r['id']}", use_container_width=True):
-                            sell_position(user_now, r['id'], r['ticker'], bp_val, s_prc, r['lots'], s_lot, is_crypto=is_c)
-                            st.toast("Terjual!"); time.sleep(1); st.rerun()
+                            if verify_pin(user_now, s_pin):
+                                sell_position(user_now, r['id'], r['ticker'], bp_val, s_prc, r['lots'], s_lot, is_crypto=is_c)
+                                st.toast("Terjual!"); time.sleep(1); st.rerun()
+                            else:
+                                st.error("⚠️ PIN Transaksi Salah!")
                             
                     with tab_beli:
-                        cp2, cl2, cb2 = st.columns([2, 2, 1])
+                        cp2, cl2, cpin2, cb2 = st.columns([1.5, 1.5, 1.5, 1])
                         b_prc = cp2.number_input("Harga Beli Baru (Rp)", value=float(lv_val), format="%g", key=f"pb_{r['id']}")
                         b_lot = cl2.number_input("Beli Tambahan?", min_value=0.000001, value=1.0 if not is_c else 0.1, format="%g", key=f"lb_{r['id']}")
+                        b_pin = cpin2.text_input("PIN Transaksi", type="password", placeholder="123456", key=f"pin_b_{r['id']}")
+                        
                         if cb2.button("TOP UP", key=f"bb_{r['id']}", use_container_width=True):
-                            if topup_asset(r['id'], b_prc, b_lot, is_c):
-                                st.toast("Lot Berhasil Digabung!"); time.sleep(1); st.rerun()
+                            if verify_pin(user_now, b_pin):
+                                if topup_asset(r['id'], b_prc, b_lot, is_c):
+                                    st.toast("Lot Berhasil Digabung!"); time.sleep(1); st.rerun()
+                            else:
+                                st.error("⚠️ PIN Transaksi Salah!")
         else: st.info("Dompet kosong.")
 
     with tab2:
@@ -406,9 +416,16 @@ def render_user_management():
     st.markdown(f"<h2 class='gradient-text'>Portal Administratif</h2>", unsafe_allow_html=True)
     st.caption("Super-user dashboard untuk pengurusan identitas anggota sistem terminal.")
     df_u = conn_gs.read(worksheet="users", ttl=0)
-    st.dataframe(df_u[['username', 'role', 'last_login', 'location']], use_container_width=True, hide_index=True)
+    
+    # Hide raw password hashes from view
+    if 'password' in df_u.columns: df_u['password'] = "🔒 ENCRYPTED"
+    if 'pin' in df_u.columns: df_u['pin'] = "🔒 ENCRYPTED"
+        
+    st.dataframe(df_u, use_container_width=True, hide_index=True)
+    
     with st.form("add_u"):
-        nu, np, nr = st.text_input("Registrasi Node ID"), st.text_input("Sandikunci", type="password"), st.selectbox("Role Izin", ["user", "admin"])
+        nu, np, nr = st.text_input("Registrasi Node ID"), st.text_input("Sandikunci Login", type="password"), st.selectbox("Role Izin", ["user", "admin"])
+        st.info("Info: PIN Transaksi default untuk akun baru adalah 123456.")
         if st.form_submit_button("SETUJUI KREDENSIAL BARU", width="stretch"):
             if add_user_db(nu, np, nr): st.success("Basis Data Diperbarui!"); st.rerun()
     with st.form("del_u"):
@@ -419,10 +436,20 @@ def render_user_management():
 def render_keamanan(user_now):
     st.markdown(f"<h2 class='gradient-text'>Keamanan Node Terminal</h2>", unsafe_allow_html=True)
     st.caption("Pusat perlindungan enkripsi akses ke modul portofolio privat Anda.")
-    with st.form("p"):
-        new_p = st.text_input("Ketikan Sandikunci Baru", type="password")
-        if st.form_submit_button("ENKRIPSI DAN SIMPAN", width="stretch"):
-            if update_password_db(user_now, new_p): st.success("Sandikunci berhasil diubah dan diamankan oleh sistem!")
+    
+    tab_pass, tab_pin = st.tabs(["🔑 Ganti Sandikunci Login", "🛡️ Ganti PIN Transaksi (2FA)"])
+    
+    with tab_pass:
+        with st.form("p"):
+            new_p = st.text_input("Ketikan Sandikunci Login Baru", type="password")
+            if st.form_submit_button("ENKRIPSI DAN SIMPAN", width="stretch"):
+                if update_password_db(user_now, new_p): st.success("Sandikunci berhasil diubah dan disandikan oleh sistem!")
+                
+    with tab_pin:
+        with st.form("form_pin"):
+            new_pin = st.text_input("Ketikan PIN Transaksi Baru (Misal: 6 Angka Rahasia)", type="password")
+            if st.form_submit_button("UBAH PIN TRANSAKSI", width="stretch"):
+                if update_pin_db(user_now, new_pin): st.success("PIN Transaksi Anda berhasil diamankan!")
 
 # =======================================================
 # 🧠 AI QUANT ADVISOR (GOD-TIER V6 - OMNI-AWARENESS)
@@ -521,7 +548,6 @@ def render_ai_chat_panel(user_now, role):
                                         c_p = float(c_data.iloc[-1])
                                         ma20 = float(c_data.tail(20).mean())
                                         
-                                        # Fast RSI
                                         delta = c_data.diff()
                                         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                                         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -554,7 +580,6 @@ def render_ai_chat_panel(user_now, role):
                             mata_uang = "$" if is_crypto_check else "Rp"
                             
                             try:
-                                # A. Tarik Teknikal & Fundamental
                                 df_raw = yf.download(ticker_symbol, period="2mo", progress=False)
                                 if not df_raw.empty:
                                     fund_text = ""
@@ -577,7 +602,6 @@ def render_ai_chat_panel(user_now, role):
                                         live_context += f"- Harga Terakhir: {mata_uang} {c_price:,.0f} (Tren: {'Uptrend' if c_price>ma20 else 'Downtrend'})\n"
                                         live_context += fund_text
                                         
-                                        # B. Tarik Berita Terkini via Google RSS
                                         try:
                                             q_news = f"{tk}+kripto" if is_crypto_check else f"{tk}+saham"
                                             feed = feedparser.parse(requests.get(f"https://news.google.com/rss/search?q={q_news}&hl=id&gl=ID&ceid=ID:id", headers={'User-Agent': 'Mozilla/5.0'}, timeout=3).content)
