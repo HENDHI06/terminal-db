@@ -38,47 +38,77 @@ def authenticate_user(u, p):
     try:
         df = conn_gs.read(worksheet="users", ttl=0)
         if df.empty: return None
+        
+        # ⚡ PAKSA SEMUA KOLOM JADI TEKS AGAR TIDAK BENTROK
         df['username'] = df['username'].astype(str).str.strip()
         df['password'] = df['password'].astype(str).str.strip()
+        
         user_match = df[(df['username'] == str(u).strip()) & (df['password'] == str(p).strip())]
+        
         if not user_match.empty:
             idx = user_match.index[0]
             role = str(user_match.iloc[0]['role'])
             ip, loc = get_visitor_info()
             tz = pytz.timezone('Asia/Jakarta') 
+            
+            # Paksa tipe teks untuk log sebelum diisi
+            df['last_login'] = df['last_login'].astype(str)
+            df['ip_address'] = df['ip_address'].astype(str)
+            df['location'] = df['location'].astype(str)
+            
             df.at[idx, 'last_login'] = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-            df.at[idx, 'ip_address'] = ip
-            df.at[idx, 'location'] = loc
+            df.at[idx, 'ip_address'] = str(ip)
+            df.at[idx, 'location'] = str(loc)
             conn_gs.update(worksheet="users", data=df)
             return role
         return None
     except Exception: return None
 
 def get_sidebar_log(u):
-    df = conn_gs.read(worksheet="users", ttl=60)
-    user_data = df[df['username'] == u]
-    if not user_data.empty: return user_data.iloc[0]['last_login'], user_data.iloc[0]['ip_address'], user_data.iloc[0]['location']
-    return "-", "-", "-"
+    try:
+        df = conn_gs.read(worksheet="users", ttl=60)
+        df['username'] = df['username'].astype(str).str.strip()
+        user_data = df[df['username'] == str(u).strip()]
+        if not user_data.empty: return user_data.iloc[0]['last_login'], user_data.iloc[0]['ip_address'], user_data.iloc[0]['location']
+        return "-", "-", "-"
+    except:
+        return "-", "-", "-"
 
 def update_password_db(u, new_p):
     df = conn_gs.read(worksheet="users", ttl=0)
-    idx = df.index[df['username'] == u].tolist()
+    
+    # ⚡ OBAT PENAWAR UTAMA: Paksa password jadi String sebelum di-edit
+    df['username'] = df['username'].astype(str).str.strip()
+    df['password'] = df['password'].astype(str).str.strip()
+    
+    idx = df.index[df['username'] == str(u).strip()].tolist()
     if idx:
-        df.at[idx[0], 'password'] = new_p
+        df.at[idx[0], 'password'] = str(new_p).strip()
         conn_gs.update(worksheet="users", data=df)
         return True
     return False
 
 def add_user_db(u, p, r):
     df = conn_gs.read(worksheet="users", ttl=0)
-    if u in df['username'].values: return False
-    conn_gs.update(worksheet="users", data=pd.concat([df, pd.DataFrame([{'username': u, 'password': p, 'role': r, 'last_login': '', 'ip_address': '', 'location': ''}])], ignore_index=True))
+    df['username'] = df['username'].astype(str).str.strip()
+    if str(u).strip() in df['username'].values: return False
+    
+    new_user = pd.DataFrame([{
+        'username': str(u).strip(), 
+        'password': str(p).strip(), 
+        'role': str(r).strip(), 
+        'last_login': '', 
+        'ip_address': '', 
+        'location': ''
+    }])
+    conn_gs.update(worksheet="users", data=pd.concat([df, new_user], ignore_index=True))
     return True
 
 def delete_user_db(u):
-    if u == 'admin': return False
+    if str(u).strip().lower() == 'admin': return False
     df = conn_gs.read(worksheet="users", ttl=0)
-    idx = df.index[df['username'] == u].tolist()
+    df['username'] = df['username'].astype(str).str.strip()
+    idx = df.index[df['username'] == str(u).strip()].tolist()
     if idx:
         conn_gs.update(worksheet="users", data=df.drop(idx[0]).reset_index(drop=True))
         return True
