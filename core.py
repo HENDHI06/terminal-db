@@ -6,11 +6,16 @@ import requests
 import pytz
 import math
 import feedparser
+import hashlib
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# 1. KONEKSI DATABASE
+# 1. KONEKSI DATABASE & MESIN KRIPTOGRAFI
 conn_gs = st.connection("gsheets", type=GSheetsConnection)
+
+def get_hash(text):
+    """Mengubah teks biasa menjadi kode acak rahasia (SHA-256)"""
+    return hashlib.sha256(str(text).strip().encode('utf-8')).hexdigest()
 
 CRYPTO_SET = {
     "BTC", "ETH", "USDT", "BNB", "SOL", "XRP", "DOGE", "ADA", "SHIB", "AVAX", 
@@ -23,7 +28,7 @@ def is_crypto_ticker(t):
     clean_t = str(t).strip().upper().replace(".JK", "").replace("-USD", "")
     return ("-" in str(t)) or (clean_t in CRYPTO_SET) or (str(t).upper().endswith("USD"))
 
-# 2. FUNGSI LOGIN & USER
+# 2. FUNGSI LOGIN & USER (DENGAN ENKRIPSI)
 def get_visitor_info():
     providers = ['https://ipapi.co/json/', 'https://ipinfo.io/json']
     for url in providers:
@@ -39,19 +44,32 @@ def authenticate_user(u, p):
         df = conn_gs.read(worksheet="users", ttl=0)
         if df.empty: return None
         
-        # ⚡ PAKSA SEMUA KOLOM JADI TEKS AGAR TIDAK BENTROK
         df['username'] = df['username'].astype(str).str.strip()
         df['password'] = df['password'].astype(str).str.strip()
         
-        user_match = df[(df['username'] == str(u).strip()) & (df['password'] == str(p).strip())]
+        # Cek apakah butuh Auto-Migrasi (Bikin kolom PIN jika belum ada di database)
+        db_updated = False
+        if 'pin' not in df.columns:
+            df['pin'] = get_hash("123456") # Default PIN transaksi
+            db_updated = True
+        
+        input_hash = get_hash(p)
+        
+        # Mampu membaca password lama (teks) ATAU password baru (hash)
+        user_match = df[(df['username'] == str(u).strip()) & ((df['password'] == input_hash) | (df['password'] == str(p).strip()))]
         
         if not user_match.empty:
             idx = user_match.index[0]
             role = str(user_match.iloc[0]['role'])
+            
+            # Auto-Migrasi: Jika password masih berupa teks telanjang, segera enkripsi!
+            if df.at[idx, 'password'] == str(p).strip():
+                df.at[idx, 'password'] = input_hash
+                db_updated = True
+                
             ip, loc = get_visitor_info()
             tz = pytz.timezone('Asia/Jakarta') 
             
-            # Paksa tipe teks untuk log sebelum diisi
             df['last_login'] = df['last_login'].astype(str)
             df['ip_address'] = df['ip_address'].astype(str)
             df['location'] = df['location'].astype(str)
@@ -59,6 +77,7 @@ def authenticate_user(u, p):
             df.at[idx, 'last_login'] = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
             df.at[idx, 'ip_address'] = str(ip)
             df.at[idx, 'location'] = str(loc)
+            
             conn_gs.update(worksheet="users", data=df)
             return role
         return None
@@ -71,19 +90,35 @@ def get_sidebar_log(u):
         user_data = df[df['username'] == str(u).strip()]
         if not user_data.empty: return user_data.iloc[0]['last_login'], user_data.iloc[0]['ip_address'], user_data.iloc[0]['location']
         return "-", "-", "-"
-    except:
-        return "-", "-", "-"
+    except: return "-", "-", "-"
 
 def update_password_db(u, new_p):
     df = conn_gs.read(worksheet="users", ttl=0)
-    
-    # ⚡ OBAT PENAWAR UTAMA: Paksa password jadi String sebelum di-edit
     df['username'] = df['username'].astype(str).str.strip()
-    df['password'] = df['password'].astype(str).str.strip()
-    
     idx = df.index[df['username'] == str(u).strip()].tolist()
     if idx:
-        df.at[idx[0], 'password'] = str(new_p).strip()
+        df.at[idx[0], 'password'] = get_hash(new_p)
+        conn_gs.update(worksheet="users", data=df)
+        return True
+    return False
+
+def verify_pin(u, input_pin):
+    try:
+        df = conn_gs.read(worksheet="users", ttl=0)
+        df['username'] = df['username'].astype(str).str.strip()
+        user_data = df[df['username'] == str(u).strip()]
+        if not user_data.empty:
+            saved_pin = str(user_data.iloc[0]['pin']).strip()
+            return saved_pin == get_hash(input_pin)
+        return False
+    except: return False
+
+def update_pin_db(u, new_pin):
+    df = conn_gs.read(worksheet="users", ttl=0)
+    df['username'] = df['username'].astype(str).str.strip()
+    idx = df.index[df['username'] == str(u).strip()].tolist()
+    if idx:
+        df.at[idx[0], 'pin'] = get_hash(new_pin)
         conn_gs.update(worksheet="users", data=df)
         return True
     return False
@@ -95,11 +130,10 @@ def add_user_db(u, p, r):
     
     new_user = pd.DataFrame([{
         'username': str(u).strip(), 
-        'password': str(p).strip(), 
+        'password': get_hash(p), 
         'role': str(r).strip(), 
-        'last_login': '', 
-        'ip_address': '', 
-        'location': ''
+        'last_login': '', 'ip_address': '', 'location': '',
+        'pin': get_hash('123456') # Default PIN
     }])
     conn_gs.update(worksheet="users", data=pd.concat([df, new_user], ignore_index=True))
     return True
@@ -192,7 +226,7 @@ def get_hot_news_tickers():
         return " ".join([entry.title for entry in feed.entries]).upper()
     except: return ""
 
-# 5. FUNGSI SCANNER REGULER (VPA) 
+# 5. FUNGSI SCANNER
 def run_scan_accurate(tickers, mode, is_crypto=False):
     tickers = list(set(tickers))
     results = []
@@ -212,7 +246,7 @@ def run_scan_accurate(tickers, mode, is_crypto=False):
     try: 
         data = yf.download(tickers, period="20d", interval="1d", group_by="ticker", threads=True, progress=False)
     except: 
-        progress.empty() # ANTI NYANGKUT
+        progress.empty()
         return pd.DataFrame()
 
     total = len(tickers)
@@ -268,10 +302,9 @@ def run_scan_accurate(tickers, mode, is_crypto=False):
             })
         except: continue
         
-    progress.empty() # ANTI NYANGKUT
+    progress.empty()
     return pd.DataFrame(results).sort_values(by="AI_SCORE", ascending=False).drop_duplicates(subset=['TICKER']) if results else pd.DataFrame()
 
-# 6. FUNGSI SCANNER INSTITUSI (MINERVINI, dll)
 def run_pro_scanner(tickers, strategy):
     results = []
     try:
